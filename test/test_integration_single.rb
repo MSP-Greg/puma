@@ -26,6 +26,7 @@ class TestIntegrationSingle < TestIntegration
 
   def test_term_exit_code
     skip_unless_signal_exist? :TERM
+    skip 'skip when running coverage' if ENV['PUMA_COVERAGE']
     skip_on :jruby # JVM does not return correct exit code for TERM
 
     cli_server "test/rackup/hello.ru"

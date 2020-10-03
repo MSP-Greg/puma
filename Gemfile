@@ -2,6 +2,12 @@ source "https://rubygems.org"
 
 gemspec
 
+group :coverage do
+  gem 'simplecov', require: false
+  gem 'simplecov-lcov', require: false
+  gem 'coveralls_reborn', '~> 0.18.0', require: false
+end
+
 gem "rdoc"
 gem "rake-compiler", "~> 1.1.1"
 

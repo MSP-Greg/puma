@@ -13,8 +13,14 @@ class TestIntegration < Minitest::Test
   TOKEN = "xxyyzz"
   WORKERS = 2
 
-  BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -Ilib" :
-    "#{Gem.ruby} -Ilib"
+  if ENV['PUMA_COVERAGE']
+    req = "#{__dir__}/coverage"
+    BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -r#{req} -Ilib" :
+      "#{Gem.ruby} -r#{req} -Ilib"
+  else
+    BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -Ilib" :
+      "#{Gem.ruby} -Ilib"
+  end
 
   def setup
     @ios_to_close = []

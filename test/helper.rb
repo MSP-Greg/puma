@@ -2,6 +2,35 @@
 # Copyright (c) 2011 Evan Phoenix
 # Copyright (c) 2005 Zed A. Shaw
 
+module TestSkips
+  HAS_FORK = ::Process.respond_to? :fork
+end
+
+if ENV['PUMA_COVERAGE']
+  require 'simplecov'
+  require 'simplecov-lcov'
+
+  if ENV['CI']
+    require 'coveralls'
+    SimpleCov::Formatter::LcovFormatter.config do |config|
+      config.report_with_single_file = true
+      config.lcov_file_name = 'lcov.info'
+    end
+
+    SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new([
+      SimpleCov::Formatter::LcovFormatter,
+      Coveralls::SimpleCov::Formatter
+    ])
+  else
+    SimpleCov.formatter = SimpleCov::Formatter::HTMLFormatter
+  end
+
+  SimpleCov.start do
+    add_filter "/test/"
+    enable_for_subprocesses(true) if ::Process.respond_to?(:fork)
+  end
+end
+
 if %w(2.2.7 2.2.8 2.2.9 2.2.10 2.3.4 2.4.1).include? RUBY_VERSION
   begin
     require 'stopgap_13632'
@@ -98,7 +127,7 @@ module TestSkips
 
   # usage: skip NO_FORK_MSG unless HAS_FORK
   # windows >= 2.6 fork is not defined, < 2.6 fork raises NotImplementedError
-  HAS_FORK = ::Process.respond_to? :fork
+#  HAS_FORK = ::Process.respond_to? :fork
   NO_FORK_MSG = "Kernel.fork isn't available on #{RUBY_ENGINE} on #{RUBY_PLATFORM}"
 
   # socket is required by puma

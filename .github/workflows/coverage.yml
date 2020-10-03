@@ -1,0 +1,86 @@
+name: Coverage
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: >-
+      ${{ matrix.os }} ${{ matrix.ruby }}${{ matrix.no-ssl }}
+    env:
+      CI: true
+      TESTOPTS: -v
+
+    runs-on: ${{ matrix.os }}
+    if: |
+      !(   contains(github.event.pull_request.title,  '[ci skip]')
+        || contains(github.event.pull_request.title,  '[skip ci]')
+        || contains(github.event.head_commit.message, '[ci skip]')
+        || contains(github.event.head_commit.message, '[skip ci]'))
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-20.04, ubuntu-18.04, macos-10.15, windows-2019 ]
+        ruby: [ 2.7 ]
+        no-ssl: ['']
+        include:
+          - { os: ubuntu-20.04 , ruby: jruby }
+
+    steps:
+      - name: repo checkout
+        uses: actions/checkout@v2
+
+      - name: load ruby, ragel
+        uses: MSP-Greg/setup-ruby-pkgs@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          apt-get: ragel
+          brew: ragel
+          mingw: _upgrade_ openssl ragel
+
+      - name:  bundle install
+        shell: pwsh
+        run:   |
+          # update RubyGems in Ruby 2.2, bundle install
+          if ('${{ matrix.ruby }}' -lt '2.3') {
+            gem update --system 2.7.10 --no-document
+          }
+          bundle install --jobs 4 --retry 3 --with=coverage
+
+      - name: set SSL
+        if: matrix.no-ssl == '-no-SSL'
+        run: echo '::set-env name=DISABLE_SSL::true'
+
+      - name: compile
+        run:  bundle exec rake compile
+
+      - name: rubocop
+        if: startsWith(matrix.ruby, 'truffleruby') == false
+        run: bundle exec rake rubocop
+
+      - name: test
+        env:
+          PUMA_COVERAGE: true
+          JRUBY_OPTS: --debug
+        timeout-minutes: 15
+        continue-on-error: true
+        run: bundle exec rake test:all
+
+      - name: Coveralls Parallel
+        uses: coverallsapp/github-action@master
+        if: ${{ always() }}
+        with:
+          flag-name: ${{ matrix.os }}-${{ matrix.ruby }}${{ matrix.no-ssl }}
+          parallel: true
+          path-to-lcov: ./coverage/lcov/lcov.info
+          github-token: ${{ secrets.github_token }}
+
+  finish:
+    needs: build
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@master
+        with:
+          parallel-finished: true
+          path-to-lcov: ./coverage/lcov/lcov.info
+          github-token: ${{ secrets.github_token }}

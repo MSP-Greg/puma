@@ -84,6 +84,7 @@ class TestIntegrationCluster < TestIntegration
   end
 
   def test_term_exit_code
+    skip 'skip when running coverage' if ENV['PUMA_COVERAGE']
     cli_server "-w #{WORKERS} test/rackup/hello.ru"
     _, status = stop_server
 
@@ -466,6 +467,4 @@ RUBY
       mutex.synchronize { replies[step] = :refused }
     end
   end
-
-
 end

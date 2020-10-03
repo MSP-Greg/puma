@@ -3,7 +3,7 @@ require "rake/testtask"
 require "rake/extensiontask"
 require "rake/javaextensiontask"
 require "rubocop/rake_task"
-require_relative 'lib/puma/detect'
+#require_relative 'lib/puma/detect'
 require 'rubygems/package_task'
 require 'bundler/gem_tasks'
 
@@ -35,7 +35,7 @@ file 'ext/puma_http11/org/jruby/puma/Http11Parser.java' => ['ext/puma_http11/htt
 end
 task :ragel => ['ext/puma_http11/org/jruby/puma/Http11Parser.java']
 
-if !Puma.jruby?
+if !defined?(JRUBY_VERSION)
   # compile extensions using rake-compiler
   # C (MRI, Rubinius)
   Rake::ExtensionTask.new("puma_http11", gemspec) do |ext|
@@ -88,7 +88,7 @@ end
 Rake::TestTask.new(:test)
 
 # tests require extension be compiled, but depend on the platform
-if Puma.jruby?
+if defined?(JRUBY_VERSION)
   task :test => [:java]
 else
   task :test => [:compile]
