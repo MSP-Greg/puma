@@ -37,6 +37,10 @@ end
 SimpleCov.command_name SecureRandom.uuid
 
 SimpleCov.start do
+  pid = Process.pid
+  at_exit do
+    SimpleCov.result.format! if Process.pid == pid
+  end
   add_filter "/test/"
   print_error_status = false
   enable_for_subprocesses(true) if ::Process.respond_to?(:fork)
