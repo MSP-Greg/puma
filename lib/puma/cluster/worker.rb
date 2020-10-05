@@ -135,8 +135,6 @@ module Puma
 
         pid = fork do
           if ENV['PUMA_COVERAGE'] && Object.const_defined?(:SimpleCov)
-            # Give our new forked process a unique command name, to prevent problems
-            # when merging coverage results.
             SimpleCov.command_name SecureRandom.uuid
             SimpleCov.start
           end

@@ -93,7 +93,14 @@ module Puma
     def spawn_worker(idx, master)
       @launcher.config.run_hooks :before_worker_fork, idx, @launcher.events
 
-      pid = fork { worker(idx, master) }
+      pid = fork do
+        if ENV['PUMA_COVERAGE'] && Object.const_defined?(:SimpleCov)
+          SimpleCov.command_name SecureRandom.uuid
+          SimpleCov.start
+        end
+        worker(idx, master)
+      end
+
       if !pid
         log "! Complete inability to spawn new workers detected"
         log "! Seppuku is the only choice."
