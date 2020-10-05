@@ -26,7 +26,7 @@ if ENV['PUMA_COVERAGE']
   end
 
   SimpleCov.start do
-    add_filter "/test/"
+    add_filter ["/test/", "lib/puma/rack/"]
     enable_for_subprocesses(true) if ::Process.respond_to?(:fork)
   end
 end

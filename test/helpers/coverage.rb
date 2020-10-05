@@ -41,7 +41,7 @@ SimpleCov.start do
   at_exit do
     SimpleCov.result.format! if Process.pid == pid
   end
-  add_filter "/test/"
+  add_filter ["/test/", "lib/puma/rack/"]
   print_error_status = false
   enable_for_subprocesses(true) if ::Process.respond_to?(:fork)
 end
