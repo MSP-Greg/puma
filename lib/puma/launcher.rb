@@ -242,24 +242,29 @@ module Puma
     end
 
     def restart!
+      do_coverage = ENV['PUMA_COVERAGE'] && Object.const_defined?(:SimpleCov)
+
       @config.run_hooks :on_restart, self, @events
 
       if Puma.jruby?
         close_binder_listeners
 
         require 'puma/jruby_restart'
+        SimpleCov.result.format! if do_coverage
         JRubyRestart.chdir_exec(@restart_dir, restart_args)
       elsif Puma.windows?
         close_binder_listeners
 
         argv = restart_args
         Dir.chdir(@restart_dir)
+        SimpleCov.result.format! if do_coverage
         Kernel.exec(*argv)
       else
         argv = restart_args
         Dir.chdir(@restart_dir)
         ENV.update(@binder.redirects_for_restart_env)
         argv += [@binder.redirects_for_restart]
+        SimpleCov.result.format! if do_coverage
         Kernel.exec(*argv)
       end
     end
@@ -298,6 +303,8 @@ module Puma
     def prune_bundler
       return if ENV['PUMA_BUNDLER_PRUNED']
       return unless defined?(Bundler)
+      do_coverage = ENV['PUMA_COVERAGE'] && Object.const_defined?(:SimpleCov)
+
       require_rubygems_min_version!(Gem::Version.new("2.2"), "prune_bundler")
       unless puma_wild_location
         log "! Unable to prune Bundler environment, continuing"
@@ -316,6 +323,7 @@ module Puma
         args = [Gem.ruby, puma_wild_location, '-I', dirs.join(':'), deps.join(',')] + @original_argv
         # Ruby 2.0+ defaults to true which breaks socket activation
         args += [{:close_others => false}]
+        ::SimpleCov.result.format! if do_coverage
         Kernel.exec(*args)
       end
     end
