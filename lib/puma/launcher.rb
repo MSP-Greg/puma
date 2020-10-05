@@ -405,6 +405,10 @@ module Puma
         arg0 = [Gem.ruby, "-S", $0]
       end
 
+      if (t = cvr)
+        arg0[1,0] = ["-r#{t}"]
+      end
+
       # Detect and reinject -Ilib from the command line, used for testing without bundler
       # cruby has an expanded path, jruby has just "lib"
       lib = File.expand_path "lib"
@@ -495,6 +499,14 @@ module Puma
         Bundler.with_clean_env { yield }
       else
         Bundler.with_unbundled_env { yield }
+      end
+    end
+
+    def cvr
+      if ENV['PUMA_COVERAGE'] && Object.const_defined?(:SimpleCov)
+        File.absolute_path '../../test/helpers/coverage', __dir__
+      else
+        nil
       end
     end
   end
