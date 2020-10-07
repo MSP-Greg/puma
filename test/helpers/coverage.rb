@@ -1,5 +1,4 @@
 require 'simplecov'
-require 'simplecov-lcov'
 require 'securerandom'
 require 'stringio'
 
@@ -19,22 +18,13 @@ end
 ::SimpleCov::Result.prepend ResultPrep
 
 if ENV['CI']
-  require 'coveralls'
-
-  SimpleCov::Formatter::LcovFormatter.config do |config|
-    config.report_with_single_file = true
-    config.lcov_file_name = 'lcov.info'
-  end
-
-  SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new([
-    SimpleCov::Formatter::LcovFormatter,
-    Coveralls::SimpleCov::Formatter
-  ])
+  require 'codecov'
+  SimpleCov.formatter = SimpleCov::Formatter::Codecov
 else
   SimpleCov.formatter = SimpleCov::Formatter::HTMLFormatter
 end
 
-SimpleCov.command_name SecureRandom.uuid
+SimpleCov.command_name ::SecureRandom.uuid
 
 SimpleCov.start do
   pid = Process.pid

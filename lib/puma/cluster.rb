@@ -95,7 +95,8 @@ module Puma
 
       pid = fork do
         if ENV['PUMA_COVERAGE'] && Object.const_defined?(:SimpleCov)
-          SimpleCov.command_name SecureRandom.uuid
+          require 'securerandom' unless Object.const_defined?(:SecureRandom)
+          SimpleCov.command_name ::SecureRandom.uuid
           SimpleCov.start
         end
         worker(idx, master)

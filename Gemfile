@@ -4,8 +4,7 @@ gemspec
 
 group :coverage do
   gem 'simplecov', require: false
-  gem 'simplecov-lcov', require: false
-  gem 'coveralls_reborn', '~> 0.18.0', require: false
+  gem 'codecov', require: false
 end
 
 gem "rdoc"

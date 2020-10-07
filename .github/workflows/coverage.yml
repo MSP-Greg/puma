@@ -65,22 +65,5 @@ jobs:
         continue-on-error: true
         run: bundle exec rake test:all
 
-      - name: Coveralls Parallel
-        uses: coverallsapp/github-action@master
-        if: ${{ always() }}
-        with:
-          flag-name: ${{ matrix.os }}-${{ matrix.ruby }}${{ matrix.no-ssl }}
-          parallel: true
-          path-to-lcov: ./coverage/lcov/lcov.info
-          github-token: ${{ secrets.github_token }}
-
-  finish:
-    needs: build
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Coveralls Finished
-        uses: coverallsapp/github-action@master
-        with:
-          parallel-finished: true
-          path-to-lcov: ./coverage/lcov/lcov.info
-          github-token: ${{ secrets.github_token }}
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1
