@@ -153,4 +153,75 @@ class TestIntegrationSingle < TestIntegration
     assert(!File.file?("t2-pid"))
     assert_equal("Puma is started\n", out)
   end
+
+  def test_shutdown_debug
+    skip_on :jruby, :truffleruby # Undiagnose thread race. TODO fix
+    @state_path = tmp_path('.state')
+    @control_tcp_port = UniquePort.call
+    cli_server "-C test/config/shutdown_debug.rb --control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN} -S #{@state_path}"
+
+    cli_pumactl "stop"
+
+    out = @server.read
+
+    assert_operator 7, :<, out.scan(/^\d+: Thread \d+\/\d+:/).size
+    assert_operator 4, :<, out.scan(/puma threadpool/).size
+
+    _, status = Process.wait2(@pid)
+    assert_equal 0, status
+
+    @server = nil
+    File.unlink @state_path rescue nil
+  end
+
+  # this test is to generate converage for the `drain_on_shutdown` code
+  # in Server#graceful_shutdown
+  # need to get at least one connection accepted before binder ios close
+  def test_drain_on_shutdown
+    skip_on :jruby, :truffleruby # Undiagnose thread race. TODO fix
+    @state_path = tmp_path('.state')
+    @control_tcp_port = UniquePort.call
+    cli_server "-C test/config/drain_on_shutdown.rb --control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN} -S #{@state_path}"
+
+    mutex = Mutex.new
+    replies = []
+    threads = []
+
+    20.times do |i|
+      threads << Thread.new do
+        sleep i.to_f/30
+        begin
+          http = Net::HTTP.new HOST, @tcp_port
+
+          req = Net::HTTP::Get.new "/", {}
+
+          http.request(req) do |rep|
+            mutex.synchronize { replies << rep.body }
+          end
+        rescue Errno::ECONNREFUSED
+        end
+
+        sleep i.to_f/30
+
+        begin
+          http.request(req) do |rep|
+            mutex.synchronize { replies << rep.body }
+          end
+        rescue Errno::ECONNREFUSED
+        end
+      end
+    end
+
+    cli_pumactl "stop"
+
+    threads.each(&:join)
+    _, status = Process.wait2(@pid)
+    assert_equal 0, status
+
+    assert_operator 20, :<=, replies.length
+    assert_equal ['Hello'], replies.uniq
+
+    @server = nil
+    File.unlink @state_path rescue nil
+  end
 end

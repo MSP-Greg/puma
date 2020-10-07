@@ -130,17 +130,4 @@ class TestIntegrationPumactl < TestIntegration
     assert_match(/No pid '\d+' found|bad URI\(is not URI\?\)/, sout.readlines.join(""))
     assert_equal(1, e.status)
   end
-
-  private
-
-  def cli_pumactl(argv, unix: false)
-    if unix
-      pumactl = IO.popen("#{BASE} bin/pumactl -C unix://#{@control_path} -T #{TOKEN} #{argv}", "r")
-    else
-      pumactl = IO.popen("#{BASE} bin/pumactl -C tcp://#{HOST}:#{@control_tcp_port} -T #{TOKEN} #{argv}", "r")
-    end
-    @ios_to_close << pumactl
-    Process.wait pumactl.pid
-    pumactl
-  end
 end
