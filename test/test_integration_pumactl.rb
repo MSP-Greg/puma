@@ -87,7 +87,9 @@ class TestIntegrationPumactl < TestIntegration
 
     _, status = Process.wait2(@pid)
     assert_equal 0, status
-    assert_operator Time.now - start, :<, (DARWIN ? 8 : 5)
+    # guess for darwin 12
+    time = ENV['PUMA_COVERAGE'] ? (DARWIN ? 12 : 8) : (DARWIN ? 8 : 5)
+    assert_operator Time.now - start, :<, time
     @server = nil
   end
 
