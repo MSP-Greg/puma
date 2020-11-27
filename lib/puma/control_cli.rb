@@ -25,7 +25,8 @@ module Puma
       'start'    => nil,
       'stats'    => nil,
       'status'   => '',
-      'stop'     => 'SIGTERM',
+      'stop'     => 'SIGINT',
+      'stop-sigterm' => 'SIGTERM',
       'thread-backtraces' => nil
     }.freeze
 
@@ -212,6 +213,8 @@ module Puma
           raise 'Unauthorized access to server (wrong auth token)'
         elsif @code == '404'
           raise "Command error: #{response.last}"
+        elsif @code == '500' && @command == 'stop-sigterm'
+          # expected with stop-sigterm
         elsif @code != '200'
           raise "Bad response from server: #{@code}"
         end

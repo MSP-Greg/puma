@@ -10,27 +10,25 @@ module Puma
 
   IS_JRUBY = Object.const_defined? :JRUBY_VERSION
 
+  # @version 5.2.2
+  IS_OSX = RUBY_PLATFORM.include? 'darwin'
+
   IS_WINDOWS = !!(RUBY_PLATFORM =~ /mswin|ming|cygwin/ ||
-    IS_JRUBY && RUBY_DESCRIPTION =~ /mswin/)
+    IS_JRUBY && RUBY_DESCRIPTION.include?('mswin'))
 
   # @version 5.2.0
   IS_MRI = (RUBY_ENGINE == 'ruby' || RUBY_ENGINE.nil?)
 
-  def self.jruby?
-    IS_JRUBY
-  end
+  def self.jruby?    ; IS_JRUBY    end
 
-  def self.windows?
-    IS_WINDOWS
-  end
+  # @version 5.2.2
+  def self.osx?      ; IS_OSX      end
 
-  # @version 5.0.0
-  def self.mri?
-    IS_MRI
-  end
+  def self.windows?  ; IS_WINDOWS  end
 
   # @version 5.0.0
-  def self.forkable?
-    HAS_FORK
-  end
+  def self.mri?      ; IS_MRI      end
+
+  # @version 5.0.0
+  def self.forkable? ; HAS_FORK    end
 end

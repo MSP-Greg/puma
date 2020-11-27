@@ -64,7 +64,7 @@ module Puma
 
         restart_server = Queue.new << true << false
 
-        fork_worker = @options[:fork_worker] && index == 0
+        fork_worker = @options[:fork_worker] && index.zero?
 
         if fork_worker
           restart_server.clear
@@ -86,7 +86,7 @@ module Puma
                   @launcher.config.run_hooks :before_refork, nil, @launcher.events
                   Puma::Util.nakayoshi_gc @events if @options[:nakayoshi_fork]
                 end
-              elsif idx == 0 # restart server
+              elsif idx.zero? # restart server
                 restart_server << true << false
               else # fork worker
                 worker_pids << pid = spawn_worker(idx)

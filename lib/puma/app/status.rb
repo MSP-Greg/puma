@@ -30,6 +30,9 @@ module Puma
           when 'stop'
             @launcher.stop ; 200
 
+          when 'stop-sigterm'
+            @launcher.stop_sigterm ; 200
+
           when 'halt'
             @launcher.halt ; 200
 

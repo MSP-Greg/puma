@@ -34,8 +34,8 @@ module Puma
 
     def stop_blocked
       log "- Gracefully stopping, waiting for requests to finish"
-      @control.stop(true) if @control
       @server.stop(true) if @server
+      @control.stop(true) if @control
     end
 
     def run
