@@ -218,8 +218,8 @@ module Puma
     def stop_blocked
       @status = :stop if @status == :run
       wakeup!
-      @control.stop(true) if @control
       Process.waitall
+      @control.stop(true) if @control
     end
 
     def halt
@@ -266,7 +266,7 @@ module Puma
 
     # @version 5.0.0
     def fork_worker!
-      if (worker = @workers.find { |w| w.index == 0 })
+      if (worker = @workers.find { |w| w.index.zero? })
         worker.phase += 1
       end
       phased_restart
@@ -283,8 +283,7 @@ module Puma
         # Auto-fork after the specified number of requests.
         if (fork_requests = @options[:fork_worker].to_i) > 0
           @launcher.events.register(:ping!) do |w|
-            fork_worker! if w.index == 0 &&
-              w.phase == 0 &&
+            fork_worker! if w.index.zero? && w.phase.zero? &&
               w.last_status[:requests_count] >= fork_requests
           end
         end
@@ -302,26 +301,6 @@ module Puma
       Signal.trap "TTOU" do
         @options[:workers] -= 1 if @options[:workers] >= 2
         wakeup!
-      end
-
-      master_pid = Process.pid
-
-      Signal.trap "SIGTERM" do
-        # The worker installs their own SIGTERM when booted.
-        # Until then, this is run by the worker and the worker
-        # should just exit if they get it.
-        if Process.pid != master_pid
-          log "Early termination of worker"
-          exit! 0
-        else
-          @launcher.close_binder_listeners
-
-          stop_workers
-          stop
-          @events.fire_on_stopped!
-          raise(SignalException, "SIGTERM") if @options[:raise_exception_on_sigterm]
-          exit 0 # Clean exit, workers were stopped
-        end
       end
     end
 

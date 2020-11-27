@@ -68,6 +68,14 @@ module Puma
       @options = @config.options
       @config.clamp
 
+      @stop_sigterm = false
+      master_pid = Process.pid
+      at_exit do
+        if @stop_sigterm && Process.pid == master_pid
+          raise(SignalException, "SIGTERM") if @options[:raise_exception_on_sigterm]
+        end
+      end
+
       @events.formatter = Events::PidFormatter.new if clustered?
       @events.formatter = options[:log_formatter] if @options[:log_formatter]
 
@@ -143,6 +151,12 @@ module Puma
       @runner.stop
     end
 
+    def stop_sigterm
+      @stop_sigterm = true
+      stop
+      @events.fire_on_stopped!
+    end
+
     # Begin async restart of the server
     def restart
       @status = :restart
@@ -214,8 +228,8 @@ module Puma
       end
     end
 
-    def close_binder_listeners
-      @runner.close_control_listeners
+    def close_binder_listeners(close_control: true)
+      @runner.close_control_listeners if close_control
       @binder.close_listeners
       unless @status == :restart
         log "=== puma shutdown: #{Time.now} ==="
@@ -470,10 +484,15 @@ module Puma
       end
 
       begin
+        master_pid = Process.pid
         Signal.trap "SIGTERM" do
-          graceful_stop
-
-          raise(SignalException, "SIGTERM") if @options[:raise_exception_on_sigterm]
+          if Process.pid == master_pid
+            stop_sigterm
+          else
+            # only called by workers that haven't booted
+            log "Early termination of worker"
+            exit! 0
+          end
         end
       rescue Exception
         log "*** SIGTERM not implemented, signal based gracefully stopping unavailable!"

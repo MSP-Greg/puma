@@ -23,6 +23,16 @@ module Puma
     end
   end
 
+  # Binder handles creating the io's that Puma listens to.
+  #
+  # Inherited sockets are used for USR2/hot restarts, and
+  # activated sockets are used by systemd.  `@ios` contain ssl sockets,
+  # `@listeners` contain the TCPSocket behind them.
+  #
+  # Note that TCP/SSL sockets can create multiple @ios when
+  # using localhost, and UNIX sockets can be created as standard file
+  # based or abstract.
+  #
   class Binder
     include Puma::Const
 
