@@ -1,7 +1,8 @@
-require_relative "helper"
-require_relative "helpers/integration"
+# frozen_string_literal: true
 
-class TestPreserveBundlerEnv < TestIntegration
+require_relative 'helpers/svr_popen'
+
+class TestPOpenPreserveBundlerEnv < ::TestPuma::SvrPOpen
   def setup
     skip_unless :fork
     super
@@ -17,7 +18,6 @@ class TestPreserveBundlerEnv < TestIntegration
   def test_usr2_restart_preserves_bundler_environment
     skip_unless_signal_exist? :USR2
 
-    @tcp_port = UniquePort.call
     env = {
       # Intentionally set this to something we wish to keep intact on restarts
       "BUNDLE_GEMFILE" => "Gemfile.bundle_env_preservation_test",
@@ -25,50 +25,45 @@ class TestPreserveBundlerEnv < TestIntegration
       "BUNDLER_ORIG_BUNDLE_GEMFILE" => nil
     }
     # Must use `bundle exec puma` here, because otherwise Bundler may not be defined, which is required to trigger the bug
-    cmd = "bundle exec puma -q -w 1 --prune-bundler -b tcp://#{HOST}:#{@tcp_port}"
+    workers 1
+    cmd = "--prune-bundler"
     Dir.chdir(File.expand_path("bundle_preservation_test", __dir__)) do
-      @server = IO.popen(env, cmd.split, "r")
+      start_puma cmd, env: env
     end
-    wait_for_server_to_boot
-    @pid = @server.pid
-    connection = connect
-    initial_reply = read_body(connection)
-    assert_match("Gemfile.bundle_env_preservation_test", initial_reply)
-    restart_server connection
-    new_reply = read_body(connection)
-    assert_match("Gemfile.bundle_env_preservation_test", new_reply)
+
+    assert_match("Gemfile.bundle_env_preservation_test", connect_get_body)
+
+    cli_pumactl :restart
+    assert_server_gets cmd_to_log_str(:restart)
+
+    assert_match("Gemfile.bundle_env_preservation_test", connect_get_body)
   end
 
   def test_phased_restart_preserves_unspecified_bundle_gemfile
-    skip_unless_signal_exist? :USR1
+    skip_unless_signal_exist? :USR2
 
-    @tcp_port = UniquePort.call
     env = {
       "BUNDLE_GEMFILE" => nil,
       "BUNDLER_ORIG_BUNDLE_GEMFILE" => nil
     }
     set_release_symlink File.expand_path("bundle_preservation_test/version1", __dir__)
-    cmd = "bundle exec puma -q -w 1 --prune-bundler -b tcp://#{HOST}:#{@tcp_port}"
+    workers 1
+    cmd = "--prune-bundler"
     Dir.chdir(current_release_symlink) do
-      @server = IO.popen(env, cmd.split, "r")
+      start_puma cmd, env: env
     end
-    wait_for_server_to_boot
-    @pid = @server.pid
-    connection = connect
 
     # Bundler itself sets ENV['BUNDLE_GEMFILE'] to the Gemfile it finds if ENV['BUNDLE_GEMFILE'] was unspecified
-    initial_reply = read_body(connection)
     expected_gemfile = File.expand_path("bundle_preservation_test/version1/Gemfile", __dir__).inspect
-    assert_equal(expected_gemfile, initial_reply)
+    assert_equal(expected_gemfile, connect_get_body)
 
     set_release_symlink File.expand_path("bundle_preservation_test/version2", __dir__)
-    start_phased_restart
 
-    connection = connect
-    connection.write "GET / HTTP/1.1\r\n\r\n"
-    new_reply = read_body(connection)
+    cli_pumactl :restart
+    assert_server_gets cmd_to_log_str(:restart)
+
     expected_gemfile = File.expand_path("bundle_preservation_test/version2/Gemfile", __dir__).inspect
-    assert_equal(expected_gemfile, new_reply)
+    assert_equal(expected_gemfile, connect_get_body)
   end
 
   private
@@ -80,11 +75,5 @@ class TestPreserveBundlerEnv < TestIntegration
   def set_release_symlink(target_dir)
     FileUtils.rm current_release_symlink, force: true
     FileUtils.symlink target_dir, current_release_symlink, force: true
-  end
-
-  def start_phased_restart
-    Process.kill :USR1, @pid
-
-    true while @server.gets !~ /booted in [.0-9]+s, phase: 1/
   end
 end

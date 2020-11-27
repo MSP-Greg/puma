@@ -17,15 +17,12 @@ require "minitest/pride"
 require "minitest/proveit"
 require "minitest/stub_const"
 require "net/http"
-require_relative "helpers/apps"
+require "puma"
 
 Thread.abort_on_exception = true
 
-$debugging_info = ''.dup
+$debugging_info = []
 $debugging_hold = false    # needed for TestCLI#test_control_clustered
-
-require "puma"
-require "puma/detect"
 
 # Either takes a string to do a get request against, or a tuple of [URI, HTTP] where
 # HTTP is some kind of Net::HTTP request object (POST, HEAD, etc.)
@@ -140,6 +137,7 @@ module TestSkips
   def skip_unless(eng, bt: caller)
     skip_msg = case eng
       when :darwin  then "Skip unless darwin"           unless Puma::IS_OSX
+      when :linux   then "Skip unless linux"            unless RUBY_PLATFORM.include? 'linux'
       when :jruby   then "Skip unless JRuby"            unless Puma::IS_JRUBY
       when :windows then "Skip unless Windows"          unless Puma::IS_WINDOWS
       when :mri     then "Skip unless MRI"              unless Puma::IS_MRI
@@ -169,10 +167,37 @@ end
 Minitest.after_run do
   # needed for TestCLI#test_control_clustered
   unless $debugging_hold
-    out = $debugging_info.strip
+    out = $debugging_info.sort_by { |i| i.lstrip[/\A[^\n]+/] }.join(' ')
     unless out.empty?
-      puts "", " Debugging Info".rjust(75, '-'),
-        out, '-' * 75, ""
+      dash = "\u2500"
+      puts "", "##[group]#{' Debugging Info'.rjust 90, dash}",
+        out, dash * 90, '::[endgroup]'
+    end
+  end
+  unless Puma::IS_JRUBY
+    GC.start
+    stdio = [STDIN, STDOUT, STDERR]
+    io_problems = Hash.new { |h,k| h[k] = [0,0,0] }
+    ObjectSpace.each_object(IO) { |io|
+      next if stdio.include? io
+      k = io.class.to_s.to_sym
+      begin
+        if io.closed?
+          io_problems[k][2] += 1
+        else
+          io_problems[k][1] += 1
+        end
+      rescue IOError
+        io_problems[k][0] += 1
+      end
+    }
+    if io_problems.keys.empty?
+      puts '', 'No open IO issues'
+    else
+      puts '', 'Open IO issues', 'Bad Init  Open  Closed    Class'
+      io_problems.sort { |a,b| a <=> b }.to_h.each { |k,v|
+        puts format("%7d  %5d   %5d    #{k}", *io_problems[k])
+      }
     end
   end
 end

@@ -1,102 +1,72 @@
-require_relative "helper"
-require "puma/events"
+require_relative 'helpers/svr_in_proc'
 
-class TestBusyWorker < Minitest::Test
+class TestBusyWorker < ::TestPuma::SvrInProc
+  parallelize_me!
+
   def setup
     skip_unless :mri # This feature only makes sense on MRI
-    @ios = []
-    @server = nil
-  end
+    super
 
-  def teardown
-    return if skipped?
-    @server.stop(true) if @server
-    @ios.each {|i| i.close unless i.closed?}
-  end
-
-  def new_connection
-    TCPSocket.new('127.0.0.1', @port).tap {|s| @ios << s}
-  rescue IOError
-    Thread.current.purge_interrupt_queue if Thread.current.respond_to? :purge_interrupt_queue
-    retry
-  end
-
-  def send_http(req)
-    new_connection << req
-  end
-
-  def send_http_and_read(req)
-    send_http(req).read
-  end
-
-  def with_server(**options, &app)
-    @requests_count = 0 # number of requests processed
-    @requests_running = 0 # current number of requests running
+    @requests = 4             # number of requests
+    @requests_count = 0       # number of requests processed
+    @requests_running = 0     # current number of requests running
     @requests_max_running = 0 # max number of requests running in parallel
-    @mutex = Mutex.new
 
-    request_handler = ->(env) do
-      @mutex.synchronize do
-        @requests_count += 1
-        @requests_running += 1
-        if @requests_running > @requests_max_running
-          @requests_max_running = @requests_running
-        end
-      end
+    @replies = {}
+    @queue = Queue.new
 
+    @app = ->(env) do
+      @queue << 1
       begin
-        yield(env)
+        sleep 0.1
+        [200, {}, ["Hello World"]]
       ensure
-        @mutex.synchronize do
-          @requests_running -= 1
-        end
+        @queue << -1
       end
     end
-
-    @server = Puma::Server.new request_handler, Puma::Events.strings, **options
-    @server.min_threads = options[:min_threads] || 0
-    @server.max_threads = options[:max_threads] || 10
-    @port = (@server.add_tcp_listener '127.0.0.1', 0).addr[1]
-    @server.run
   end
 
   # Multiple concurrent requests are not processed
   # sequentially as a small delay is introduced
   def test_multiple_requests_waiting_on_less_busy_worker
-    with_server(wait_for_less_busy_worker: 1.0) do |_|
-      sleep(0.1)
+    run_requests wait_for_less_busy_worker: 0.5
 
-      [200, {}, [""]]
-    end
-
-    n = 2
-
-    Array.new(n) do
-      Thread.new { send_http_and_read "GET / HTTP/1.0\r\n\r\n" }
-    end.each(&:join)
-
-    assert_equal n, @requests_count, "number of requests needs to match"
-    assert_equal 0, @requests_running, "none of requests needs to be running"
-    assert_equal 1, @requests_max_running, "maximum number of concurrent requests needs to be 1"
+    assert_operator @requests_max_running, :<, @requests, "maximum number of concurrent requests needs to less than #{@requests}"
   end
 
   # Multiple concurrent requests are processed
   # in parallel as a delay is disabled
   def test_multiple_requests_processing_in_parallel
-    with_server(wait_for_less_busy_worker: 0.0) do |_|
-      sleep(0.1)
+    run_requests
 
-      [200, {}, [""]]
-    end
+    assert_equal @requests_max_running, @requests, "maximum number of concurrent requests needs to match"
+  end
 
-    n = 4
+  private
 
-    Array.new(n) do
-      Thread.new { send_http_and_read "GET / HTTP/1.0\r\n\r\n" }
-    end.each(&:join)
+  def run_requests(**opts)
+    opts[:threads] = '5:5'
+    start_server opts
 
-    assert_equal n, @requests_count, "number of requests needs to match"
+    create_clients(@replies, @requests, 1, dly_thread: nil, dly_client: nil).each(&:join)
+    get_data
+
+    assert_equal @replies[:success], @requests, "number of requests needs to match"
     assert_equal 0, @requests_running, "none of requests needs to be running"
-    assert_equal n, @requests_max_running, "maximum number of concurrent requests needs to match"
+  end
+
+  # parses the @queue (sequence of 1 & -1) for server request data
+  def get_data
+    run = 0
+    ary = []
+    ary << @queue.shift until @queue.empty?
+
+    @requests_count = ary.count(-1)
+    @requests_running = ary.inject(0, &:+)                     # Ruby 2.2 no sum
+
+    ary.each { |i|
+      run += i
+      @requests_max_running = run if run > @requests_max_running
+    }
   end
 end
