@@ -1,0 +1,2 @@
+wait_for_less_busy_worker 0.001
+max_fast_inline 10

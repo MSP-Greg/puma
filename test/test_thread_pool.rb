@@ -55,7 +55,7 @@ class TestThreadPool < Minitest::Test
   end
 
   def test_thread_name
-    skip 'Thread.name not supported' unless Thread.current.respond_to?(:name)
+    skip 'Thread#name not supported' unless Thread.current.respond_to?(:name)
     thread_name = nil
     pool = mutex_pool(0, 1) {thread_name = Thread.current.name}
     pool << 1

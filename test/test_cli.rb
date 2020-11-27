@@ -24,16 +24,16 @@ class TestCLI < Minitest::Test
     @events.on_booted { @ready << "!" }
   end
 
-  def wait_booted
-    @wait.sysread 1
-  end
-
   def teardown
     File.unlink @tmp_path if File.exist? @tmp_path
     File.unlink @tmp_path2 if File.exist? @tmp_path2
 
     @wait.close
     @ready.close
+  end
+
+  def wait_booted
+    @wait.sysread 1
   end
 
   def test_control_for_tcp
@@ -147,8 +147,8 @@ class TestCLI < Minitest::Test
       done = nil
       until done
         @events.stdout.rewind
-        log = @events.stdout.readlines.join ''
-        done = log[/ - Goodbye!/]
+        log = @events.stdout.read
+        done = log.include? '- Goodbye!'
       end
 
       $debugging_hold = false

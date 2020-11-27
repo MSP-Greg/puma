@@ -1,7 +1,8 @@
-require_relative "helper"
-require_relative "helpers/integration"
+# frozen_string_literal: true
 
-class TestRedirectIO < TestIntegration
+require_relative 'helpers/svr_popen'
+
+class TestPOpenRedirectIO < ::TestPuma::SvrPOpen
   parallelize_me!
 
   def setup
@@ -17,6 +18,9 @@ class TestRedirectIO < TestIntegration
 
   def teardown
     return if skipped?
+    Process.kill :INT, @pid
+    @server.close unless @server.closed?
+    @server = nil
     super
 
     paths = (skipped? ? [@out_file_path, @err_file_path] :
@@ -35,7 +39,7 @@ class TestRedirectIO < TestIntegration
       '--redirect-stderr', @err_file_path,
       'test/rackup/hello.ru'
     ]
-    cli_server cli_args.join ' '
+    start_puma cli_args.join ' '
 
     wait_until_file_has_content @out_file_path
     assert_match 'puma startup', File.read(@out_file_path)
@@ -63,7 +67,7 @@ class TestRedirectIO < TestIntegration
       '--redirect-stderr', @err_file_path,
       'test/rackup/hello.ru'
     ]
-    cli_server cli_args.join ' '
+    start_puma cli_args.join ' '
 
     wait_until_file_has_content @out_file_path
     assert_match 'puma startup', File.read(@out_file_path)

@@ -9,7 +9,7 @@ require "puma/events"
 require "puma/configuration"
 
 class TestBinderBase < Minitest::Test
-  include SSLHelper if ::Puma::HAS_SSL
+  include SSLHelper if Puma::HAS_SSL
   include TmpPath
 
   def setup
@@ -18,6 +18,7 @@ class TestBinderBase < Minitest::Test
   end
 
   def teardown
+    @binder.envs.clear
     @binder.ios.reject! { |io| Minitest::Mock === io || io.to_io.closed? }
     @binder.close
     @binder.unix_paths.select! { |path| File.exist? path }
@@ -262,7 +263,11 @@ class TestBinder < TestBinderBase
     env_hash = @binder.envs[@binder.ios.first]
 
     @binder.proto_env.each do |k,v|
-      assert_equal env_hash[k], v
+      if v.nil?
+        assert_nil env_hash[k]
+      else
+        assert_equal env_hash[k], v
+      end
     end
   end
 
@@ -276,13 +281,13 @@ class TestBinder < TestBinderBase
   end
 
   def test_close_calls_close_on_ios
-    @mocked_ios = [Minitest::Mock.new, Minitest::Mock.new]
-    @mocked_ios.each { |m| m.expect(:close, true) }
-    @binder.ios = @mocked_ios
+    mocked_ios = [Minitest::Mock.new, Minitest::Mock.new]
+    mocked_ios.each { |m| m.expect(:close, true) }
+    @binder.ios = mocked_ios
 
     @binder.close
 
-    assert @mocked_ios.map(&:verify).all?
+    assert mocked_ios.map(&:verify).all?
   end
 
   def test_redirects_for_restart_creates_a_hash
