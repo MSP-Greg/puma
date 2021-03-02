@@ -25,7 +25,8 @@ module Puma
       'start'    => nil,
       'stats'    => nil,
       'status'   => '',
-      'stop'     => 'SIGTERM',
+      'stop'     => 'SIGINT',
+      'stop-sigterm' => 'SIGTERM',
       'thread-backtraces' => nil
     }.freeze
 
@@ -176,7 +177,7 @@ module Puma
         when 'tcp'
           TCPSocket.new uri.host, uri.port
         when 'unix'
-          UNIXSocket.new "#{uri.host}#{uri.path}"
+          UNIXSocket.new "#{uri.host}#{uri.path}".sub(/\A@/, "\0")
         else
           raise "Invalid scheme: #{uri.scheme}"
         end
@@ -210,6 +211,8 @@ module Puma
           raise 'Unauthorized access to server (wrong auth token)'
         elsif @code == '404'
           raise "Command error: #{response.last}"
+        elsif @code == '500' && @command == 'stop-sigterm'
+          # expected with stop-sigterm
         elsif @code != '200'
           raise "Bad response from server: #{@code}"
         end

@@ -143,7 +143,7 @@ module Puma
       else
         begin
           if fast_check &&
-              IO.select([@to_io], nil, nil, FAST_TRACK_KA_TIMEOUT)
+              IO.select([@to_io], nil, nil, 0) # FAST_TRACK_KA_TIMEOUT)
             return try_to_finish
           end
         rescue IOError
@@ -155,7 +155,7 @@ module Puma
 
     def close
       begin
-        @io.close
+        @io.close unless @io.closed?
       rescue IOError
         Thread.current.purge_interrupt_queue if Thread.current.respond_to? :purge_interrupt_queue
       end

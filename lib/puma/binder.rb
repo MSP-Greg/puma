@@ -23,6 +23,16 @@ module Puma
     end
   end
 
+  # Binder handles creating the io's that Puma listens to.
+  #
+  # Inherited sockets are used for USR2/hot restarts, and
+  # activated sockets are used by systemd.  `@ios` contain ssl sockets,
+  # `@listeners` contain the TCPSocket behind them.
+  #
+  # Note that TCP/SSL sockets can create multiple @ios when
+  # using localhost, and UNIX sockets can be created as standard file
+  # based or abstract.
+  #
   class Binder
     include Puma::Const
 
@@ -177,11 +187,19 @@ module Puma
           @listeners << [str, io] if io
         when "unix"
           path = "#{uri.host}#{uri.path}".gsub("%20", " ")
+          abstract = false
+          if str.start_with? 'unix://@'
+            raise "OS does not support abstract UNIXSockets" unless Puma.abstract_unix_socket?
+            abstract = true
+            path = "@#{path}"
+          end
 
           if fd = @inherited_fds.delete(str)
+            @unix_paths << path unless abstract
             io = inherit_unix_listener path, fd
             logger.log "* Inherited #{str}"
           elsif sock = @activated_sockets.delete([ :unix, path ])
+            @unix_paths << path unless abstract || File.exist?(path)
             io = inherit_unix_listener path, sock
             logger.log "* Activated #{str}"
           else
@@ -205,6 +223,7 @@ module Puma
               end
             end
 
+            @unix_paths << path unless abstract || File.exist?(path)
             io = add_unix_listener path, umask, mode, backlog
             logger.log "* #{log_msg} on #{str}"
           end
@@ -258,14 +277,18 @@ module Puma
       end
 
       # Also close any unused activated sockets
-      @activated_sockets.each do |key, sock|
-        logger.log "* Closing unused activated socket: #{key.join ':'}"
-        begin
-          sock.close
-        rescue SystemCallError
+      unless @activated_sockets.empty?
+        fds = @ios.map(&:to_i)
+        @activated_sockets.each do |key, sock|
+          next if fds.include? sock.to_i
+          logger.log "* Closing unused activated socket: #{key.join ':'}"
+          begin
+            sock.close
+          rescue SystemCallError
+          end
+          # We have to unlink a unix socket path that's not being used
+          File.unlink key[1] if key[0] == :unix
         end
-        # We have to unlink a unix socket path that's not being used
-        File.unlink key[1] if key[0] == :unix
       end
     end
 
@@ -351,8 +374,6 @@ module Puma
     # Tell the server to listen on +path+ as a UNIX domain socket.
     #
     def add_unix_listener(path, umask=nil, mode=nil, backlog=1024)
-      @unix_paths << path unless File.exist? path
-
       # Let anyone connect by default
       umask ||= 0
 
@@ -370,7 +391,7 @@ module Puma
           end
         end
 
-        s = UNIXServer.new(path)
+        s = UNIXServer.new path.sub(/\A@/, "\0")
         s.listen backlog
         @ios << s
       ensure
@@ -389,8 +410,6 @@ module Puma
     end
 
     def inherit_unix_listener(path, fd)
-      @unix_paths << path unless File.exist? path
-
       s = fd.kind_of?(::TCPServer) ? fd : ::UNIXServer.for_fd(fd)
 
       @ios << s
@@ -403,24 +422,24 @@ module Puma
     end
 
     def close_listeners
-      listeners.each do |l, io|
-        io.close unless io.closed? # Ruby 2.2 issue
-        uri = URI.parse(l)
+      @listeners.each do |l, io|
+        io.close unless io.closed?
+        uri = URI.parse l
         next unless uri.scheme == 'unix'
         unix_path = "#{uri.host}#{uri.path}"
-        File.unlink unix_path if unix_paths.include? unix_path
+        File.unlink unix_path if @unix_paths.include?(unix_path) && File.exist?(unix_path)
       end
     end
 
     def redirects_for_restart
-      redirects = listeners.map { |a| [a[1].to_i, a[1].to_i] }.to_h
+      redirects = @listeners.map { |a| [a[1].to_i, a[1].to_i] }.to_h
       redirects[:close_others] = true
       redirects
     end
 
     # @version 5.0.0
     def redirects_for_restart_env
-      listeners.each_with_object({}).with_index do |(listen, memo), i|
+      @listeners.each_with_object({}).with_index do |(listen, memo), i|
         memo["PUMA_INHERIT_#{i}"] = "#{listen[1].to_i}:#{listen[0]}"
       end
     end
