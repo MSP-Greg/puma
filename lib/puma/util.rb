@@ -4,10 +4,22 @@ require 'uri/common'
 
 module Puma
   module Util
+    module PIO
+      def <<(str)
+        syswrite str
+      end
+
+      def write(str)
+        syswrite str
+      end
+    end
+
     module_function
 
     def pipe
-      IO.pipe
+      rd, wr = IO.pipe
+      wr.singleton_class.prepend PIO
+      [rd, wr]
     end
 
     # Unescapes a URI escaped string with +encoding+. +encoding+ will be the
