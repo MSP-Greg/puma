@@ -1,0 +1,11 @@
+task:
+  name: Puma FreeBSD
+
+  freebsd_instance:
+    image_family: freebsd-12-2
+
+  requirements_script: pkg install -y git devel/ragel devel/ruby-gems
+  update_rg_script: gem update --system --no-document
+  install_script: bundle install --jobs 4 --retry 3
+  compile_script: bundle exec rake compile
+  test_script: bundle exec rake test TESTOPTS=--verbose
