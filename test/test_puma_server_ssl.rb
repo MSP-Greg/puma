@@ -158,7 +158,7 @@ class TestPumaServerSSL < Minitest::Test
       end
     end
     unless Puma.jruby?
-      msg = /wrong version number|no protocols available|version too low|unknown SSL method/
+      msg = /wrong version number|no protocols available|version too low|unknown SSL method|unsupported protocol/
       assert_match(msg, @events.error.message) if @events.error
     end
   end
