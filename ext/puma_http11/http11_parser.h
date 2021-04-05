@@ -50,7 +50,7 @@ typedef struct puma_parser {
   element_cb header_done;
 
   char buf[BUFFER_LEN];
-  
+
 } puma_parser;
 
 int puma_parser_init(puma_parser *parser);
