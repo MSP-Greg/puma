@@ -1191,9 +1191,11 @@ EOF
   end
 
   def test_drain_on_shutdown(drain=true)
-    num_connections = 10
-
+    num_connections = 20
+    conn_limit = 17
+    @events.instance_variable_set :@debug, true
     wait = Queue.new
+
     server_run(drain_on_shutdown: drain, max_threads: 1) do
       wait.pop
       [200, {}, ["DONE"]]
@@ -1202,6 +1204,7 @@ EOF
     @server.stop
     wait.close
     bad = 0
+
     connections.each do |s|
       begin
         assert_match 'DONE', s.read
@@ -1210,9 +1213,11 @@ EOF
       end
     end
     if drain
+      drained = @events.stdout.string[/Drained (\d+) additional connections/, 1].to_i
+      assert_operator drained, :>=, conn_limit
       assert_equal 0, bad
     else
-      refute_equal 0, bad
+      assert_operator bad, :>=, conn_limit
     end
   end
 
