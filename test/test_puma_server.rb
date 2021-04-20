@@ -383,14 +383,19 @@ EOF
   end
 
   def test_timeout_in_data_phase
-    @server.first_data_timeout = 2
+    @server.first_data_timeout = 1
     server_run
 
     sock = send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\n"
+    sleep 1.15
+    sock << "Hello"
 
-    data = sock.gets
-
-    assert_equal "HTTP/1.1 408 Request Timeout\r\n", data
+    if Puma::IS_WINDOWS
+      assert_raises(Errno::ECONNABORTED) { sock.gets }
+    else
+      data = sock.gets
+      assert_equal "HTTP/1.1 408 Request Timeout\r\n", data
+    end
   end
 
   def test_timeout_data_no_queue
