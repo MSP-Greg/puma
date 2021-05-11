@@ -105,7 +105,7 @@ module Puma
 
     PUMA_SERVER_STRING = ['puma', PUMA_VERSION, CODE_NAME].join(' ').freeze
 
-    FAST_TRACK_KA_TIMEOUT = 0.2
+    FAST_TRACK_KA_TIMEOUT = 0.0005
 
     # The default number of seconds for another request within a persistent
     # session.

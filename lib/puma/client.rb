@@ -144,7 +144,7 @@ module Puma
       else
         begin
           if fast_check &&
-              IO.select([@to_io], nil, nil, 0) # FAST_TRACK_KA_TIMEOUT)
+              IO.select([@to_io], nil, nil, FAST_TRACK_KA_TIMEOUT)
             return try_to_finish
           end
         rescue IOError
