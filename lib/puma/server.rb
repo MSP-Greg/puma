@@ -37,6 +37,8 @@ module Puma
 
     PURGE_INTERRUPT_QUEUE = Thread.current.respond_to? :purge_interrupt_queue
 
+    TCP_INFO = Socket.const_defined?(:TCP_INFO) && Socket.const_defined?(:IPPROTO_TCP)
+
     attr_reader :thread
     attr_reader :events
     attr_reader :min_threads, :max_threads  # for #stats
@@ -170,7 +172,7 @@ module Puma
       end
     end
 
-    if closed_socket_supported?
+    if TCP_INFO
       UNPACK_TCP_STATE_FROM_TCP_INFO = "C".freeze
 
       def closed_socket?(socket)
@@ -329,6 +331,8 @@ module Puma
           remote_addr_header = @options[:remote_address_header]
         end
 
+        workers = @options[:workers] || 2
+
         while @status == :run || (drain && shutting_down?)
           begin
             ios = IO.select sockets, nil, nil, (shutting_down? ? 0 : nil)
@@ -337,8 +341,16 @@ module Puma
               if sock == check
                 break if handle_check
               else
-                pool.wait_until_not_full
-                pool.wait_for_less_busy_worker(@options[:wait_for_less_busy_worker])
+                if TCP_INFO && sock.to_io.is_a?(TCPSocket)
+                  tcp_info = sock.to_io.getsockopt(Socket::IPPROTO_TCP, Socket::TCP_INFO)
+                  if tcp_info.inspect[/unacked=(\d+)/,1].to_i < [@max_threads, workers].max
+                    pool.wait_until_not_full
+                    pool.wait_for_less_busy_worker @options.fetch(:wait_for_less_busy_worker, 0.0001)
+                  end
+                else
+                  pool.wait_until_not_full
+                  pool.wait_for_less_busy_worker @options.fetch(:wait_for_less_busy_worker, 0.0001)
+                end
 
                 io = begin
                   sock.accept_nonblock
@@ -353,6 +365,7 @@ module Puma
                 elsif remote_addr_header
                   client.remote_addr_header = remote_addr_header
                 end
+
                 pool << client
               end
             end
