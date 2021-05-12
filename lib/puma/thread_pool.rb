@@ -225,6 +225,10 @@ module Puma
     # by the server. This would continue until a fully buffered request
     # makes it through the reactor and can then be processed by the thread pool.
     def wait_until_not_full
+      if @todo.size > 0
+        sleep 0.0001
+        return
+      end
       with_mutex do
         while true
           return if @shutdown
