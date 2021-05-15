@@ -11,17 +11,17 @@ Puma::Plugin.create do
     # If we can't write to the path, then just don't bother with this plugin
     begin
       File.write(path, "") unless File.exist?(path)
-      orig = File.stat(path).mtime
+      orig = File.mtime path
     rescue SystemCallError
       return
     end
 
     in_background do
       while true
-        sleep 2
+        sleep 1
 
         begin
-          mtime = File.stat(path).mtime
+          mtime = File.mtime path
         rescue SystemCallError
           # If the file has disappeared, assume that means don't restart
         else
