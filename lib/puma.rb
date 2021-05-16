@@ -45,7 +45,7 @@ module Puma
         begin
           ::UNIXServer.new("\0puma.temp.unix").close
           true
-        rescue ArgumentError  # darwin
+        rescue ArgumentError, Errno::ENOPROTOOPT
           false
         end
       else
