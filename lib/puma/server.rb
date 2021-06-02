@@ -37,7 +37,8 @@ module Puma
 
     PURGE_INTERRUPT_QUEUE = Thread.current.respond_to? :purge_interrupt_queue
 
-    TCP_INFO = Socket.const_defined?(:TCP_INFO) && Socket.const_defined?(:IPPROTO_TCP)
+    TCP_INFO = Socket.const_defined?(:TCP_INFO) && Socket.const_defined?(:IPPROTO_TCP) &&
+      !IS_JRUBY
 
     attr_reader :thread
     attr_reader :events
