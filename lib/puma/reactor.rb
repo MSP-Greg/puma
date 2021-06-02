@@ -87,9 +87,11 @@ module Puma
           end
         end
       rescue StandardError => e
-        STDERR.puts "Error in reactor loop escaped: #{e.message} (#{e.class})"
-        STDERR.puts e.backtrace
-        retry
+        unless e.message.include? 'closed stream'
+          STDERR.puts "Error in reactor loop escaped: #{e.message} (#{e.class})"
+          STDERR.puts e.backtrace
+          retry
+        end
       end
       # Wakeup all remaining objects on shutdown.
       @timeouts.each(&@block)
