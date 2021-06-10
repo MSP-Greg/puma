@@ -402,21 +402,19 @@ module Puma
 
     # :nodoc:
     def handle_check
-      cmd = @check.read(1)
-
-      case cmd
+      case @check.read(1)
       when STOP_COMMAND
         @status = :stop
-        return true
+        true
       when HALT_COMMAND
         @status = :halt
-        return true
+        true
       when RESTART_COMMAND
         @status = :restart
-        return true
+        true
+      else
+        false
       end
-
-      false
     end
 
     # Given a connection on +client+, handle the incoming requests,
