@@ -25,6 +25,8 @@ unless ENV["DISABLE_SSL"]
 
     have_func  "X509_STORE_up_ref"
     have_func("SSL_CTX_set_ecdh_auto(NULL, 0)", "openssl/ssl.h")
+
+    $defs.push("-DHAVE_RANDOM_BYTES") if Random.respond_to?(:bytes)
   end
 end
 
