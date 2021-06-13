@@ -13,6 +13,10 @@ module TestPuma
   # @!macro [new] tout
   #   @param [Float] timeout: read timeout for socket
 
+  # @!macro [new] ret_skt
+  #   @return [SktSSL, SktTCP, SktUNIX] the opened socket
+
+
   READ_TIMEOUT = 10
 
   # This module is prepended into the three socket classes (`SktSSL`, `SktTCP`,
@@ -156,6 +160,16 @@ module TestPuma
     end
   end
 
+
+  if !Object.const_defined?(:Puma) || Puma.ssl?
+    require 'openssl'
+    # The SSLSocket class used by the TestPuma framework.  The `SktPrepend` module
+    # is prepended.  The socket is opened with parameters set by `bind_type`.
+    class SktSSL < ::OpenSSL::SSL::SSLSocket
+      prepend SktPrepend
+    end
+  end
+
   # The TCPSocket class used by the TestPuma framework.  The `SktPrepend` module
   # is prepended.  The socket is opened with parameters set by `bind_type`.
   class SktTCP < ::TCPSocket
@@ -166,15 +180,6 @@ module TestPuma
     # The UNIXSocket class used by the TestPuma framework.  The `SktPrepend` module
     # is prepended.  The socket is opened with parameters set by `bind_type`.
     class SktUNIX < ::UNIXSocket
-      prepend SktPrepend
-    end
-  end
-
-  if !Object.const_defined?(:Puma) || Puma.ssl?
-    require 'openssl'
-    # The SSLSocket class used by the TestPuma framework.  The `SktPrepend` module
-    # is prepended.  The socket is opened with parameters set by `bind_type`.
-    class SktSSL < ::OpenSSL::SSL::SSLSocket
       prepend SktPrepend
     end
   end
@@ -248,52 +253,10 @@ module TestPuma
       ary.freeze
     end
 
-    # Creates a get request and returns the response body.
-    # Socket properties set by `bind_type`.
-    # @!macro req
-    # @!macro tout
-    # @return [String] response body
-    def connect_get_body(path = nil, dly: nil, len: nil, timeout: nil)
-      connect_get(path, dly: dly, len: len).read_body timeout
-    end
-
-    # Creates a get request and returns the response as an array of two
-    # strings, the first is the headers, the second is the body.
-    # @!macro req
-    # @!macro tout
-    # @return [Array<String, String>] response ary
-    def connect_get_response(path = nil, dly: nil, len: nil, timeout: nil)
-      connect_get(path, dly: dly, len: len).read_response timeout
-    end
-
-    # Creates a get request and returns the socket. Does not read.
-    # Socket properties set by `bind_type`.
-    # @!macro req
-    # @return [Socket]
-    def connect_get(path = nil, dly: nil, len: nil)
-      req = "GET /#{path} HTTP/1.1\r\n".dup
-      req << "Dly: #{dly}\r\n" if dly
-      req << "Len: #{len}\r\n" if len
-      req << "\r\n"
-      connect_raw req
-    end
-
-    # Creates a request and returns the socket. Does not wait for a read.
-    # Use to send a raw string, keyword parameters are the same as `connect`.
-    # @param str [String] request string
-    # @!macro connect
-    # @return [Socket]
-    #
-    def connect_raw(str = nil, type: nil, p: nil)
-      s = connect type: type, p: p
-      s.fast_write str
-      s
-    end
-
     # Opens a socket.  Normally, the connection info is supplied by calling `bind_type`,
     # but that can be set manually if needed for control sockets, etc.
     # @!macro connect
-    # @return [Socket]
+    # @!macro ret_skt
     #
     def connect(type: nil, p: nil)
       _bind_type = type || @bind_type
@@ -324,6 +287,51 @@ module TestPuma
       @connection_close = nil
       @ios_to_close << skt
       skt
+    end
+
+    # Creates a get request and returns the socket. Does not read.
+    # Socket properties set by `bind_type`.
+    # @!macro req
+    # @!macro ret_skt
+    #
+    def connect_get(path = nil, dly: nil, len: nil)
+      req = "GET /#{path} HTTP/1.1\r\n".dup
+      req << "Dly: #{dly}\r\n" if dly
+      req << "Len: #{len}\r\n" if len
+      req << "\r\n"
+      connect_raw req
+    end
+
+    # Creates a get request and returns the response body.
+    # Socket properties set by `bind_type`.
+    # @!macro req
+    # @!macro tout
+    # @return [String] response body
+    #
+    def connect_get_body(path = nil, dly: nil, len: nil, timeout: nil)
+      connect_get(path, dly: dly, len: len).read_body timeout
+    end
+
+    # Creates a get request and returns the response as an array of two
+    # strings, the first is the headers, the second is the body.
+    # @!macro req
+    # @!macro tout
+    # @return [Array<String, String>] response ary
+    #
+    def connect_get_response(path = nil, dly: nil, len: nil, timeout: nil)
+      connect_get(path, dly: dly, len: len).read_response timeout
+    end
+
+    # Creates a request and returns the socket. Does not wait for a read.
+    # Use to send a raw string, keyword parameters are the same as `connect`.
+    # @param str [String] request string
+    # @!macro connect
+    # @!macro ret_skt
+    #
+    def connect_raw(str = nil, type: nil, p: nil)
+      s = connect type: type, p: p
+      s.fast_write str
+      s
     end
 
     # Creates a stream of client sockets.  Simplified code is:
