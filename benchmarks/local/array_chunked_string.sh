@@ -28,16 +28,16 @@ printf "%7d  2050kB Body\n" $(curl -kso /dev/null -w '%{size_download}' -H 'Len:
 # curl -kvo /dev/null -H 'Len: 1' $curl_str
 
 printf "\n────────────────────────────────────────────────────────────────────────────   1kB Body\n"
-ruby benchmarks/local/clients_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b1
+ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b1
 
 printf "\n────────────────────────────────────────────────────────────────────────────  10kB Body\n"
-ruby benchmarks/local/clients_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b10
+ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b10
 
 printf "\n──────────────────────────────────────────────────────────────────────────── 100kB Body\n"
-ruby benchmarks/local/clients_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b100
+ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b100
 
 printf "\n─────────────────────────────────────────────────────────────────────────── 2050kB Body\n"
-ruby benchmarks/local/clients_times.rb -l10 -c15 -r2 -s$skt_type -b2050
+ruby benchmarks/local/client_times.rb -l10 -c15 -r2 -s$skt_type -b2050
 
 printf "\n"
 bundle exec ruby -Ilib bin/pumactl -C tcp://$HOST:$CTRL -T test stop
@@ -58,16 +58,16 @@ printf "%7d  2050kB Body\n" $(curl -kso /dev/null -w '%{size_download}' -H 'Len:
 # curl -kvo /dev/null -H 'Len: 1' $curl_str
 
 printf "\n────────────────────────────────────────────────────────────────────────────   1kB Body\n"
-ruby benchmarks/local/clients_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b1
+ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b1
 
 printf "\n────────────────────────────────────────────────────────────────────────────  10kB Body\n"
-ruby benchmarks/local/clients_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b10
+ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b10
 
 printf "\n──────────────────────────────────────────────────────────────────────────── 100kB Body\n"
-ruby benchmarks/local/clients_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b100
+ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b100
 
 printf "\n─────────────────────────────────────────────────────────────────────────── 2050kB Body\n"
-ruby benchmarks/local/clients_times.rb -l10 -c15 -r2 -s$skt_type -b2050
+ruby benchmarks/local/client_times.rb -l10 -c15 -r2 -s$skt_type -b2050
 
 printf "\n"
 bundle exec ruby -Ilib bin/pumactl -C tcp://$HOST:$CTRL -T test stop
@@ -85,16 +85,16 @@ printf "%7d   100kB Body\n" $(curl -kso /dev/null -w '%{size_download}' -H 'Len:
 printf "%7d  2050kB Body\n" $(curl -kso /dev/null -w '%{size_download}' -H 'Len: 2050' $curl_str)
 
 printf "\n────────────────────────────────────────────────────────────────────────────   1kB Body\n"
-ruby benchmarks/local/clients_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b1
+ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b1
 
 printf "\n────────────────────────────────────────────────────────────────────────────  10kB Body\n"
-ruby benchmarks/local/clients_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b10
+ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b10
 
 printf "\n──────────────────────────────────────────────────────────────────────────── 100kB Body\n"
-ruby benchmarks/local/clients_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b100
+ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type -b100
 
 printf "\n─────────────────────────────────────────────────────────────────────────── 2050kB Body\n"
-ruby benchmarks/local/clients_times.rb -l10 -c15 -r2 -s$skt_type -b2050
+ruby benchmarks/local/client_times.rb -l10 -c15 -r2 -s$skt_type -b2050
 
 printf "\n"
 bundle exec ruby -Ilib bin/pumactl -C tcp://$HOST:$CTRL -T test stop
