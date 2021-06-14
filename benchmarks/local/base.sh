@@ -36,41 +36,41 @@ done
 
 optional_args=""
 
-if test -z "$loops" ; then
+if [ -z "$loops" ] ; then
   loops=10
 fi
 
-if test -z "$connections"; then
+if [ -z "$connections" ]; then
   connections=200
 fi
 
-if test -z "$req_per_client"; then
+if [ -z "$req_per_client" ]; then
   req_per_client=1
 fi
 
-if test -n "$dly_app"; then
+if [ -n "$dly_app" ]; then
   optional_args="-d$dly_app"
 fi
 
-if test -n "$body_kb"; then
+if [ -n "$body_kb" ]; then
   optional_args="$optional_args -b$body_kb"
 fi
 
-if test -z "$skt_type"; then
+if [ -z "$skt_type" ]; then
   skt_type=tcp
 fi
 
-if test -n "$workers"; then
+if [ -n "$workers" ]; then
   puma_args="-w$workers"
 else
   puma_args=""
 fi
 
-if test -n "$threads"; then
+if [ -n "$threads" ]; then
   puma_args="$puma_args -t$threads"
 fi
 
-if test -n "$conf"; then
+if [ -n "$conf" ]; then
   puma_args="$puma_args -C $tconf"
 fi
 

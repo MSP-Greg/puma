@@ -6,7 +6,7 @@ require_relative 'clients_base'
 require 'optparse'
 
 module TestPuma
-  class ClientsTime < ClientsBase
+  class ClientTimes < ClientsBase
 
     include TestPuma::Sockets
 
@@ -33,4 +33,4 @@ module TestPuma
     end
   end
 end
-TestPuma::ClientsTime.new.run
+TestPuma::ClientTimes.new.run
