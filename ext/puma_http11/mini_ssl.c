@@ -208,7 +208,7 @@ sslctx_initialize(VALUE self, VALUE mini_ssl_ctx) {
 #endif
   int ssl_options;
   VALUE key, cert, ca, verify_mode, ssl_cipher_filter, no_tlsv1, no_tlsv1_1,
-    verification_flags, session_id_bytes, bytes_func;
+    verification_flags, session_id_bytes;
   DH *dh;
 
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
