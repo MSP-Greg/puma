@@ -419,7 +419,7 @@ module Puma
       # of concurrent connections exceeds the size of the threadpool.
       res_info[:keep_alive] &&= requests < @max_fast_inline ||
         @thread_pool.busy_threads < @max_threads ||
-        !client.listener.wait_readable(0)
+        !client.listener.to_io.wait_readable(0)
 
       res_info[:response_hijack] = nil
 
