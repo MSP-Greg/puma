@@ -621,7 +621,8 @@ module TestPuma
     # @return [Array<Exception>] Errors classifies as 'refused'
     def read_refused_errors
       if @bind_type == :unix
-        ary = [Errno::EBADF, Errno::ENOENT]
+        ary = IS_OSX ? [Errno::EBADF, Errno::ENOENT, Errno::EPIPE] :
+          [Errno::EBADF, Errno::ENOENT]
       else
         ary = IS_OSX ? [Errno::EBADF, Errno::ECONNREFUSED, Errno::EPIPE, EOFError] :
           [Errno::EBADF, Errno::ECONNREFUSED]  # intermittent Errno::EBADF with ssl?
