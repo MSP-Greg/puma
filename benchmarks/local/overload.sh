@@ -24,11 +24,8 @@ printf "%7d    10kB Body\n" $(curl -kso /dev/null -w '%{size_download}' -H 'Len:
 printf "%7d   100kB Body\n" $(curl -kso /dev/null -w '%{size_download}' -H 'Len: 100' $curl_str)
 printf "%7d  2050kB Body\n" $(curl -kso /dev/null -w '%{size_download}' -H 'Len: 2050' $curl_str)
 
-printf "\n──────────────────────────────────────────────────────────────────────────── $loops Client Threads\n"
-ruby benchmarks/local/client_times.rb -l$loops -c$connections -r$req_per_client -s$skt_type $optional_args
-
-printf "\n──────────────────────────────────────────────────────────────────────────── $connections Client Threads\n"
-ruby benchmarks/local/client_times.rb -l$connections -c$loops -r$req_per_client -s$skt_type $optional_args
+printf "\n──────────────────────────────────────────────────────────────────────────── Overload Stats\n"
+ruby benchmarks/local/overload.rb -t$threads -w$workers -c$connections -r$req_per_client -s$skt_type $optional_args
 
 printf "\n"
 bundle exec ruby -Ilib bin/pumactl -C tcp://$HOST:$CTRL -T test stop

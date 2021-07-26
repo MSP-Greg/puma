@@ -55,6 +55,14 @@ module TestPuma
           @bind_type = arg.to_sym
         end
 
+        o.on "-t", "--threads THREADS", String, "Puma Server threads" do |arg|
+          @threads = arg[/\d+\z/].to_i
+        end
+
+        o.on "-w", "--workers WORKERS", OptionParser::DecimalInteger, "Puma Server workers" do |arg|
+          @workers = arg.to_i
+        end
+
         o.on("-h", "--help", "Prints this help") do
           puts o
           exit
