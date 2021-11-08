@@ -514,10 +514,10 @@ module TestPuma
                     if @bind_type == :ssl
                       socket.sysclose
                     else
-                      socket.shutdown ::Socket::SHUT_RDWR
+                      socket.shutdown Socket::SHUT_RDWR
                       socket.close
                     end
-                  rescue Errno::EBADF
+                  rescue Errno::EBADF, Errno::ENOTCONN
                   end
                 end
               end
