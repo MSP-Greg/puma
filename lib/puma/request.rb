@@ -262,7 +262,7 @@ module Puma
     # @todo make private in 6.0.0
     #
     def normalize_env(env, client)
-      if host = env[HTTP_HOST]
+      if (host = env[HTTP_HOST])
         # host can be a hostname, ipv4 or bracketed ipv6. Followed by an optional port.
         if colon = host.rindex("]:") # IPV6 with port
           env[SERVER_NAME] = host[0, colon+1]
