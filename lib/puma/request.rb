@@ -34,12 +34,11 @@ module Puma
     # @return [Boolean,:async]
     #
     def handle_request(client, lines, requests)
-      env = client.env
       io  = client.io   # io may be a MiniSSL::Socket
 
       return false if closed_socket?(io)
 
-      normalize_env env, client
+      env = normalize_env client
 
       env[PUMA_SOCKET] = io
 
@@ -56,7 +55,7 @@ module Puma
       if @early_hints
         env[EARLY_HINTS] = lambda { |headers|
           begin
-            fast_write io, str_early_hints(headers)
+            fast_write_str io, str_early_hints(headers)
           rescue ConnectionError => e
             @events.debug_error e
             # noop, if we lost the socket we just won't send the early hints
@@ -134,7 +133,7 @@ module Puma
         end
 
         lines << LINE_END
-        fast_write io, lines.read
+        fast_write_str io, lines.read
         return keep_alive
       end
 
@@ -149,7 +148,7 @@ module Puma
       lines << line_ending
 
       if response_hijack
-        fast_write io, lines.read
+        fast_write_str io, lines.read
         response_hijack.call io
         return :async
       end
@@ -187,7 +186,7 @@ module Puma
     # @param str [String] the string written to the io
     # @raise [ConnectionError]
     #
-    def fast_write(io, str)
+    def fast_write_str(io, str)
       n = 0
       byte_size = str.bytesize
       while n < byte_size
@@ -205,7 +204,7 @@ module Puma
     end
 
     # Used to write headers and body.
-    # Writes to an io (normally `Client#io`) using `#fast_write`.
+    # Writes to an io (normally `Client#io`) using `#fast_write_str`.
     # Accumulates `body` items into `strm`, then writes anytime `strm` is 128kB
     # or larger.
     # @param io [#write] the io to write to
@@ -219,19 +218,25 @@ module Puma
         if chunked  # would this ever happen?
           while part = body.read(BUFFER_LENGTH)
             strm.append part.bytesize.to_s(16), LINE_END, part, LINE_END
-            fast_write io, strm.read
+            fast_write_str io, strm.read
           end
-          fast_write io, CLOSE_CHUNKED
+          fast_write_str io, CLOSE_CHUNKED
         else
           IO.copy_stream body, strm
           strm.rewind
-          fast_write io, strm.read
+          fast_write_str io, strm.read
           io.flush
         end
       elsif body.is_a?(::Array) && body.length == 1
-        strm.write body.first
-        strm.rewind
-        fast_write io, strm.read
+        if body.first.is_a?(::String) && body.first.bytesize >= 256*1024
+          strm.rewind
+          fast_write_str io, strm.read
+          fast_write_str io, body.first
+        else
+          strm.write body.first
+          strm.rewind
+          fast_write_str io, strm.read
+        end
         io.flush
       else
         if chunked
@@ -244,7 +249,7 @@ module Puma
           body.each { |part| strm.write(part) unless part.bytesize.zero? }
         end
         strm.rewind
-        fast_write io, strm.read
+        fast_write_str io, strm.read
         io.flush
       end
     rescue Errno::EAGAIN, Errno::EWOULDBLOCK
@@ -253,7 +258,7 @@ module Puma
       raise ConnectionError, SKT_WRITE_ERR_MSG
     end
 
-    private :fast_write, :fast_write_body
+    private :fast_write_str, :fast_write_body
 
     # Given a Hash +env+ for the request read from +client+, add
     # and fixup keys to comply with Rack's env guidelines.
@@ -261,13 +266,14 @@ module Puma
     # @param client [Puma::Client] only needed for Client#peerip
     # @todo make private in 6.0.0
     #
-    def normalize_env(env, client)
+    def normalize_env(client)
+      env = client.env
       if (host = env[HTTP_HOST])
         # host can be a hostname, ipv4 or bracketed ipv6. Followed by an optional port.
-        if colon = host.rindex("]:") # IPV6 with port
+        if (colon = host.rindex ']:') # IPV6 with port
           env[SERVER_NAME] = host[0, colon+1]
           env[SERVER_PORT] = host[colon+2, host.bytesize]
-        elsif !host.start_with?("[") && colon = host.index(":") # not hostname or IPV4 with port
+        elsif !host.start_with?('[') && (colon = host.index ':') # not hostname or IPV4 with port
           env[SERVER_NAME] = host[0, colon]
           env[SERVER_PORT] = host[colon+1, host.bytesize]
         else
@@ -316,6 +322,7 @@ module Puma
 
         env[REMOTE_ADDR] = addr
       end
+      env
     end
     # private :normalize_env
 
