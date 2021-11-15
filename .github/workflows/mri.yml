@@ -17,31 +17,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-20.04, ubuntu-18.04, macos-10.15, macos-11, windows-2019 ]
+        os: [ ubuntu-20.04, ubuntu-18.04, windows-2022 ]
         ruby: [ 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, '3.0', head ]
         no-ssl: ['']
         include:
-          - { os: windows-2019 , ruby: mingw }
+          - { os: windows-2022 , ruby: mingw }
+          - { os: windows-2022 , ruby: ucrt }
           - { os: ubuntu-20.04 , ruby: 2.7   , no-ssl: ' no SSL' }
-          - { os: windows-2019 , ruby: 2.7   , no-ssl: ' no SSL' }
+          - { os: windows-2022 , ruby: 2.7   , no-ssl: ' no SSL' }
         exclude:
           - { os: ubuntu-20.04 , ruby: 2.2  }
           - { os: ubuntu-20.04 , ruby: 2.3  }
           - { os: ubuntu-20.04 , ruby: 2.4  }
           - { os: ubuntu-20.04 , ruby: 2.6  }
-          - { os: windows-2019 , ruby: head }
+          - { os: windows-2022 , ruby: 2.2  }
+          - { os: windows-2022 , ruby: 2.3  }
+          - { os: windows-2022 , ruby: 2.4  }
 
     steps:
       - name: repo checkout
         uses: actions/checkout@v2
 
-      - name: load ruby, ragel
-        uses: MSP-Greg/setup-ruby-pkgs@v1
+      - name: load ruby
+        uses: MSP-Greg/ruby-setup-ruby@win-ucrt-1
         with:
           ruby-version: ${{ matrix.ruby }}
-          apt-get: ragel
-          brew: ragel
-          mingw: _upgrade_ openssl ragel
 
       - name:  bundle install
         timeout-minutes: 5
@@ -67,7 +67,7 @@ jobs:
 
       - name: rubocop
         # 2021-05-20 - RuboCop won't run with Psych 4.0 - remove when fixed
-        if: (endsWith(matrix.ruby, 'head') == false) && (endsWith(matrix.ruby, 'mingw') == false)
+        if: (endsWith(matrix.ruby, 'head') == false) && (endsWith(matrix.ruby, 'mingw') == false) && (endsWith(matrix.ruby, 'ucrt') == false)
         run: bundle exec rake rubocop
 
       - name: test
