@@ -133,7 +133,7 @@ module Puma
         end
 
         lines << LINE_END
-        fast_write_str io, lines.read
+        fast_write_str io, lines.to_s
         return keep_alive
       end
 
@@ -148,7 +148,7 @@ module Puma
       lines << line_ending
 
       if response_hijack
-        fast_write_str io, lines.read
+        fast_write_str io, lines.to_s
         response_hijack.call io
         return :async
       end
@@ -218,24 +218,21 @@ module Puma
         if chunked  # would this ever happen?
           while part = body.read(BUFFER_LENGTH)
             strm.append part.bytesize.to_s(16), LINE_END, part, LINE_END
-            fast_write_str io, strm.read
           end
-          fast_write_str io, CLOSE_CHUNKED
+          strm << CLOSE_CHUNKED
+          fast_write_str io, strm.to_s
         else
           IO.copy_stream body, strm
-          strm.rewind
-          fast_write_str io, strm.read
+          fast_write_str io, strm.to_s
           io.flush
         end
       elsif body.is_a?(::Array) && body.length == 1
         if body.first.is_a?(::String) && body.first.bytesize >= 256*1024
-          strm.rewind
-          fast_write_str io, strm.read
+          fast_write_str io, strm.to_s
           fast_write_str io, body.first
         else
           strm.write body.first
-          strm.rewind
-          fast_write_str io, strm.read
+          fast_write_str io, strm.to_s
         end
         io.flush
       else
@@ -248,8 +245,7 @@ module Puma
         else
           body.each { |part| strm.write(part) unless part.bytesize.zero? }
         end
-        strm.rewind
-        fast_write_str io, strm.read
+        fast_write_str io, strm.to_s
         io.flush
       end
     rescue Errno::EAGAIN, Errno::EWOULDBLOCK
