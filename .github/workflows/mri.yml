@@ -41,6 +41,11 @@ jobs:
           setup-ruby-ref: MSP-Greg/ruby-setup-ruby/win-ucrt-1
         timeout-minutes: 10
 
+      - name: update rubygems for Ruby 2.2
+        if: matrix.ruby < '2.3'
+        run: gem update --system 2.7.11 --no-document
+        timeout-minutes: 5
+
       - name: Compile Puma without SSL support
         if: matrix.no-ssl == ' no SSL'
         shell: bash
