@@ -43,6 +43,7 @@ jobs:
 
       - name: update rubygems for Ruby 2.2
         if: matrix.ruby < '2.3'
+        shell: pwsh
         run: gem update --system 2.7.11 --no-document
         timeout-minutes: 5
 
