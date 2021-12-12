@@ -17,13 +17,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-20.04, windows-2022, windows-2019 ]
+        os: [ ubuntu-20.04, macos-11, windows-2022, windows-2019 ]
         ruby: [ 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, '3.0', head ]
         no-ssl: ['']
         yjit: ['']
         include:
           - { os: ubuntu-20.04 , ruby: head  , yjit: ' yjit' }
-          - { os: windows-2022 , ruby: mingw }
           - { os: windows-2022 , ruby: ucrt  }
           - { os: windows-2022 , ruby: 2.7   , no-ssl: ' no SSL' }
 
@@ -37,18 +36,10 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           apt-get: ragel
           brew: ragel
-          mingw: _upgrade_ openssl ragel
+          mingw: openssl ragel
+          bundler-cache: true
           setup-ruby-ref: MSP-Greg/ruby-setup-ruby/win-ucrt-1
-
-      - name:  bundle install
-        timeout-minutes: 5
-        shell: pwsh
-        run:   |
-          # update RubyGems in Ruby 2.2, bundle install
-          if ('${{ matrix.ruby }}' -lt '2.3') {
-            gem update --system 2.7.11 --no-document
-          }
-          bundle install --jobs 4 --retry 3
+        timeout-minutes: 10
 
       - name: Compile Puma without SSL support
         if: matrix.no-ssl == ' no SSL'
@@ -64,7 +55,7 @@ jobs:
 
       - name: rubocop
         # 2021-05-20 - RuboCop won't run with Psych 4.0 - remove when fixed
-        if: (endsWith(matrix.ruby, 'head') == false) && (endsWith(matrix.ruby, 'mingw') == false) && (endsWith(matrix.ruby, 'ucrt') == false)
+        if: (endsWith(matrix.ruby, 'head') == false) && (endsWith(matrix.ruby, 'ucrt') == false)
         run: bundle exec rake rubocop
 
       - name: Use yjit
