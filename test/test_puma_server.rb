@@ -5,7 +5,7 @@ require "nio"
 require "ipaddr"
 
 class TestPumaServer < Minitest::Test
-  parallelize_me! unless JRUBY_HEAD
+  # parallelize_me! unless JRUBY_HEAD
 
   def setup
     @host = "127.0.0.1"
