@@ -3,6 +3,7 @@
 #include <ruby.h>
 #include <ruby/version.h>
 #include <ruby/io.h>
+#include <string.h>
 
 #ifdef HAVE_OPENSSL_BIO_H
 
@@ -15,6 +16,12 @@
 #ifndef SSL_OP_NO_COMPRESSION
 #define SSL_OP_NO_COMPRESSION 0
 #endif
+
+// ALPN Protocols
+const unsigned char server[] = {
+  8, 'h', 't', 't', 'p', '/', '1', '.', '1'
+};
+const int server_len = sizeof(server);
 
 typedef struct {
   BIO* read;
@@ -179,6 +186,25 @@ static int engine_verify_callback(int preverify_ok, X509_STORE_CTX* ctx) {
   return preverify_ok;
 }
 
+/* This the context that we pass to alpn_cb */
+typedef struct tlsextalpnctx_st {
+  unsigned char *data;
+  size_t len;
+} tlsextalpnctx;
+
+static int alpn_cb(SSL *s, const unsigned char **out, unsigned char *outlen,
+                   const unsigned char *in, unsigned int inlen, void *arg)
+{
+
+  if (SSL_select_next_proto
+    ((unsigned char **)out, outlen, server, server_len, in,
+     inlen) != OPENSSL_NPN_NEGOTIATED) {
+    return SSL_TLSEXT_ERR_ALERT_FATAL;
+  }
+
+  return SSL_TLSEXT_ERR_OK;
+}
+
 static VALUE
 sslctx_alloc(VALUE klass) {
   SSL_CTX *ctx;
@@ -221,6 +247,7 @@ sslctx_initialize(VALUE self, VALUE mini_ssl_ctx) {
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
   EC_KEY *ecdh;
 #endif
+  unsigned char server2[server_len];
 
   TypedData_Get_Struct(self, SSL_CTX, &sslctx_type, ctx);
 
@@ -361,6 +388,16 @@ sslctx_initialize(VALUE self, VALUE mini_ssl_ctx) {
 #else
   dh = get_dh2048();
   SSL_CTX_set_tmp_dh(ctx, dh);
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+  tlsextalpnctx alpn_ctx = { NULL, 0 };
+
+  memcpy(server2, server, server_len);
+
+  alpn_ctx.data = server2;
+
+  SSL_CTX_set_alpn_select_cb(ctx, alpn_cb, &alpn_ctx);
 #endif
 
   rb_obj_freeze(self);
