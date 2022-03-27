@@ -227,8 +227,7 @@ sslctx_alloc(VALUE klass) {
   return TypedData_Wrap_Struct(klass, &sslctx_type, ctx);
 }
 
-VALUE
-sslctx_initialize(VALUE self, VALUE mini_ssl_ctx) {
+VALUE sslctx_initialize(VALUE self, VALUE mini_ssl_ctx) {
   SSL_CTX* ctx;
 
 #ifdef HAVE_SSL_CTX_SET_MIN_PROTO_VERSION
@@ -246,8 +245,10 @@ sslctx_initialize(VALUE self, VALUE mini_ssl_ctx) {
 
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
   EC_KEY *ecdh;
-#endif
+#else
   unsigned char server2[server_len];
+  tlsextalpnctx alpn_ctx = { NULL, 0 };
+#endif
 
   TypedData_Get_Struct(self, SSL_CTX, &sslctx_type, ctx);
 
@@ -391,8 +392,6 @@ sslctx_initialize(VALUE self, VALUE mini_ssl_ctx) {
 #endif
 
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
-  tlsextalpnctx alpn_ctx = { NULL, 0 };
-
   memcpy(server2, server, server_len);
 
   alpn_ctx.data = server2;
@@ -634,8 +633,7 @@ VALUE engine_peercert(VALUE self) {
 /* @see Puma::MiniSSL::Socket#ssl_version_state
  * @version 5.0.0
  */
-static VALUE
-engine_ssl_vers_st(VALUE self) {
+static VALUE engine_ssl_vers_st(VALUE self) {
   ms_conn* conn;
   TypedData_Get_Struct(self, ms_conn, &engine_data_type, conn);
   return rb_ary_new3(2, rb_str_new2(SSL_get_version(conn->ssl)), rb_str_new2(SSL_state_string(conn->ssl)));
