@@ -322,6 +322,12 @@ module Puma
       @options[:first_data_timeout] = Integer(seconds)
     end
 
+    # Define a size threshold that Puma waits for collected Array or Enum bodies
+    # to reach before sending.  Affects time-to-first-byte.
+    def size_to_first_byte(transmit_size)
+      @options[:size_to_first_byte] = Integer(transmit_size)
+    end
+
     # Work around leaky apps that leave garbage in Thread locals
     # across requests.
     def clean_thread_locals(which=true)

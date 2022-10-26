@@ -96,6 +96,7 @@ module Puma
       @queue_requests      = @options[:queue_requests]
       @max_fast_inline     = @options[:max_fast_inline]
       @io_selector_backend = @options[:io_selector_backend]
+      @size_to_first_byte  = @options[:size_to_first_byte]
 
       temp = !!(@options[:environment] =~ /\A(development|test)\z/)
       @leak_stack_on_error = @options[:environment] ? temp : true

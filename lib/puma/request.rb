@@ -15,14 +15,11 @@ module Puma
   module Request # :nodoc:
 
     # determines whether to write body to io_buffer first, or straight to socket
-    # also fixes max size of chunked body read when bosy is an IO.
+    # also fixes max size of chunked body read when body is an IO.
     BODY_LEN_MAX   = 1_024 * 256
 
-    # size divide for using copy_stream on body
+    # size divide for using copy_stream on IO like bodies
     IO_BODY_MAX = 1_024 * 64
-
-    # max size for io_buffer, force write when exceeded
-    IO_BUFFER_LEN_MAX = 1_024 * 1_024 * 4
 
     SOCKET_WRITE_ERR_MSG = "Socket timeout writing data"
 
@@ -181,8 +178,6 @@ module Puma
         response_hijack = resp_info[:response_hijack]
       end
 
-      cork_socket socket
-
       if resp_info[:no_body]
         if content_length and status != 204
           io_buffer.append CONTENT_LENGTH_S, content_length.to_s, line_ending
@@ -213,7 +208,6 @@ module Puma
     ensure
       io_buffer.reset
       resp_info = nil
-      uncork_socket socket
       app_body.close if app_body.respond_to? :close
       client.tempfile&.unlink
 
@@ -271,6 +265,7 @@ module Puma
     # @raise [ConnectionError]
     #
     def fast_write_response(socket, body, io_buffer, chunked, content_length)
+
       if body.is_a?(::File) || body.respond_to?(:read) || body.respond_to?(:readpartial)
         if chunked  # would this ever happen?
           while part = body.read(BODY_LEN_MAX)
@@ -283,8 +278,10 @@ module Puma
             io_buffer.write body.sysread(content_length)
             fast_write_str socket, io_buffer.to_s
           else
+            cork_socket socket
             fast_write_str socket, io_buffer.to_s
             IO.copy_stream body, socket
+            uncork_socket socket
           end
         end
         body.close
@@ -300,13 +297,13 @@ module Puma
           fast_write_str socket, io_buffer.to_s
         end
       else
-        # for array bodies, flush io_buffer to socket when size is greater than
-        # IO_BUFFER_LEN_MAX
+        # for array/enum bodies, flush io_buffer to socket when size is greater than
+        # @size_to_first_byte
         if chunked
           body.each do |part|
             next if (byte_size = part.bytesize).zero?
             io_buffer.append byte_size.to_s(16), LINE_END, part, LINE_END
-            if io_buffer.length > IO_BUFFER_LEN_MAX
+            if io_buffer.length > @size_to_first_byte
               fast_write_str socket, io_buffer.to_s
               io_buffer.reset
             end
@@ -316,7 +313,7 @@ module Puma
           body.each do |part|
             next if part.bytesize.zero?
             io_buffer.write part
-            if io_buffer.length > IO_BUFFER_LEN_MAX
+            if io_buffer.length > @size_to_first_byte
               fast_write_str socket, io_buffer.to_s
               io_buffer.reset
             end
