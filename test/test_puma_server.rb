@@ -1471,4 +1471,48 @@ EOF
     remote_addr = send_http_and_sysread("GET / HTTP/1.1\r\n\r\n").split("\r\n").last
     assert_equal @host, remote_addr
   end
+
+  def get_chunk_times
+    body = +''
+    times = []
+    Net::HTTP.start @host, @port do |http|
+      req = Net::HTTP::Get.new '/'
+      http.request req do |resp|
+        resp.read_body do |chunk|
+          next if chunk.empty?
+          body << chunk
+          times << Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        end
+
+      end
+    end
+    [body, times]
+  end
+
+  # see https://github.com/sinatra/sinatra/blob/master/examples/stream.ru
+  def test_streaming_enum_body
+    str = "Hello Puma World"
+    body_len = str.bytesize * 3
+
+    server_run do |env|
+      hdrs = {}
+      hdrs['Content-Type'] = "text; charset=utf-8"
+
+      body = Enumerator.new do |yielder|
+          yielder << str
+          sleep 0.5
+          yielder << str
+          sleep 1.5
+          yielder << str
+      end
+      [200, hdrs, body]
+    end
+
+    body, times = get_chunk_times
+    assert_equal body_len, body.bytesize
+    assert_equal str * 3, body
+    assert times[1] - times[0] > 0.4
+    assert times[1] - times[0] < 1
+    assert times[2] - times[1] > 1
+  end
 end
