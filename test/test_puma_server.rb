@@ -1442,4 +1442,68 @@ EOF
     remote_addr = send_http_and_read("GET / HTTP/1.1\r\n\r\n").split("\r\n").last
     assert_equal @host, remote_addr
   end
+
+  def get_chunk_times
+    body = +''
+    times = []
+    Net::HTTP.start @host, @port do |http|
+      req = Net::HTTP::Get.new '/'
+      http.request req do |resp|
+        resp.read_body do |chunk|
+          next if chunk.empty?
+          body << chunk
+          times << Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        end
+
+      end
+    end
+    [body, times]
+  end
+
+  def test_size_to_first_byte_small
+    str = "Hello Puma World" * 64
+    body_len = str.bytesize * 3
+
+    server_run(size_to_first_byte: 0) do |env|
+      hdrs = {}
+      hdrs['Content-Type'] = "text; charset=utf-8"
+
+      body = Enumerator.new do |yielder|
+          yielder << str
+          sleep 0.1
+          yielder << str
+          sleep 0.1
+          yielder << str
+      end
+      [200, hdrs, body]
+    end
+
+    body, times = get_chunk_times
+    assert_equal body_len, body.bytesize
+    assert_operator 0.2, :<=, times.last - times.first
+  end
+
+  def test_size_to_first_byte_large
+    str = 'Hello Puma World' * 64
+    body_len = str.bytesize * 3
+
+    server_run(size_to_first_byte: 4_096) do |env|
+      hdrs = {}
+      hdrs['Content-Type'] = "text; charset=utf-8"
+
+      body = Enumerator.new do |yielder|
+          yielder << str
+          sleep 0.1
+          yielder << str
+          sleep 0.1
+          yielder << str
+      end
+      [200, hdrs, body]
+    end
+
+    body, times = get_chunk_times
+    body, times = get_chunk_times
+    assert_equal body_len, body.bytesize
+    assert_operator 0.01, :>=, times.last - times.first
+  end
 end
