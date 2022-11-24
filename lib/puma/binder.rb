@@ -171,7 +171,13 @@ module Puma
 
           @listeners << [str, io] if io
         when "unix"
-          path = "#{uri.host}#{uri.path}".gsub("%20", " ")
+          # bug in uri parsing a Windows path, need to remove when fixed
+          # windows paths may start with '<drive letter>:/' or '/'
+          # network shares start with text and no colon
+          path = Puma::IS_WINDOWS && Puma::IS_MRI && str.count(':') == 2 ?
+            "#{uri.host}:#{uri.path}".gsub("%20", " ") :
+            "#{uri.host}#{uri.path}".gsub("%20", " ")
+
           abstract = false
           if str.start_with? 'unix://@'
             raise "OS does not support abstract UNIXSockets" unless Puma.abstract_unix_socket?
