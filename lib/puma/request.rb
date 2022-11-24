@@ -124,8 +124,8 @@ module Puma
       end
       prepare_response(status, headers, res_body, requests, client)
     ensure
-      io_buffer.reset
       uncork_socket client.io
+      io_buffer.reset
       app_body.close if app_body.respond_to? :close
       client.tempfile&.unlink
       after_reply = env[RACK_AFTER_REPLY] || []
@@ -163,21 +163,22 @@ module Puma
 
       resp_info = str_headers(env, status, headers, res_body, io_buffer, force_keep_alive)
 
+      content_length = resp_info[:content_length]
       close_body = false
 
       # below converts app_body into body, dependent on app_body's characteristics, and
       # resp_info[:content_length] will be set if it can be determined
-      if !resp_info[:content_length] && !resp_info[:transfer_encoding] && status != 204
+      if !content_length && !resp_info[:transfer_encoding] && status != 204
         if res_body.respond_to?(:to_ary) && (array_body = res_body.to_ary)
           body = array_body
-          resp_info[:content_length] = body.sum(&:bytesize)
+          content_length = body.sum(&:bytesize)
         elsif res_body.is_a?(File) && res_body.respond_to?(:size)
           body = res_body
-          resp_info[:content_length] = body.size
+          content_length = body.size
         elsif res_body.respond_to?(:to_path) && res_body.respond_to?(:each) &&
             File.readable?(fn = res_body.to_path)
           body = File.open fn, 'rb'
-          resp_info[:content_length] = body.size
+          content_length = body.size
           close_body = true
         else
           body = res_body
@@ -185,12 +186,12 @@ module Puma
       elsif !res_body.is_a?(::File) && res_body.respond_to?(:to_path) && res_body.respond_to?(:each) &&
           File.readable?(fn = res_body.to_path)
         body = File.open fn, 'rb'
-        resp_info[:content_length] = body.size
+        content_length = body.size
         close_body = true
       elsif !res_body.is_a?(::File) && res_body.respond_to?(:filename) && res_body.respond_to?(:each) &&
           res_body.respond_to?(:bytesize) && File.readable?(fn = res_body.filename)
         # Sprockets::Asset
-        resp_info[:content_length] = res_body.bytesize unless resp_info[:content_length]
+        content_length = res_body.bytesize unless resp_info[:content_length]
         if res_body.to_hash[:source]   # use each to return @source
           body = res_body
         else                           # avoid each and use a File object
@@ -203,8 +204,7 @@ module Puma
 
       line_ending = LINE_END
 
-      content_length = resp_info[:content_length]
-      keep_alive     = resp_info[:keep_alive]
+      keep_alive = resp_info[:keep_alive]
 
       if res_body && !res_body.respond_to?(:each)
         response_hijack = res_body
@@ -214,14 +214,14 @@ module Puma
 
       cork_socket socket
 
-      if resp_info[:no_body]
+      if resp_info[:no_body] && !response_hijack
         if content_length and status != 204
           io_buffer.append CONTENT_LENGTH_S, content_length.to_s, line_ending
         end
 
         io_buffer << LINE_END
         fast_write_str socket, io_buffer.read_and_reset
-        socket.flush
+        uncork_socket socket
         return keep_alive
       end
       if content_length
@@ -236,11 +236,13 @@ module Puma
 
       if response_hijack
         fast_write_str socket, io_buffer.read_and_reset
+        uncork_socket socket
         response_hijack.call socket
         return :async
       end
 
       fast_write_response socket, body, io_buffer, chunked, content_length.to_i
+      socket.flush
       body.close if close_body
       keep_alive
     end
@@ -280,6 +282,7 @@ module Puma
           raise ConnectionError, SOCKET_WRITE_ERR_MSG
         end
       end
+      socket.flush
     end
 
     # Used to write headers and body.
