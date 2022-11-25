@@ -63,11 +63,8 @@ jobs:
           sed -i "s/$SRC/$DST/" Gemfile
           # use `stdio` for log_writer, always have one thread existing
           SRC="Silent: true"
-          DST="Silent: false, Threads: '1:4'"
+          DST="Silent: false, Threads: '5:5'"
           sed -i "s/$SRC/$DST/" test/application_system_test_case.rb
-          SRC="visit echo_messages_path"
-          DST="visit echo_messages_path; sleep 0.001"
-          sed -i "s/$SRC/$DST/" test/system/broadcasts_test.rb
           bundle config set --local path vendor/bundle
           bundle config set --local with test
           bundle install --jobs 4 --retry 3
