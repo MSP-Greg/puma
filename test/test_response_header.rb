@@ -63,7 +63,7 @@ class TestResponseHeader < Minitest::Test
   # The values of the header must be Strings
   def test_integer_value
     server_run app: ->(env) { [200, {'Content-Length' => 500}, []] }
-    data = send_http_and_read "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_and_read "HEAD / HTTP/1.0\r\n\r\n"
 
     assert_match(/HTTP\/1.0 200 OK\r\nContent-Length: 500\r\n\r\n/, data)
   end
