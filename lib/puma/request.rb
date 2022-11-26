@@ -166,7 +166,7 @@ module Puma
 
       close_body = false
 
-      if resp_info[:no_body] && content_length
+      if (resp_info[:no_body] && content_length) || resp_info[:app_sent_chunked]
         body = res_body
       else
         # below converts app_body into body, dependent on app_body's characteristics, and
@@ -187,6 +187,7 @@ module Puma
           # Sprockets::Asset
           content_length = res_body.bytesize
           if res_body.to_hash[:source]   # use each to return @source
+#@log_writer.log "Sprockets::Asset #{res_body.to_hash[:source].class}"
             body = res_body
           else                           # avoid each and use a File object
             body = File.open fn, 'rb'
@@ -230,7 +231,7 @@ module Puma
 
       if response_hijack
         fast_write_str socket, io_buffer.read_and_reset
-        uncork_socket socket # ensure called
+        uncork_socket socket # ensure called after last statement before return
         response_hijack.call socket
         return :async
       end
@@ -308,13 +309,16 @@ module Puma
           end
         end
       elsif body.is_a?(::Array) && body.length == 1
+#@log_writer.log "\nArray1  #{chunked}"
         body_first = nil
         # using body_first = body.first causes issues?
         body.each { |str| body_first ||= str }
 
         if body_first.is_a?(::String) && body_first.bytesize < BODY_LEN_MAX
           # smaller body, write to io_buffer first
+#@log_writer.log io_buffer.string
           io_buffer.write body_first
+#@log_writer.log "body_first.bytesize #{body_first.bytesize}"
           fast_write_str socket, io_buffer.read_and_reset
         else
           # large body, write both header & body to socket
@@ -322,34 +326,41 @@ module Puma
           fast_write_str socket, body_first
         end
       elsif body.is_a?(::Array)
-        # for array bodies, flush io_buffer to socket when size is greater than
-        # IO_BUFFER_LEN_MAX
-        if chunked
-          body.each do |part|
-            next if (byte_size = part.bytesize).zero?
-            io_buffer.append byte_size.to_s(16), LINE_END, part, LINE_END
-            if io_buffer.length > IO_BUFFER_LEN_MAX
-              fast_write_str socket, io_buffer.read_and_reset
-            end
-          end
-          io_buffer.write CLOSE_CHUNKED
+        if body.empty?
+          fast_write_str socket, io_buffer.read_and_reset
         else
-          body.each do |part|
-            next if part.bytesize.zero?
-            io_buffer.write part
-            if io_buffer.length > IO_BUFFER_LEN_MAX
-              fast_write_str socket, io_buffer.read_and_reset
+  @log_writer.log "\nArray #{chunked}\n#{io_buffer.string}\n"
+          # for array bodies, flush io_buffer to socket when size is greater than
+          # IO_BUFFER_LEN_MAX
+          if chunked
+            body.each do |part|
+              next if (byte_size = part.bytesize).zero?
+              io_buffer.append byte_size.to_s(16), LINE_END, part, LINE_END
+              if io_buffer.length > IO_BUFFER_LEN_MAX
+                fast_write_str socket, io_buffer.read_and_reset
+              end
+            end
+            io_buffer.write CLOSE_CHUNKED
+          else
+            body.each do |part|
+              next if part.bytesize.zero?
+              io_buffer.write part
+              if io_buffer.length > IO_BUFFER_LEN_MAX
+                fast_write_str socket, io_buffer.read_and_reset
+              end
             end
           end
+          # may write last body part for non-chunked, also headers if array is empty
+          fast_write_str(socket, io_buffer.read_and_reset) unless io_buffer.length.zero?
         end
-        # may write last body part for non-chunked, also headers if array is empty
-        fast_write_str(socket, io_buffer.read_and_reset) unless io_buffer.length.zero?
       else
+@log_writer.log "\nEnum #{chunked}\n#{io_buffer.string}\n"
         # for enum bodies
         fast_write_str socket, io_buffer.read_and_reset
         if chunked
           body.each do |part|
             next if (byte_size = part.bytesize).zero?
+@log_writer.log "byte_size #{byte_size}"
              fast_write_str socket, (byte_size.to_s(16) << LINE_END), false
              fast_write_str socket, part, false
              fast_write_str socket, LINE_END
@@ -358,6 +369,7 @@ module Puma
         else
           body.each do |part|
             next if part.bytesize.zero?
+@log_writer.log "bytesize #{part.bytesize}"
             fast_write_str socket, part
           end
         end
@@ -598,6 +610,7 @@ module Puma
           resp_info[:allow_chunked] = false
           resp_info[:content_length] = nil
           resp_info[:transfer_encoding] = vs
+          resp_info[:app_sent_chunked] ||= vs.include? 'chunked'
         when HIJACK
           resp_info[:response_hijack] = vs
           next
