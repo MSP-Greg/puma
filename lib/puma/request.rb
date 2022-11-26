@@ -187,7 +187,7 @@ module Puma
           # Sprockets::Asset
           content_length = res_body.bytesize
           if res_body.to_hash[:source]   # use each to return @source
-#@log_writer.log "Sprockets::Asset #{res_body.to_hash[:source].class}"
+#@log_Writer.log "Sprockets::Asset #{res_body.to_hash[:source].class}"
             body = res_body
           else                           # avoid each and use a File object
             body = File.open fn, 'rb'
@@ -309,16 +309,16 @@ module Puma
           end
         end
       elsif body.is_a?(::Array) && body.length == 1
-#@log_writer.log "\nArray1  #{chunked}"
+#@log_Writer.log "\nArray1  #{chunked}"
         body_first = nil
         # using body_first = body.first causes issues?
         body.each { |str| body_first ||= str }
 
         if body_first.is_a?(::String) && body_first.bytesize < BODY_LEN_MAX
           # smaller body, write to io_buffer first
-#@log_writer.log io_buffer.string
+#@log_Writer.log io_buffer.string
           io_buffer.write body_first
-#@log_writer.log "body_first.bytesize #{body_first.bytesize}"
+#@log_Writer.log "body_first.bytesize #{body_first.bytesize}"
           fast_write_str socket, io_buffer.read_and_reset
         else
           # large body, write both header & body to socket
@@ -329,7 +329,7 @@ module Puma
         if body.empty?
           fast_write_str socket, io_buffer.read_and_reset
         else
-  @log_writer.log "\nArray #{chunked}\n#{io_buffer.string}\n"
+#@log_Writer.log "\nArray #{chunked}\n#{io_buffer.string}\n"
           # for array bodies, flush io_buffer to socket when size is greater than
           # IO_BUFFER_LEN_MAX
           if chunked
@@ -354,13 +354,13 @@ module Puma
           fast_write_str(socket, io_buffer.read_and_reset) unless io_buffer.length.zero?
         end
       else
-@log_writer.log "\nEnum #{chunked}\n#{io_buffer.string}\n"
+#@log_Writer.log "\nEnum #{chunked}\n#{io_buffer.string}\n"
         # for enum bodies
         fast_write_str socket, io_buffer.read_and_reset
         if chunked
           body.each do |part|
             next if (byte_size = part.bytesize).zero?
-@log_writer.log "byte_size #{byte_size}"
+#@log_Writer.log "byte_size #{byte_size}"
              fast_write_str socket, (byte_size.to_s(16) << LINE_END), false
              fast_write_str socket, part, false
              fast_write_str socket, LINE_END
@@ -369,7 +369,7 @@ module Puma
         else
           body.each do |part|
             next if part.bytesize.zero?
-@log_writer.log "bytesize #{part.bytesize}"
+#@log_Writer.log "bytesize #{part.bytesize}"
             fast_write_str socket, part
           end
         end
