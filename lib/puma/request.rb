@@ -73,6 +73,7 @@ module Puma
         env[EARLY_HINTS] = lambda { |headers|
           begin
             fast_write_str socket, str_early_hints(headers)
+            socket.flush
           rescue ConnectionError => e
             @log_writer.debug_error e
             # noop, if we lost the socket we just won't send the early hints
@@ -97,11 +98,11 @@ module Puma
           status, headers, app_body = [501, {}, ["#{env[REQUEST_METHOD]} method is not supported"]]
         end
 
+        return :async if client.hijacked
+
         # app_body needs to always be closed, hold value in case lowlevel_error
         # is called
         res_body = app_body
-
-        return :async if client.hijacked
 
         status = status.to_i
 
@@ -109,7 +110,6 @@ module Puma
           unless headers.empty? and res_body == []
             raise "async response must have empty headers and body"
           end
-
           return :async
         end
       rescue ThreadPool::ForceShutdown => e
@@ -187,7 +187,6 @@ module Puma
           # Sprockets::Asset
           content_length = res_body.bytesize
           if res_body.to_hash[:source]   # use each to return @source
-#@log_Writer.log "Sprockets::Asset #{res_body.to_hash[:source].class}"
             body = res_body
           else                           # avoid each and use a File object
             body = File.open fn, 'rb'
@@ -310,16 +309,12 @@ module Puma
           end
         end
       elsif body.is_a?(::Array) && body.length == 1
-#@log_Writer.log "\nArray1  #{chunked}"
         body_first = nil
         # using body_first = body.first causes issues?
         body.each { |str| body_first ||= str }
-
         if body_first.is_a?(::String) && body_first.bytesize < BODY_LEN_MAX
           # smaller body, write to io_buffer first
-#@log_Writer.log io_buffer.string
           io_buffer.write body_first
-#@log_Writer.log "body_first.bytesize #{body_first.bytesize}"
           fast_write_str socket, io_buffer.read_and_reset
         else
           # large body, write both header & body to socket
@@ -330,7 +325,6 @@ module Puma
         if body.empty?
           fast_write_str socket, io_buffer.read_and_reset
         else
-#@log_Writer.log "\nArray #{chunked}\n#{io_buffer.string}\n"
           # for array bodies, flush io_buffer to socket when size is greater than
           # IO_BUFFER_LEN_MAX
           if chunked
@@ -355,13 +349,11 @@ module Puma
           fast_write_str(socket, io_buffer.read_and_reset) unless io_buffer.length.zero?
         end
       else
-#@log_Writer.log "\nEnum #{chunked}\n#{io_buffer.string}\n"
         # for enum bodies
         fast_write_str socket, io_buffer.read_and_reset
         if chunked
           body.each do |part|
             next if (byte_size = part.bytesize).zero?
-#@log_Writer.log "byte_size #{byte_size}"
              fast_write_str socket, (byte_size.to_s(16) << LINE_END), false
              fast_write_str socket, part, false
              fast_write_str socket, LINE_END
@@ -370,7 +362,6 @@ module Puma
         else
           body.each do |part|
             next if part.bytesize.zero?
-#@log_Writer.log "bytesize #{part.bytesize}"
             fast_write_str socket, part
           end
         end
