@@ -105,6 +105,22 @@ module TestPuma
       exit 1
     end
 
+    def requests(workers)
+      data = run 'stats'
+      unless workers.zero?
+        requests = {}
+        data[:worker_status].each do |wrkr_data|
+          requests[wrkr_data[:index]] = wrkr_data.dig(:last_status, :requests_count)
+        end
+        values = requests.values
+        mean = values.sum/values.length.to_f
+        max_min = values.max - values.min
+        puts "Requests Worker"
+        requests.each { |k,v| puts format(' %7d  %2d', v, k) }
+        puts format(" %7d Average, (max - min)/mean %4.2f%%", mean.round, 100 * max_min/mean)
+      end
+    end
+
     def message(msg)
       @stdout.puts msg unless @quiet
     end

@@ -95,6 +95,8 @@ module TestPuma
       puts e.class, e.message, e.backtrace
     ensure
       puts ''
+      @puma_info.requests @workers
+      puts ''
       @puma_info.run 'stop'
       sleep 2
       running_time = Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_start
