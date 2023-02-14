@@ -29,7 +29,7 @@ class TestIntegrationSSL < TestIntegration
     @control_tcp_port ||= UniquePort.call
   end
 
-  def with_server(config)
+  def with_server(config, log: false)
     config_file = Tempfile.new %w(config .rb)
     config_file.write config
     config_file.close
@@ -37,7 +37,7 @@ class TestIntegrationSSL < TestIntegration
     # start server
     cmd = "#{BASE} bin/puma -C #{config_file.path}"
     @server = IO.popen cmd, 'r'
-    wait_for_server_to_boot
+    wait_for_server_to_boot log: log
     @pid = @server.pid
 
     http = Net::HTTP.new HOST, bind_port
@@ -164,21 +164,32 @@ RUBY
     end
   end
 
-  def test_ssl_run_with_localhost_authority
+  def test_ssl_run_with_localhost_authority_single
+    ssl_run_with_localhost_authority 0
+  end
+
+  def test_ssl_run_with_localhost_authority_cluster
+    skip_unless :fork
+    ssl_run_with_localhost_authority 2
+  end
+
+  private
+
+  def ssl_run_with_localhost_authority(workers, log: false)
     skip_if :jruby
 
-    config = <<RUBY
-  require 'localhost'
-  ssl_bind '#{HOST}', '#{bind_port}'
+    config = <<~RUBY
+      require 'localhost'
+      ssl_bind '#{HOST}', '#{bind_port}'
+      workers #{workers}
+      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
 
-activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      app do |env|
+        [200, {}, [env['rack.url_scheme']]]
+      end
+    RUBY
 
-app do |env|
-  [200, {}, [env['rack.url_scheme']]]
-end
-RUBY
-
-    with_server(config) do |http|
+    with_server(config, log: log) do |http|
       body = nil
       http.start do
         req = Net::HTTP::Get.new '/', {}
@@ -187,8 +198,6 @@ RUBY
       assert_equal 'https', body
     end
   end
-
-  private
 
   def curl_and_get_response(url, method: :get, args: nil); require 'open3'
     cmd = "curl -s -v --show-error #{args} -X #{method.to_s.upcase} -k #{url}"
