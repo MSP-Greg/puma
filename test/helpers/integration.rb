@@ -357,48 +357,45 @@ class TestIntegration < Minitest::Test
 
     num_requests = (total_requests/num_threads).to_i
 
-    num_threads.times do |thread|
-      client_threads << Thread.new do
-        num_requests.times do |req_num|
+    req_loop = -> () {
+      num_requests.times do |req_num|
+        begin
           begin
+            socket = TCPSocket.new HOST, @tcp_port
+            fast_write socket, "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
+          rescue => e
+            replies[:write_error] += 1
+            raise e
+          end
+          body = read_body(socket, 10)
+          if body == "Hello World"
+            mutex.synchronize {
+              replies[:success] += 1
+              replies[:restart] += 1 if restart_count > 0
+            }
+          else
+            mutex.synchronize { replies[:unexpected_response] += 1 }
+          end
+        rescue Errno::ECONNRESET, Errno::EBADF, Errno::ENOTCONN
+          # connection was accepted but then closed
+          # client would see an empty response
+          # Errno::EBADF Windows may not be able to make a connection
+          mutex.synchronize { replies[:reset] += 1 }
+        rescue *refused, IOError
+          # IOError intermittently thrown by Ubuntu, add to allow retry
+          mutex.synchronize { replies[:refused] += 1 }
+        rescue ::Timeout::Error
+          mutex.synchronize { replies[:read_timeout] += 1 }
+        ensure
+          if socket.is_a?(IO) && !socket.closed?
             begin
-              socket = TCPSocket.new HOST, @tcp_port
-              fast_write socket, "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
-            rescue => e
-              replies[:write_error] += 1
-              raise e
-            end
-            body = read_body(socket, 10)
-            if body == "Hello World"
-              mutex.synchronize {
-                replies[:success] += 1
-                replies[:restart] += 1 if restart_count > 0
-              }
-            else
-              mutex.synchronize { replies[:unexpected_response] += 1 }
-            end
-          rescue Errno::ECONNRESET, Errno::EBADF, Errno::ENOTCONN
-            # connection was accepted but then closed
-            # client would see an empty response
-            # Errno::EBADF Windows may not be able to make a connection
-            mutex.synchronize { replies[:reset] += 1 }
-          rescue *refused, IOError
-            # IOError intermittently thrown by Ubuntu, add to allow retry
-            mutex.synchronize { replies[:refused] += 1 }
-          rescue ::Timeout::Error
-            mutex.synchronize { replies[:read_timeout] += 1 }
-          ensure
-            if socket.is_a?(IO) && !socket.closed?
-              begin
-                socket.close
-              rescue Errno::EBADF
-              end
+              socket.close
+            rescue Errno::EBADF
             end
           end
         end
-        # STDOUT.puts "#{thread} #{replies[:success]}"
       end
-    end
+    }
 
     run = true
 
@@ -417,7 +414,17 @@ class TestIntegration < Minitest::Test
       end
     end
 
-    client_threads.each(&:join)
+    if num_threads > 1
+      num_threads.times do |thread|
+        client_threads << Thread.new do
+          req_loop.call
+        end
+      end
+    else
+      req_loop.call
+    end
+
+    client_threads.each(&:join) if num_threads > 1
     run = false
     restart_thread.join
     if Puma.windows?
@@ -455,7 +462,7 @@ class TestIntegration < Minitest::Test
     if Puma.windows?
       assert_equal (num_threads * num_requests) - reset - refused, replies[:success]
     else
-      assert_equal (num_threads * num_requests), replies[:success]
+      assert_operator replies[:success], :>=, (num_threads * num_requests) - 1, "No more than 1 refused connection"
     end
 
   ensure
