@@ -294,9 +294,7 @@ class TestThreadPool < Minitest::Test
     pool << 1
     pool << 2
 
-    Puma::ThreadPool.stub_const(:SHUTDOWN_GRACE_TIME, grace) do
-      pool.shutdown(timeout)
-    end
+    pool.shutdown(timeout, grace)
     assert_equal 0, pool.spawned
     assert_equal 2, rescued.length
     refute rescued.compact.any?(&:alive?)
