@@ -72,8 +72,11 @@ class TestBusyWorker < Minitest::Test
 
     n = 2
 
-    Array.new(n) do
-      Thread.new { send_http_and_read "GET / HTTP/1.0\r\n\r\n" }
+    # send all requests first, read later
+    skts = Array.new(n) { send_http "GET / HTTP/1.0\r\n\r\n" }
+
+    Array.new(n) do |i|
+      Thread.new { skts[i].read }
     end.each(&:join)
 
     assert_equal n, @requests_count, "number of requests needs to match"
@@ -92,8 +95,11 @@ class TestBusyWorker < Minitest::Test
 
     n = 4
 
-    Array.new(n) do
-      Thread.new { send_http_and_read "GET / HTTP/1.0\r\n\r\n" }
+    # send all requests first, read later
+    skts = Array.new(n) { send_http "GET / HTTP/1.0\r\n\r\n" }
+
+    Array.new(n) do |i|
+      Thread.new { skts[i].read }
     end.each(&:join)
 
     assert_equal n, @requests_count, "number of requests needs to match"
