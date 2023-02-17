@@ -38,9 +38,16 @@ class TestPersistent < Minitest::Test
 
   def lines(count, s=@client)
     str = +''
-    Timeout.timeout(5) do
-      count.times { str << (s.gets || "") }
+    time_limit = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5.0
+    ok = true
+    count.times do
+      str << (s.gets || "") if s.wait_readable 1
+      if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_limit
+        ok = false
+        break
+      end
     end
+    assert ok, 'Read failed within 5 seconds'
     str
   end
 
