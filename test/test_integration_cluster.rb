@@ -472,10 +472,21 @@ RUBY
     cli_server "-w #{workers} -t 1:1 test/rackup/hello.ru", config: config
 
     pids = []
-    Timeout.timeout(iterations * timeout + 1) do
-      (pids << @server.gets[/Terminating timed out worker \(#{details}\): (\d+)/, 1]).compact! while pids.size < workers * iterations
-      pids.map!(&:to_i)
+    time_limit = Process.clock_gettime(Process::CLOCK_MONOTONIC) + (iterations * timeout + 1)
+    ok = true
+    wanted_size = workers * iterations
+    while pids.size < wanted_size
+      if @server.wait_readable 0.1
+        (pids << @server.gets[/Terminating timed out worker \(#{details}\): (\d+)/, 1]).compact!
+      end
+      sleep 0.1
+      if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_limit
+        ok = false
+        break
+      end
     end
+    assert ok, "Failed within #{iterations * timeout + 1} seconds, terminated workers #{pids.size}"
+    pids.map!(&:to_i)
 
     assert_equal pids, pids.uniq
   end

@@ -229,20 +229,19 @@ class TestIntegrationSingle < TestIntegration
       read_body connection
     end
 
+    time_limit = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5.0
     begin
-      Timeout.timeout(5) do
-        begin
-          Process.kill :SIGTERM, @pid
-        rescue Errno::ESRCH
-        end
-        begin
-          Process.wait2 @pid
-        rescue Errno::ECHILD
+      Process.kill :SIGTERM, @pid
+    rescue Errno::ESRCH
+    end
+    begin
+      until Process.wait2(@pid, Process::WNOHANG)
+        sleep 0.01
+        if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_limit
+          Process.kill :SIGKILL, @pid
+          assert false, "Process froze"
         end
       end
-    rescue Timeout::Error
-      Process.kill :SIGKILL, @pid
-      assert false, "Process froze"
     end
     assert true
   end

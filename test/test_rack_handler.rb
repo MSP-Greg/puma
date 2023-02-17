@@ -58,11 +58,18 @@ module TestRackUp
         end
       end
 
-      # Wait for launcher to boot
-      Timeout.timeout(10) do
-        sleep 0.5 until @launcher
+      time_limit = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10.0
+      booted = false
+
+      while Process.clock_gettime(Process::CLOCK_MONOTONIC) < time_limit
+        if @launcher && @launcher.log_writer.stdout.string.include?('Use Ctrl-C to stop')
+          booted = true
+          break
+        else
+          sleep 0.1
+        end
       end
-      sleep 1.5 unless Puma::IS_MRI
+      assert booted, 'Puma did not boot in 10 seconds?'
 
       yield @launcher
     ensure
@@ -298,22 +305,14 @@ module TestRackUp
 
   # Run using IO.popen so we don't load Rack and/or Rackup in the main process
   class RackUp < Minitest::Test
-    def setup
-      FileUtils.copy_file 'test/rackup/hello.ru', 'config.ru'
-    end
-
-    def teardown
-      FileUtils.rm 'config.ru'
-    end
-
     def test_bin
       # JRuby & TruffleRuby take a long time using IO.popen
       skip_unless :mri
-      io = IO.popen "rackup -p 0"
+      io = IO.popen "rackup -p 0 test/rackup/hello.ru"
       io.wait_readable 2
       sleep 0.7
       log = io.sysread 2_048
-      pid = log[/PID: (\d+)/, 1] || io.pid
+      pid = log[/ PID: (\d+)/, 1] || io.pid
       assert_includes log, 'Puma version'
       assert_includes log, 'Use Ctrl-C to stop'
     ensure
