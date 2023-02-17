@@ -347,7 +347,7 @@ module Puma
     # Next, wait an extra +grace+ seconds then force-kill remaining threads.
     # Finally, wait +kill_grace+ seconds for remaining threads to exit.
     #
-    def shutdown(timeout=-1)
+    def shutdown(timeout=-1, grace_time = SHUTDOWN_GRACE_TIME)
       threads = with_mutex do
         @shutdown = true
         @trim_requested = @spawned
@@ -382,7 +382,7 @@ module Puma
             t.raise ForceShutdown if t[:with_force_shutdown]
           end
         end
-        join.call(SHUTDOWN_GRACE_TIME)
+        join.call(grace_time)
 
         # If threads are _still_ running, forcefully kill them and wait to finish.
         threads.each(&:kill)
