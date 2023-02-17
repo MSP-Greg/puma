@@ -33,10 +33,10 @@ class TestIntegrationSSL < TestIntegration
     config_file = Tempfile.new %w(config .rb)
     config_file.write config
     config_file.close
-    config_file.path
+    cf_path = config_file.path
 
     # start server
-    cmd = "#{BASE} bin/puma -C #{config_file.path}"
+    cmd = "#{BASE} bin/puma -C #{cf_path}"
     @server = IO.popen cmd, 'r'
     wait_for_server_to_boot
     @pid = @server.pid
@@ -53,6 +53,8 @@ class TestIntegrationSSL < TestIntegration
     sock.syswrite "GET /stop?token=#{TOKEN} HTTP/1.1\r\n\r\n"
     sock.read
     assert_match 'Goodbye!', @server.read
+  ensure
+    File.unlink cf_path if File.exist?(cf_path)
   end
 
   def test_ssl_run
