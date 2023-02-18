@@ -78,7 +78,7 @@ jobs:
       # fixes 'has a bug that prevents `required_ruby_version`'
       - name: update rubygems for Ruby 2.4 - 2.5
         if: |
-          contains('2.4 2.5 2.6', matrix.ruby) && 
+          contains('2.4 2.5 2.6', matrix.ruby) &&
           (needs.skip_duplicate_runs.outputs.should_skip != 'true')
         run: gem update --system 3.3.14 --no-document
         continue-on-error: true
@@ -92,7 +92,7 @@ jobs:
         run: echo 'PUMA_DISABLE_SSL=true' >> $GITHUB_ENV
 
       - name: set WERRORFLAG
-        if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }} 
+        if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
         shell: bash
         run: echo 'PUMA_MAKE_WARNINGS_INTO_ERRORS=true' >> $GITHUB_ENV
 
@@ -107,11 +107,14 @@ jobs:
         shell: bash
         run: echo 'RUBYOPT=--yjit' >> $GITHUB_ENV
 
+      - name: Repo & Commit Info
+        run: ruby .github/workflows/github_actions_info.rb
+
       - name: test
         if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
         timeout-minutes: 10
         run: bundle exec rake test:all
-  
+
   test_non_mri:
     name: >-
       NON-MRI: ${{ matrix.os }} ${{ matrix.ruby }}${{ matrix.no-ssl }}
@@ -185,7 +188,7 @@ jobs:
         timeout-minutes: 12
         continue-on-error: ${{ matrix.allow-failure || false }}
         if: | # only run if previous steps have succeeded
-          success() && 
+          success() &&
           (needs.skip_duplicate_runs.outputs.should_skip != 'true')
         run: bundle exec rake test:all
 
