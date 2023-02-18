@@ -10,8 +10,10 @@ class WithoutBacktraceError < StandardError
   def message; "no backtrace error"; end
 end
 
-class TestPumaServer < Minitest::Test
-  parallelize_me!
+class TestPumaServerBase < Minitest::Test
+  RESP_READ_LEN = 65_536
+  RESP_READ_TIMEOUT = 10
+  RESP_SPLIT = "\r\n\r\n"
 
   def setup
     @host = "127.0.0.1"
@@ -58,17 +60,15 @@ class TestPumaServer < Minitest::Test
     header
   end
 
-  # only for shorter bodies!
-  def send_http_and_sysread(req)
-    send_http(req).sysread 2_048
-  end
-
   def send_http_and_read(req)
-    send_http(req).read
+    skt = send_http req
+    skt.read_response
   end
 
   def send_http(req)
-    new_connection << req
+    skt = new_connection
+    skt.syswrite req
+    skt
   end
 
   def send_proxy_v1_http(req, remote_ip, multisend = false)
@@ -83,12 +83,141 @@ class TestPumaServer < Minitest::Test
     else
       conn << ("PROXY #{family} #{remote_ip} #{target} 10000 80\r\n" + req)
     end
+    conn
   end
 
+  READ_BODY = -> (timeout = nil) {
+    self.read_response(timeout).split(RESP_SPLIT, 2).last
+  }
+
+  READ_RESPONSE = -> (timeout = nil) do
+    timeout ||= RESP_READ_TIMEOUT
+    content_length = nil
+    chunked = nil
+    response = +''
+    t_st = Process.clock_gettime Process::CLOCK_MONOTONIC
+    if self.to_io.wait_readable timeout
+      loop do
+        begin
+          part = self.read_nonblock(RESP_READ_LEN, exception: false)
+          case part
+          when String
+            unless content_length || chunked
+              chunked ||= part.include? "\r\nTransfer-Encoding: chunked\r\n"
+              content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
+            end
+
+            response << part
+            hdrs, body = response.split RESP_SPLIT, 2
+            unless body.nil?
+              # below could be simplified, but allows for debugging...
+              ret =
+                if content_length
+                  body.bytesize == content_length
+                elsif chunked
+                  body.end_with? "\r\n0\r\n\r\n"
+                elsif !hdrs.empty? && !body.empty?
+                  true
+                else
+                  false
+                end
+              if ret
+                return response
+              end
+            end
+            sleep 0.000_1
+          when :wait_readable, :wait_writable # :wait_writable for ssl
+            sleep 0.000_2
+          when nil
+            if response.empty?
+              raise EOFError
+            else
+              return response
+            end
+          end
+          if timeout < Process.clock_gettime(Process::CLOCK_MONOTONIC) - t_st
+            raise Timeout::Error, 'Client Read Timeout'
+          end
+        end
+      end
+    else
+      raise Timeout::Error, 'Client Read Timeout'
+    end
+  end
+
+  REQ_WRITE = -> (str) { self.syswrite str }
 
   def new_connection
-    TCPSocket.new(@host, @port).tap {|sock| @ios << sock}
+    skt = TCPSocket.new @host, @port
+    skt.singleton_class.define_method :read_response, READ_RESPONSE
+    skt.singleton_class.define_method :read_body, READ_BODY
+    skt.singleton_class.define_method :<<, REQ_WRITE
+    @ios << skt
+    skt
   end
+
+  def read_body(timeout = nil)
+    self.read_response(timeout).split(RESP_SPLIT, 2).last
+  end
+
+  def read_response(timeout = nil)
+    timeout ||= RESP_READ_TIMEOUT
+    content_length = nil
+    chunked = nil
+    response = +''
+    t_st = Process.clock_gettime Process::CLOCK_MONOTONIC
+    if self.to_io.wait_readable timeout
+      loop do
+        begin
+          part = self.read_nonblock(RESP_READ_LEN, exception: false)
+          case part
+          when String
+            unless content_length || chunked
+              chunked ||= part.include? "\r\nTransfer-Encoding: chunked\r\n"
+              content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
+            end
+
+            response << part
+            hdrs, body = response.split RESP_SPLIT, 2
+            unless body.nil?
+              # below could be simplified, but allows for debugging...
+              ret =
+                if content_length
+                  body.bytesize == content_length
+                elsif chunked
+                  body.end_with? "\r\n0\r\n\r\n"
+                elsif !hdrs.empty? && !body.empty?
+                  true
+                else
+                  false
+                end
+              if ret
+                return response
+              end
+            end
+            sleep 0.000_1
+          when :wait_readable, :wait_writable # :wait_writable for ssl
+            sleep 0.000_2
+          when nil
+            if response.empty?
+              raise EOFError
+            else
+              return response
+            end
+          end
+          if timeout < Process.clock_gettime(Process::CLOCK_MONOTONIC) - t_st
+            raise Timeout::Error, 'Client Read Timeout'
+          end
+        end
+      end
+    else
+      raise Timeout::Error, 'Client Read Timeout'
+    end
+  end
+end
+
+class TestPumaServerP < TestPumaServerBase
+  parallelize_me!
 
   def test_normalize_host_header_missing
     server_run do |env|
@@ -141,7 +270,7 @@ class TestPumaServer < Minitest::Test
   def test_streaming_body
     server_run do |env|
       body = lambda do |stream|
-        stream.write("Hello World")
+        stream << "Hello World"
         stream.close
       end
 
@@ -150,7 +279,7 @@ class TestPumaServer < Minitest::Test
 
     data = send_http_and_read "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
 
-    assert_equal "Hello World", data.split("\r\n\r\n", 2).last
+    assert_equal "Hello World", data.split(RESP_SPLIT, 2).last
   end
 
   def test_file_body
@@ -160,11 +289,9 @@ class TestPumaServer < Minitest::Test
 
     server_run { |env| [200, {}, tf] }
 
-    data = +''
     skt = send_http("GET / HTTP/1.1\r\nHost: [::ffff:127.0.0.1]:#{@port}\r\n\r\n")
-    data << skt.sysread(65_536) while skt.wait_readable(0.1)
 
-    ary = data.split("\r\n\r\n", 2)
+    ary = skt.read_response.split RESP_SPLIT, 2
 
     assert_equal random_bytes.bytesize, ary.last.bytesize
     assert_equal random_bytes, ary.last
@@ -184,10 +311,8 @@ class TestPumaServer < Minitest::Test
 
     server_run { |env| [200, {}, obj] }
 
-    data = +''
     skt = send_http("GET / HTTP/1.1\r\nHost: [::ffff:127.0.0.1]:#{@port}\r\n\r\n")
-    data << skt.sysread(65_536) while skt.wait_readable(0.1)
-    ary = data.split("\r\n\r\n", 2)
+    ary = skt.read_response.split RESP_SPLIT, 2
 
     assert_equal random_bytes.bytesize, ary.last.bytesize
     assert_equal random_bytes, ary.last
@@ -210,7 +335,7 @@ class TestPumaServer < Minitest::Test
     sleep 0.1 # important so that the previous data is sent as a packet
     sock << fifteen
 
-    sock.read
+    sock.read_response
 
     assert_equal "#{fifteen}#{fifteen}", data
   end
@@ -243,7 +368,7 @@ class TestPumaServer < Minitest::Test
       break if line == "\r\n"
     end
 
-    out = sock.read
+    out = sock.read_response
 
     assert_equal giant.bytesize, out.bytesize
   end
@@ -464,7 +589,7 @@ EOF
       [[0,1], {}, app_body]
     end
 
-    data = send_http_and_sysread "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_and_read "GET / HTTP/1.0\r\n\r\n"
 
     assert_includes data, 'HTTP/1.0 500 Internal Server Error'
     assert_includes data, "Puma caught this error: undefined method `to_i' for"
@@ -479,7 +604,7 @@ EOF
       raise NoMethodError, "Oh no an error"
     end
 
-    data = send_http_and_sysread "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_and_read "GET / HTTP/1.0\r\n\r\n"
 
     assert_includes data, 'HTTP/1.0 500 Internal Server Error'
     assert_match(/Puma caught this error: Oh no an error.*\(NoMethodError\).*test\/test_puma_server.rb/m, data)
@@ -490,7 +615,7 @@ EOF
       raise WithoutBacktraceError.new
     end
 
-    data = send_http_and_sysread "GET / HTTP/1.1\r\n\r\n"
+    data = send_http_and_read "GET / HTTP/1.1\r\n\r\n"
     assert_includes data, 'HTTP/1.1 500 Internal Server Error'
     assert_includes data, 'Puma caught this error: no backtrace error (WithoutBacktraceError)'
     assert_includes data, '<no backtrace available>'
@@ -710,8 +835,8 @@ EOF
   def test_Expect_100
     server_run { [200, {}, [""]] }
 
-    data = send_http_and_read "GET / HTTP/1.1\r\nConnection: close\r\nExpect: 100-continue\r\n\r\n"
-
+    skt = send_http "GET / HTTP/1.1\r\nConnection: close\r\nExpect: 100-continue\r\n\r\n"
+    data = skt.read_response
     assert_equal "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
   end
 
@@ -775,10 +900,9 @@ EOF
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1\r\n"
     sleep 1
-
     sock << "h\r\n4\r\nello\r\n0\r\n\r\n"
 
-    data = sock.read
+    data = sock.read_response
 
     assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
@@ -796,10 +920,9 @@ EOF
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n"
     sleep 1
-
     sock << "4\r\nello\r\n0\r\n\r\n"
 
-    data = sock.read
+    data = sock.read_response
 
     assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
@@ -817,10 +940,9 @@ EOF
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1\r"
     sleep 1
-
     sock << "\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
-    data = sock.read
+    data = sock.read_response
 
     assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
@@ -838,10 +960,9 @@ EOF
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1"
     sleep 1
-
     sock << "\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
-    data = sock.read
+    data = sock.read_response
 
     assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
@@ -859,10 +980,9 @@ EOF
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\ne"
     sleep 1
-
     sock << "llo\r\n0\r\n\r\n"
 
-    data = sock.read
+    data = sock.read_response
 
     assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
@@ -883,16 +1003,12 @@ EOF
     chunked_body = "#{part1.size.to_s(16)}\r\n#{part1}\r\n1\r\nb\r\n0\r\n\r\n"
 
     sock = send_http "PUT /path HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n"
-
     sleep 0.1
-
     sock << chunked_body[0..-10]
-
     sleep 0.1
-
     sock << chunked_body[-9..-1]
 
-    data = sock.read
+    data = sock.read_response
 
     assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal (part1 + 'b'), body
@@ -909,12 +1025,10 @@ EOF
     }
 
     sock = send_http "PUT /path HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r"
-
     sleep 1
-
     sock << "\n0\r\n\r\n"
 
-    data = sock.read
+    data = sock.read_response
 
     assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal 'hello', body
@@ -931,12 +1045,10 @@ EOF
     }
 
     sock = send_http "PUT /path HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello"
-
     sleep 1
-
     sock << "\r\n0\r\n\r\n"
 
-    data = sock.read
+    data = sock.read_response
 
     assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal 'hello', body
@@ -1126,7 +1238,7 @@ EOF
     server_run(**options) { [200, {}, ["Hello"]] }
     s = send_http nil
     sleep 0.1
-    s << "GET / HTTP/1.0\r\n\r\n"
+    s.syswrite "GET / HTTP/1.0\r\n\r\n"
     assert_equal 'Hello', s.readlines.last
   end
 
@@ -1257,7 +1369,7 @@ EOF
     assert_match(s1_response, s1.gets) if s1_response
 
     # Send s2 after shutdown begins
-    s2 << "\r\n" unless s2.wait_readable(0.2)
+    s2.syswrite "\r\n" unless s2.wait_readable(0.2)
 
     assert s2.wait_readable(10), 'timeout waiting for response'
     s2_result = begin
@@ -1327,35 +1439,6 @@ EOF
     sock.close
   end
 
-  def stub_accept_nonblock(error)
-    @port = (@server.add_tcp_listener @host, 0).addr[1]
-    io = @server.binder.ios.last
-
-    accept_old = io.method(:accept_nonblock)
-    io.singleton_class.send :define_method, :accept_nonblock do
-      accept_old.call.close
-      raise error
-    end
-
-    @server.run
-    new_connection
-    sleep 0.01
-  end
-
-  # System-resource errors such as EMFILE should not be silently swallowed by accept loop.
-  def test_accept_emfile
-    stub_accept_nonblock Errno::EMFILE.new('accept(2)')
-    refute_empty @log_writer.stderr.string, "Expected EMFILE error not logged"
-  end
-
-  # Retryable errors such as ECONNABORTED should be silently swallowed by accept loop.
-  def test_accept_econnaborted
-    # Match Ruby #accept_nonblock implementation, ECONNABORTED error is extended by IO::WaitReadable.
-    error = Errno::ECONNABORTED.new('accept(2) would block').tap {|e| e.extend IO::WaitReadable}
-    stub_accept_nonblock(error)
-    assert_empty @log_writer.stderr.string
-  end
-
   # see      https://github.com/puma/puma/issues/2390
   # fixed by https://github.com/puma/puma/pull/2279
   #
@@ -1369,7 +1452,7 @@ EOF
 
     # valid req & read, close
     sock = TCPSocket.new @host, @port
-    sock.syswrite "GET / HTTP/1.0\r\n\r\n"
+    sock << "GET / HTTP/1.0\r\n\r\n"
     sleep 0.05  # macOS TruffleRuby may not get the body without
     resp = sock.sysread 256
     sock.close
@@ -1379,14 +1462,14 @@ EOF
 
     # valid req, close
     sock = TCPSocket.new @host, @port
-    sock.syswrite "GET / HTTP/1.0\r\n\r\n"
+    sock << "GET / HTTP/1.0\r\n\r\n"
     sock.close
     sleep 0.5
     assert_empty @log_writer.stdout.string
 
     # invalid req, close
     sock = TCPSocket.new @host, @port
-    sock.syswrite "GET / HTTP"
+    sock << "GET / HTTP"
     sock.close
     sleep 0.5
     assert_empty @log_writer.stdout.string
@@ -1413,13 +1496,15 @@ EOF
   end
 
   def test_command_ignored_before_run
-    @server.stop # ignored
-    @server.run
-    @server.halt
     done = Queue.new
     @server.events.register(:state) do |state|
       done << @server.instance_variable_get(:@status) if state == :done
     end
+
+    @server.stop # ignored
+    @server.run
+    @server.halt
+    sleep 0.001 while done.length.zero?
     assert_equal :halt, done.pop
   end
 
@@ -1448,7 +1533,7 @@ EOF
     bad = 0
     connections.each do |s|
       begin
-        assert_match 'DONE', s.read
+        assert_equal 'DONE', s.read.split("\r\n\r\n").last
       rescue Errno::ECONNRESET
         bad += 1
       end
@@ -1473,7 +1558,7 @@ EOF
 
     # TODO: it would be great to test a connection from a non-localhost IP, but we can't really do that. For
     # now, at least test that it doesn't return garbage.
-    remote_addr = send_http_and_sysread("GET / HTTP/1.1\r\n\r\n").split("\r\n").last
+    remote_addr = send_http_and_read("GET / HTTP/1.1\r\n\r\n").split("\r\n").last
     assert_equal @host, remote_addr
   end
 
@@ -1544,5 +1629,36 @@ EOF
     assert_equal body_len, resp_body.bytesize
     assert_equal str * loops, resp_body
     assert_operator times.last - times.first, :>, 1.0
+  end
+end
+
+class TestPumaServerS < TestPumaServerBase
+  def stub_accept_nonblock(error)
+    @port = (@server.add_tcp_listener @host, 0).addr[1]
+    io = @server.binder.ios.last
+
+    accept_old = io.method(:accept_nonblock)
+    io.singleton_class.send :define_method, :accept_nonblock do
+      accept_old.call.close
+      raise error
+    end
+
+    @server.run
+    new_connection
+    sleep 0.02
+  end
+
+  # System-resource errors such as EMFILE should not be silently swallowed by accept loop.
+  def test_accept_emfile
+    stub_accept_nonblock Errno::EMFILE.new('accept(2)')
+    refute_empty @log_writer.stderr.string, "Expected EMFILE error not logged"
+  end
+
+  # Retryable errors such as ECONNABORTED should be silently swallowed by accept loop.
+  def test_accept_econnaborted
+    # Match Ruby #accept_nonblock implementation, ECONNABORTED error is extended by IO::WaitReadable.
+    error = Errno::ECONNABORTED.new('accept(2) would block').tap {|e| e.extend IO::WaitReadable}
+    stub_accept_nonblock(error)
+    assert_empty @log_writer.stderr.string
   end
 end
