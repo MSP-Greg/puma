@@ -46,6 +46,9 @@ class TestIntegrationCluster < TestIntegration
   def test_pre_existing_unix_stop_after_restart
     skip_unless :unix
 
+    # intermittent output of 'Master seems to have exited, exiting.'
+    @check_server_err = false
+
     File.open(@bind_path, mode: 'wb') { |f| f.puts 'pre existing' }
 
     cli_server "-w #{workers} -q test/rackup/sleep_step.ru", unix: :unix
@@ -182,7 +185,7 @@ class TestIntegrationCluster < TestIntegration
     @control_tcp_port = UniquePort.call
     worker_check_interval = 1
 
-    cli_server "-w 1 -t 1:1 --control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN} test/rackup/hello.ru", config: "worker_check_interval #{worker_check_interval}"
+    cli_server "-w1 -t1:1 #{set_pumactl_args} test/rackup/hello.ru", config: "worker_check_interval #{worker_check_interval}"
 
     sleep worker_check_interval + 1
     checkin_1 = get_stats["worker_status"].first["last_checkin"]
@@ -327,8 +330,7 @@ RUBY
 
   def test_nio4r_gem_not_required_in_master_process_when_using_control_server
     @control_tcp_port = UniquePort.call
-    control_opts = "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN}"
-    cli_server "-w #{workers} #{control_opts} -C test/config/prune_bundler_print_nio_defined.rb test/rackup/hello.ru"
+    cli_server "-w #{workers} #{set_pumactl_args} -C test/config/prune_bundler_print_nio_defined.rb test/rackup/hello.ru"
 
     line = @server.gets
     assert_match(/Starting control server/, line)
@@ -463,7 +465,6 @@ RUBY
 
     assert wait_for_server_to_include('Loaded Extensions - worker 0:')
     assert wait_for_server_to_include('Loaded Extensions - master:')
-    @pid = @server.pid
   end
 
   private
