@@ -2,7 +2,6 @@
 
 require "puma/control_cli"
 require "json"
-require "open3"
 require "io/wait"
 require_relative 'tmp_path'
 
@@ -22,6 +21,8 @@ class TestIntegration < Minitest::Test
 
   def setup
     @server = nil
+    @server_err = nil
+    @check_server_err = true
     @pid = nil
     @ios_to_close = []
     @bind_path    = tmp_path('.sock')
@@ -32,6 +33,14 @@ class TestIntegration < Minitest::Test
       cli_pumactl 'stop'
     elsif @server && @pid && !Puma.windows?
       stop_server @pid, signal: :INT
+    end
+
+    if @server_err.is_a?(IO) && @check_server_err
+      if @server_err.wait_readable 3
+        err_out = @server_err.read
+        assert_empty err_out
+      end
+      @server_err&.close
     end
 
     @ios_to_close&.each do |io|
@@ -68,7 +77,6 @@ class TestIntegration < Minitest::Test
   def cli_server(argv,  # rubocop:disable Metrics/ParameterLists
       unix: false,      # uses a UNIXSocket for the server listener when true
       config: nil,      # string to use for config file
-      merge_err: false, # merge STDERR into STDOUT
       log: false,       # output server log to console (for debugging)
       no_wait: false,   # don't wait for server to boot
       puma_debug: nil,  # set env['PUMA_DEBUG'] = 'true'
@@ -89,13 +97,11 @@ class TestIntegration < Minitest::Test
 
     env['PUMA_DEBUG'] = 'true' if puma_debug
 
-    if merge_err
-      @server = IO.popen(env, cmd, :err=>[:child, :out])
-    else
-      @server = IO.popen(env, cmd)
-    end
+    @server, @server_err, @pid = popen2(env, cmd)
+    # =below helpful may be helpful for debugging
+    # STDOUT.syswrite "\nPID #{@pid} #{self.class.to_s}##{name}\n"
+
     wait_for_server_to_boot(log: log) unless no_wait
-    @pid = @server.pid
     @server
   end
 
@@ -152,7 +158,7 @@ class TestIntegration < Minitest::Test
       end
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
       retry_cntr += 1
-      flunk "server did not output '#{str}' in allowed time" if retry_cntr > 20
+      flunk "server did not output '#{str}' in allowed time #{e.class}" if retry_cntr > 20
       sleep 0.1
       retry
     end
@@ -179,7 +185,7 @@ class TestIntegration < Minitest::Test
       end
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
       retry_cntr += 1
-      flunk "server output did not match '#{re}' in allowed time" if retry_cntr > 20
+      flunk "server output did not match '#{re}' in allowed time #{e.class}" if retry_cntr > 20
       sleep 0.1
       retry
     end
@@ -338,10 +344,9 @@ class TestIntegration < Minitest::Test
     MSG
     skip_if :truffleruby, suffix: ' - Undiagnosed failures on TruffleRuby'
 
-    args = "-w #{workers} -t 5:5 -q test/rackup/hello_with_delay.ru"
+    args = "-w#{workers} -t5:5 -q test/rackup/hello_with_delay.ru"
     if Puma.windows?
-      @control_tcp_port = UniquePort.call
-      cli_server "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN} #{args}"
+      cli_server "#{set_pumactl_args} #{args}"
     else
       cli_server args
     end
@@ -429,7 +434,7 @@ class TestIntegration < Minitest::Test
     restart_thread.join
     if Puma.windows?
       cli_pumactl 'stop'
-      Process.wait @server.pid
+      Process.wait @pid
     else
       stop_server
     end
@@ -468,11 +473,27 @@ class TestIntegration < Minitest::Test
   ensure
     return if skipped
     if passed?
+     refused = replies[:refused]
+      reset   = replies[:reset]
       msg = "    #{restart_count} restarts, #{reset} resets, #{refused} refused, #{replies[:restart]} success after restart, #{replies[:write_error]} write error"
       $debugging_info << "#{full_name}\n#{msg}\n"
     else
       client_threads.each { |thr| thr.kill if thr.is_a? Thread }
       $debugging_info << "#{full_name}\n#{msg}\n"
     end
+  end
+
+  def popen2(env = {}, cmd)
+    opts = {}
+
+    out_r, out_w = IO.pipe
+    opts[:out] = out_w
+
+    err_r, err_w = IO.pipe
+    opts[:err] = err_w
+
+    pid = spawn(env, cmd, opts)
+    [out_w, err_w].each(&:close)
+    [out_r, err_r, pid]
   end
 end

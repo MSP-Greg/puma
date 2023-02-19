@@ -106,25 +106,25 @@ class TestIntegrationSingle < TestIntegration
 
     cli_server 'test/rackup/sleep.ru'
 
-    _stdin, curl_stdout, _stderr, curl_wait_thread = Open3.popen3({ 'LC_ALL' => 'C' }, "curl http://#{HOST}:#{@tcp_port}/sleep10")
+    curl_stdout, _stderr, curl_pid = popen2({ 'LC_ALL' => 'C' }, "curl http://#{HOST}:#{@tcp_port}/sleep10")
     sleep 1 # ensure curl send a request
 
     Process.kill :TERM, @pid
     assert wait_for_server_to_include('Gracefully stopping') # wait for server to begin graceful shutdown
 
     # Invoke a request which must be rejected
-    _stdin, _stdout, rejected_curl_stderr, rejected_curl_wait_thread = Open3.popen3("curl #{HOST}:#{@tcp_port}")
+    _stdout, rejected_curl_stderr, rej_curl_pid = popen2("curl #{HOST}:#{@tcp_port}")
 
-    assert nil != Process.getpgid(@server.pid) # ensure server is still running
-    assert nil != Process.getpgid(curl_wait_thread[:pid]) # ensure first curl invocation still in progress
-
-    curl_wait_thread.join
-    rejected_curl_wait_thread.join
+    refute_nil Process.getpgid(@pid) # ensure server is still running
+    refute_nil Process.getpgid(rej_curl_pid) # ensure first curl invocation still in progress
 
     assert_match(/Slept 10/, curl_stdout.read)
     assert_match(/Connection refused|Couldn't connect to server/, rejected_curl_stderr.read)
 
-    Process.wait(@server.pid)
+    Process.wait(curl_pid)
+    Process.wait(rej_curl_pid)
+
+    Process.wait(@pid)
     @server.close unless @server.closed?
     @server = nil # prevent `#teardown` from killing already killed server
   end
@@ -216,11 +216,11 @@ class TestIntegrationSingle < TestIntegration
   # listener is closed 'externally' while Puma is in the IO.select statement
   def test_closed_listener
     skip_unless_signal_exist? :TERM
-
-    cli_server "test/rackup/close_listeners.ru", merge_err: true
+#    @check_server_err = false
+    cli_server "test/rackup/close_listeners.ru"
     connection = fast_connect
 
-    if DARWIN && RUBY_VERSION < '2.5'
+    if DARWIN && RUBY_VERSION < '2.5' || TRUFFLE
       begin
         read_body connection
       rescue EOFError
@@ -234,6 +234,7 @@ class TestIntegrationSingle < TestIntegration
       Process.kill :SIGTERM, @pid
     rescue Errno::ESRCH
     end
+
     begin
       until Process.wait2(@pid, Process::WNOHANG)
         sleep 0.01
@@ -243,7 +244,12 @@ class TestIntegrationSingle < TestIntegration
         end
       end
     end
-    assert true
+    if RUBY_PLATFORM == 'java'
+      refute_empty @server_err.read
+    else
+      # linux IOError, macOS Errno::EBADF
+      assert_match(/Exception handling servers: (#<IOError: closed stream>|#<Errno::EBADF: Bad file descriptor>)/, @server_err.read)
+    end
   end
 
   def test_puma_debug_loaded_exts
