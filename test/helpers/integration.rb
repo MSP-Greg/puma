@@ -151,7 +151,7 @@ class TestIntegration < Minitest::Test
       end
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
       retry_cntr += 1
-      raise e if retry_cntr > 10
+      flunk "server did not output '#{str}' in allowed time" if retry_cntr > 20
       sleep 0.1
       retry
     end
@@ -178,7 +178,7 @@ class TestIntegration < Minitest::Test
       end
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
       retry_cntr += 1
-      raise e if retry_cntr > 10
+      flunk "server output did not match '#{re}' in allowed time" if retry_cntr > 20
       sleep 0.1
       retry
     end
