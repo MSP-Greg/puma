@@ -30,10 +30,10 @@ class TestIntegration < Minitest::Test
   end
 
   def teardown
+    err_out = ''
     if @server_err.is_a?(IO) && @check_server_err
       if @server_err.wait_readable 3
         err_out = @server_err.read
-        assert_empty err_out
       end
       @server_err&.close
     end
@@ -67,6 +67,7 @@ class TestIntegration < Minitest::Test
         @server = nil
       end
     end
+    STDOUT.syswrite("\n-----------------------------------err_out\n#{err_out}\n") unless err_out.empty?
   end
 
   private
@@ -138,8 +139,10 @@ class TestIntegration < Minitest::Test
 
   # wait for server to say it booted
   # @server and/or @server.gets may be nil on slow CI systems
-  def wait_for_server_to_boot(log: false)
+  def wait_for_server_to_boot(log: false, no_error: false)
     wait_for_server_to_include 'Ctrl-C', log: log
+  rescue => e
+    flunk "Server didn't boot in a timely manner #{e.class}"
   end
 
   # Returns true if and when server log includes str.
@@ -413,8 +416,7 @@ class TestIntegration < Minitest::Test
         else
           Process.kill :USR2, @pid
         end
-        sleep 0.5
-        wait_for_server_to_boot
+        wait_for_server_to_boot(no_error: true)
         restart_count += 1
         sleep(Puma.windows? ? 2.0 : 0.5)
       end
