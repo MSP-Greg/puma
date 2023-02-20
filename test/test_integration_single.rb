@@ -255,7 +255,5 @@ class TestIntegrationSingle < TestIntegration
     cli_server "#{set_pumactl_args} test/rackup/hello.ru", puma_debug: true
 
     assert wait_for_server_to_include('Loaded Extensions:')
-
-    cli_pumactl 'stop'
   end
 end
