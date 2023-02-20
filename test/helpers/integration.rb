@@ -30,18 +30,18 @@ class TestIntegration < Minitest::Test
   end
 
   def teardown
-    if @server && defined?(@control_tcp_port) && Puma.windows?
-      cli_pumactl 'stop'
-    elsif @server && @pid && !Puma.windows?
-      stop_server @pid, signal: :INT
-    end
-
     if @server_err.is_a?(IO) && @check_server_err
       if @server_err.wait_readable 3
         err_out = @server_err.read
         assert_empty err_out
       end
       @server_err&.close
+    end
+
+    if @server && defined?(@control_tcp_port) && Puma.windows?
+      cli_pumactl 'stop'
+    elsif @server && @pid && !Puma.windows?
+      stop_server @pid, signal: :INT
     end
 
     @ios_to_close&.each do |io|
@@ -110,6 +110,7 @@ class TestIntegration < Minitest::Test
   # that is already stopped/killed, especially since Process.wait2 is
   # blocking
   def stop_server(pid = @pid, signal: :TERM)
+    @check_server_err = false
     begin
       Process.kill signal, pid
     rescue Errno::ESRCH
@@ -307,7 +308,6 @@ class TestIntegration < Minitest::Test
                [IOError, Errno::ECONNREFUSED, Errno::EPIPE, Errno::EBADF]
     end
   end
-
 
   def set_pumactl_args(unix: false)
     if unix

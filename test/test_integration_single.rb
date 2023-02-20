@@ -216,7 +216,6 @@ class TestIntegrationSingle < TestIntegration
   # listener is closed 'externally' while Puma is in the IO.select statement
   def test_closed_listener
     skip_unless_signal_exist? :TERM
-#    @check_server_err = false
     cli_server "test/rackup/close_listeners.ru"
     connection = fast_connect
 
