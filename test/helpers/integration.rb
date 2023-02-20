@@ -33,6 +33,7 @@ class TestIntegration < Minitest::Test
     err_out = ''
     if @server_err.is_a?(IO) && @check_server_err
       if @server_err.wait_readable 3
+        STDOUT.syswrite "\n------------------------------------- loaded err_out\n"
         err_out = @server_err.read
       end
       @server_err&.close
