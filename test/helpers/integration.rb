@@ -31,8 +31,7 @@ class TestIntegration < Minitest::Test
   def teardown
     err_out = ''
     if @server_err.is_a?(IO) && @check_server_err
-      if @server_err.wait_readable 3
-        STDOUT.syswrite "\n------------------------------------- loaded err_out\n"
+      if @server_err.wait_readable 0.1
         err_out = @server_err.read
       end
       @server_err&.close
@@ -234,7 +233,7 @@ class TestIntegration < Minitest::Test
   end
 
   def read_body(connection, timeout = nil)
-    read_response(connection, timeout).last
+    read_response(connection, timeout).split(RESP_SPLIT, 2).last
   end
 
   def read_response(connection, timeout = nil)
@@ -269,14 +268,18 @@ class TestIntegration < Minitest::Test
                   false
                 end
               if ret
-                return [hdrs, body]
+                return response
               end
             end
             sleep 0.000_1
           when :wait_readable, :wait_writable # :wait_writable for ssl
             sleep 0.000_2
           when nil
-            raise EOFError
+            if response.empty?
+              raise EOFError
+            else
+              return response
+            end
           end
           if timeout < Process.clock_gettime(Process::CLOCK_MONOTONIC) - t_st
             raise Timeout::Error, 'Client Read Timeout'
