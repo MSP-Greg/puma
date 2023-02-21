@@ -219,7 +219,7 @@ class TestIntegrationSingle < TestIntegration
     cli_server "test/rackup/close_listeners.ru"
     connection = fast_connect
 
-    if DARWIN && RUBY_VERSION < '2.5' || TRUFFLE
+    if DARWIN && RUBY_VERSION < '2.6' || TRUFFLE
       begin
         read_body connection
       rescue EOFError
