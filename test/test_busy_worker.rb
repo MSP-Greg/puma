@@ -1,6 +1,8 @@
 require_relative "helper"
 
 class TestBusyWorker < Minitest::Test
+  parallelize_me! if ::Puma.mri?
+
   def setup
     skip_unless :mri # This feature only makes sense on MRI
     @ios = []
@@ -21,11 +23,13 @@ class TestBusyWorker < Minitest::Test
   end
 
   def send_http(req)
-    new_connection << req
+    t = new_connection
+    t.syswrite req
+    t
   end
 
   def send_http_and_read(req)
-    send_http(req).read
+    send_http(req).read_nonblock(1024)
   end
 
   def with_server(**options, &app)
@@ -76,7 +80,10 @@ class TestBusyWorker < Minitest::Test
     skts = Array.new(n) { send_http "GET / HTTP/1.0\r\n\r\n" }
 
     Array.new(n) do |i|
-      Thread.new { skts[i].read }
+      Thread.new {
+        skts[i].wait_readable 2
+        skts[i].read_nonblock 1024
+      }
     end.each(&:join)
 
     assert_equal n, @requests_count, "number of requests needs to match"
@@ -99,7 +106,10 @@ class TestBusyWorker < Minitest::Test
     skts = Array.new(n) { send_http "GET / HTTP/1.0\r\n\r\n" }
 
     Array.new(n) do |i|
-      Thread.new { skts[i].read }
+      Thread.new {
+        skts[i].wait_readable 2
+        skts[i].read_nonblock 1024
+      }
     end.each(&:join)
 
     assert_equal n, @requests_count, "number of requests needs to match"
