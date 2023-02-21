@@ -691,7 +691,7 @@ RUBY
   def thread_run_step(replies, delay, sleep_time, step, mutex, refused, unix: false)
     begin
       sleep delay
-      s = connect "sleep#{sleep_time}-#{step}", unix: unix
+      s = fast_connect "sleep#{sleep_time}-#{step}", unix: unix
       body = read_body(s, 20)
       if body[/\ASlept /]
         mutex.synchronize { replies[step] = :success }
