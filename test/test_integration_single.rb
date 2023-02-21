@@ -243,11 +243,13 @@ class TestIntegrationSingle < TestIntegration
         end
       end
     end
+    @server_err.wait_readable 2
+    server_err = @server_err.read_nonblock 2_048
     if RUBY_PLATFORM == 'java'
-      refute_empty @server_err.read
+      refute_empty server_err
     else
       # linux IOError, macOS Errno::EBADF
-      assert_match(/Exception handling servers: (#<IOError: closed stream>|#<Errno::EBADF: Bad file descriptor>)/, @server_err.read)
+      assert_match(/Exception handling servers: (#<IOError: closed stream>|#<Errno::EBADF: Bad file descriptor>)/, server_err)
     end
   end
 
