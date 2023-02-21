@@ -102,7 +102,7 @@ class WebServerTest < Minitest::Test
     chunks_out = 0
 
     while data = request.read(chunk)
-      chunks_out += socket.write(data)
+      chunks_out += socket.syswrite(data)
       socket.flush
     end
     socket
