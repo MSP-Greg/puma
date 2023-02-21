@@ -37,7 +37,9 @@ class TestResponseHeader < Minitest::Test
   end
 
   def send_http(req)
-    new_connection << req
+    skt = new_connection
+    skt.syswrite req
+    skt
   end
 
   def new_connection
