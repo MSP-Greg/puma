@@ -33,11 +33,15 @@ class TestOutOfBandServer < Minitest::Test
   end
 
   def send_http(req)
-    new_connection << req
+    skt = new_connection
+    skt.syswrite req
+    skt
   end
 
   def send_http_and_read(req)
-    send_http(req).read
+    skt = send_http req
+    skt.wait_readable 2
+    skt.read_nonblock 2_048
   end
 
   def oob_server(**options)
