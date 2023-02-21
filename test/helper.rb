@@ -117,8 +117,8 @@ end
 
 Minitest::Test.prepend TimeoutEveryTestCase
 if ENV['CI']
-  require 'minitest/retry'
-  Minitest::Retry.use!
+#  require 'minitest/retry'
+#  Minitest::Retry.use!
 end
 
 module TestSkips
