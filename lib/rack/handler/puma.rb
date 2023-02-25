@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
-# This module is used as an 'include' file in code at bottom of file
+# This module is used as an 'include' file in code at bottom of file.  It may also
+# be used to to create a config for use with code that creates a Puma::Server
+# instance.  One example is Capybara.
+#
 module Puma
   module RackHandler
     DEFAULT_OPTIONS = {
@@ -107,6 +110,8 @@ module Puma
         end
       end
     end
+    # allow systems that create a Puma::Server to use these methods for config
+    extend self
   end
 end
 
