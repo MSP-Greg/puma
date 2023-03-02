@@ -132,6 +132,8 @@ class TestIntegration < Minitest::Test
   # @server and/or @server.gets may be nil on slow CI systems
   def wait_for_server_to_boot(log: false)
     wait_for_server_to_include 'Ctrl-C', log: log
+  rescue => e
+    flunk "wait_for_server_to_boot raised: #{e.class}\n   #{e.message}"
   end
 
   # Returns true if and when server log includes str.
@@ -411,7 +413,11 @@ class TestIntegration < Minitest::Test
           Process.kill :USR2, @pid
         end
         sleep 0.5
-        wait_for_server_to_boot
+        begin
+          wait_for_server_to_boot
+        rescue
+          break
+        end
         restart_count += 1
         sleep(Puma.windows? ? 2.0 : 0.5)
       end
