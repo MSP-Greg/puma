@@ -448,7 +448,7 @@ RUBY
     stop_server
 
     # helpful for non MRI Rubies
-    assert wait_for_server_to_include('puma shutdown')
+    assert(wait_for_server_to_include 'puma shutdown') unless Puma::IS_MRI
 
     assert_equal 'index 0 data 0', File.read(file0, mode: 'rb:UTF-8')
     assert_equal 'index 1 data 1', File.read(file1, mode: 'rb:UTF-8')
