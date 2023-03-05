@@ -113,7 +113,7 @@ class TestIntegrationSingle < TestIntegration
     sleep 1
 
     assert_raises(Errno::ECONNREFUSED) {
-      fast_connect '/sleep10'
+      fast_connect '/sleep1'
     }
 
     refute_nil Process.getpgid(@pid) # ensure server is still running
