@@ -305,38 +305,38 @@ module TestRackUp
 
   # Run using IO.popen so we don't load Rack and/or Rackup in the main process
   class RackUp < Minitest::Test
-    def setup
-      Dir.mkdir 'tmp/rackup' unless Dir.exist? 'tmp/rackup'
-      FileUtils.copy_file 'test/rackup/hello.ru', 'tmp/rackup/config.ru'
-    end
-
     def teardown
+      return if skipped?
       Dir.chdir "tmp/rackup" do
         FileUtils.rm 'config.ru'
       end
+
+      if Puma::IS_WINDOWS
+        `taskkill /F /PID #{@pid}`
+      else
+        Process.kill :KILL, @pid
+        begin
+          Process.wait2 @pid
+        rescue Errno::ECHILD
+        end
+      end
+      @io.close unless @io.closed?
     end
 
     def test_bin
       # JRuby & TruffleRuby take a long time using IO.popen
       skip_unless :mri
-      io = Dir.chdir('tmp/rackup') { IO.popen "bundle exec rackup -p 0" }
-      io.wait_readable 2
+
+      Dir.mkdir 'tmp/rackup' unless Dir.exist? 'tmp/rackup'
+      FileUtils.copy_file 'test/rackup/hello.ru', 'tmp/rackup/config.ru'
+
+      @io = Dir.chdir('tmp/rackup') { IO.popen "bundle exec rackup -p 0" }
+      @io.wait_readable 2
       sleep (::Puma::IS_OSX ? 1.5 : 0.7)
-      log = io.sysread 2_048
-      pid = (log[/ PID: (\d+)/, 1] || io.pid).to_i
+      log = @io.sysread 2_048
+      @pid = (log[/ PID: (\d+)/, 1] || @io.pid).to_i
       assert_includes log, 'Puma version'
       assert_includes log, 'Use Ctrl-C to stop'
-    ensure
-      return if skipped?
-      if Puma::IS_WINDOWS
-        `taskkill /F /PID #{pid}`
-      else
-        Process.kill :KILL, pid
-        begin
-          Process.wait2 pid
-        rescue Errno::ECHILD
-        end
-      end
     end
   end
 end
