@@ -71,7 +71,7 @@ class TestBusyWorker < Minitest::Test
     with_server(wait_for_less_busy_worker: 1.0) do |_|
       sleep(0.1)
 
-      [200, {}, [""]]
+      [200, {}, ["Hello World"]]
     end
 
     n = 2
@@ -97,7 +97,7 @@ class TestBusyWorker < Minitest::Test
     with_server(wait_for_less_busy_worker: 0.0) do |_|
       sleep(0.1)
 
-      [200, {}, [""]]
+      [200, {}, ["Hello World"]]
     end
 
     n = 4
