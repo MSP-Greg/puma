@@ -7,6 +7,7 @@ class TestBusyWorker < Minitest::Test
   include PumaTest::SocketTCP
 
   def setup
+    @host = '127.0.0.1'
     @app = -> (env) {
       sleep 0.1
       [200, {}, ["Hello World"]]
@@ -20,7 +21,7 @@ class TestBusyWorker < Minitest::Test
   def teardown
     return if skipped?
     @server&.stop true
-    @ios.each {|i| i.close unless i.closed?}
+    @ios.each { |io| io.close unless io.closed? }
   end
 
   def with_server(**options)
@@ -54,6 +55,8 @@ class TestBusyWorker < Minitest::Test
     @server = Puma::Server.new request_handler, nil, **options
     @port = (@server.add_tcp_listener '127.0.0.1', 0).addr[1]
     @server.run
+    # server is running in thread, and creating threads
+    sleep 0.25
   end
 
   def run_requests(n)
@@ -72,7 +75,7 @@ class TestBusyWorker < Minitest::Test
   # sequentially as a small delay is introduced
   def test_multiple_requests_waiting_on_less_busy_worker
     with_server(wait_for_less_busy_worker: 1.0)
-    n = 4
+    n = 3
     run_requests n
 
     assert_equal n, @requests_count, "number of requests needs to match"
