@@ -149,9 +149,9 @@ class TestPumaServerBase < Minitest::Test
 
   def new_connection
     skt = TCPSocket.new @host, @port
-    skt.singleton_class.define_method :read_response, READ_RESPONSE
-    skt.singleton_class.define_method :read_body, READ_BODY
-    skt.singleton_class.define_method :<<, REQ_WRITE
+    skt.singleton_class.send :define_method, :read_response, READ_RESPONSE
+    skt.singleton_class.send :define_method, :read_body, READ_BODY
+    skt.singleton_class.send :define_method, :<<, REQ_WRITE
     @ios << skt
     skt
   end
