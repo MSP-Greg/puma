@@ -106,23 +106,20 @@ class TestIntegrationSingle < TestIntegration
 
     cli_server 'test/rackup/sleep.ru'
 
-    curl_stdout, _stderr, curl_pid = popen2({ 'LC_ALL' => 'C' }, "curl http://#{HOST}:#{@tcp_port}/sleep10")
-    sleep 1 # ensure curl send a request
+    skt = fast_connect "/sleep5"
 
     Process.kill :TERM, @pid
     assert wait_for_server_to_include('Gracefully stopping') # wait for server to begin graceful shutdown
 
-    # Invoke a request which must be rejected
-    _stdout, rejected_curl_stderr, rej_curl_pid = popen2("curl #{HOST}:#{@tcp_port}")
+    sleep 1
+
+    assert_raises(Errno::ECONNREFUSED) {
+      fast_connect "/sleep10"
+    }
 
     refute_nil Process.getpgid(@pid) # ensure server is still running
-    refute_nil Process.getpgid(rej_curl_pid) # ensure first curl invocation still in progress
 
-    assert_match(/Slept 10/, curl_stdout.read)
-    assert_match(/Connection refused|Couldn't connect to server/, rejected_curl_stderr.read)
-
-    Process.wait(curl_pid)
-    Process.wait(rej_curl_pid)
+    assert_match(/Slept 5/, read_response(skt))
 
     Process.wait(@pid)
     @server.close unless @server.closed?
