@@ -323,14 +323,14 @@ module TestRackUp
       io.wait_readable 2
       sleep (::Puma::IS_OSX ? 1.5 : 0.7)
       log = io.sysread 2_048
-      pid = log[/ PID: (\d+)/, 1] || io.pid
+      pid = (log[/ PID: (\d+)/, 1] || io.pid).to_i
       assert_includes log, 'Puma version'
       assert_includes log, 'Use Ctrl-C to stop'
     ensure
       if Puma::IS_WINDOWS
         `taskkill /F /PID #{pid}`
       else
-        Process.kill :KILL, pid.to_i
+        Process.kill :KILL, pid
         begin
           Process.wait2 pid
         rescue Errno::ECHILD
