@@ -1,9 +1,17 @@
 require_relative "helper"
+require_relative "helpers/socket_tcp"
 
 class TestBusyWorker < Minitest::Test
   parallelize_me! if ::Puma.mri?
 
+  include PumaTest::SocketTCP
+
   def setup
+    @app = -> (env) {
+      sleep 0.1
+      [200, {}, ["Hello World"]]
+    }
+
     skip_unless :mri # This feature only makes sense on MRI
     @ios = []
     @server = nil
@@ -15,24 +23,7 @@ class TestBusyWorker < Minitest::Test
     @ios.each {|i| i.close unless i.closed?}
   end
 
-  def new_connection
-    TCPSocket.new('127.0.0.1', @port).tap {|s| @ios << s}
-  rescue IOError
-    Puma::Util.purge_interrupt_queue
-    retry
-  end
-
-  def send_http(req)
-    t = new_connection
-    t.syswrite req
-    t
-  end
-
-  def send_http_and_read(req)
-    send_http(req).read_nonblock(1024)
-  end
-
-  def with_server(**options, &app)
+  def with_server(**options)
     @requests_count = 0 # number of requests processed
     @requests_running = 0 # current number of requests running
     @requests_max_running = 0 # max number of requests running in parallel
@@ -48,7 +39,7 @@ class TestBusyWorker < Minitest::Test
       end
 
       begin
-        yield(env)
+        @app.call env
       ensure
         @mutex.synchronize do
           @requests_running -= 1
@@ -56,8 +47,8 @@ class TestBusyWorker < Minitest::Test
       end
     end
 
-    options[:min_threads] ||= 0
-    options[:max_threads] ||= 10
+    options[:min_threads] = 4
+    options[:max_threads] = 4
     options[:log_writer]  ||= Puma::LogWriter.strings
 
     @server = Puma::Server.new request_handler, nil, **options
@@ -65,17 +56,7 @@ class TestBusyWorker < Minitest::Test
     @server.run
   end
 
-  # Multiple concurrent requests are not processed
-  # sequentially as a small delay is introduced
-  def test_multiple_requests_waiting_on_less_busy_worker
-    with_server(wait_for_less_busy_worker: 1.0) do |_|
-      sleep(0.1)
-
-      [200, {}, ["Hello World"]]
-    end
-
-    n = 2
-
+  def run_requests(n)
     # send all requests first, read later
     skts = Array.new(n) { send_http "GET / HTTP/1.0\r\n\r\n" }
 
@@ -85,6 +66,14 @@ class TestBusyWorker < Minitest::Test
         skts[i].read_nonblock 1024
       }
     end.each(&:join)
+  end
+
+  # Multiple concurrent requests are not processed
+  # sequentially as a small delay is introduced
+  def test_multiple_requests_waiting_on_less_busy_worker
+    with_server(wait_for_less_busy_worker: 1.0)
+    n = 4
+    run_requests n
 
     assert_equal n, @requests_count, "number of requests needs to match"
     assert_equal 0, @requests_running, "none of requests needs to be running"
@@ -94,23 +83,9 @@ class TestBusyWorker < Minitest::Test
   # Multiple concurrent requests are processed
   # in parallel as a delay is disabled
   def test_multiple_requests_processing_in_parallel
-    with_server(wait_for_less_busy_worker: 0.0) do |_|
-      sleep(0.1)
-
-      [200, {}, ["Hello World"]]
-    end
-
+    with_server(wait_for_less_busy_worker: 0.0)
     n = 4
-
-    # send all requests first, read later
-    skts = Array.new(n) { send_http "GET / HTTP/1.0\r\n\r\n" }
-
-    Array.new(n) do |i|
-      Thread.new {
-        skts[i].wait_readable 2
-        skts[i].read_nonblock 1024
-      }
-    end.each(&:join)
+    run_requests n
 
     assert_equal n, @requests_count, "number of requests needs to match"
     assert_equal 0, @requests_running, "none of requests needs to be running"
