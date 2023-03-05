@@ -98,7 +98,7 @@ class TestIntegration < Minitest::Test
 
     env['PUMA_DEBUG'] = 'true' if puma_debug
 
-    @server, @server_err, @pid = spawn_puma env, cmd
+    @server, @server_err, @pid = spawn_cmd env, cmd
     # =below helpful may be helpful for debugging
     # STDOUT.syswrite "\nPID #{@pid} #{self.class.to_s}##{name}\n"
 
@@ -487,7 +487,7 @@ class TestIntegration < Minitest::Test
     end
   end
 
-  def spawn_puma(env = {}, cmd)
+  def spawn_cmd(env = {}, cmd)
     opts = {}
 
     out_r, out_w = IO.pipe
