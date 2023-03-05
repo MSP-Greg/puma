@@ -346,10 +346,12 @@ class TestIntegration < Minitest::Test
   end
 
   def hot_restart_does_not_drop_connections(num_threads: 1, total_requests: 500)
+    skipped = true
     skip_if :jruby, suffix: <<-MSG
  - file descriptors are not preserved on exec on JRuby; connection reset errors are expected during restarts
     MSG
     skip_if :truffleruby, suffix: ' - Undiagnosed failures on TruffleRuby'
+    skipped = false
 
     args = "-w#{workers} -t5:5 -q test/rackup/hello_with_delay.ru"
     if Puma.windows?
@@ -476,16 +478,15 @@ class TestIntegration < Minitest::Test
     end
 
   ensure
-    unless skipped?
-      if passed?
-       refused = replies[:refused]
-        reset   = replies[:reset]
-        msg = "    #{restart_count} restarts, #{reset} resets, #{refused} refused, #{replies[:restart]} success after restart, #{replies[:write_error]} write error"
-        $debugging_info << "#{full_name}\n#{msg}\n"
-      else
-        client_threads.each { |thr| thr.kill if thr.is_a? Thread }
-        $debugging_info << "#{full_name}\n#{msg}\n"
-      end
+    return if skipped
+    if passed?
+     refused = replies[:refused]
+      reset   = replies[:reset]
+      msg = "    #{restart_count} restarts, #{reset} resets, #{refused} refused, #{replies[:restart]} success after restart, #{replies[:write_error]} write error"
+      $debugging_info << "#{full_name}\n#{msg}\n"
+    else
+      client_threads.each { |thr| thr.kill if thr.is_a? Thread }
+      $debugging_info << "#{full_name}\n#{msg}\n"
     end
   end
 
