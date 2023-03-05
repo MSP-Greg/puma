@@ -327,7 +327,7 @@ module TestRackUp
       assert_includes log, 'Puma version'
       assert_includes log, 'Use Ctrl-C to stop'
     ensure
-      return if skipped
+      return if skipped?
       if Puma::IS_WINDOWS
         `taskkill /F /PID #{pid}`
       else
