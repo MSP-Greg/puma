@@ -72,7 +72,7 @@ class TestIntegration < Minitest::Test
   private
 
   def silent_and_checked_system_command(*args)
-    assert(system(*args, out: File::NULL, err: File::NULL))
+    assert system(*args, out: File::NULL, err: File::NULL)
   end
 
   def cli_server(argv,  # rubocop:disable Metrics/ParameterLists
