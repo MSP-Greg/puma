@@ -1,15 +1,19 @@
 # frozen_string_literal: true
 
 module PumaTest
+
+  # Note: no setup or teardown, make sure to initialize @ios = []
+  #
   module SocketTCP
     RESP_READ_LEN = 65_536
     RESP_READ_TIMEOUT = 10
     RESP_SPLIT = "\r\n\r\n"
+    HOST = '127.0.0.1'
 
-    def header(sock)
+    def header(skt)
       header = []
       while true
-        line = sock.gets
+        line = skt.gets
         break if line == "\r\n"
         header << line.strip
       end
@@ -90,6 +94,7 @@ module PumaTest
     REQ_WRITE = -> (str) { self.syswrite str }
 
     def new_connection
+      @host ||= HOST
       skt = TCPSocket.new @host, @port
       skt.singleton_class.send :define_method, :read_response, READ_RESPONSE
       skt.singleton_class.send :define_method, :read_body, READ_BODY
