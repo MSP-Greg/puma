@@ -106,20 +106,19 @@ class TestIntegrationSingle < TestIntegration
 
     cli_server 'test/rackup/sleep.ru'
 
-    skt = fast_connect "/sleep5"
-
+    skt = fast_connect '/sleep10'
     Process.kill :TERM, @pid
     assert wait_for_server_to_include('Gracefully stopping') # wait for server to begin graceful shutdown
 
     sleep 1
 
     assert_raises(Errno::ECONNREFUSED) {
-      fast_connect "/sleep10"
+      fast_connect '/sleep10'
     }
 
     refute_nil Process.getpgid(@pid) # ensure server is still running
 
-    assert_match(/Slept 5/, read_response(skt))
+    assert_match(/Slept 10/, read_response(skt))
 
     Process.wait(@pid)
     @server.close unless @server.closed?
