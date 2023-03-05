@@ -7,13 +7,14 @@ class TestBusyWorker < Minitest::Test
   include PumaTest::SocketTCP
 
   def setup
+    skip_unless :mri # This feature only makes sense on MRI
+
     @host = '127.0.0.1'
     @app = -> (env) {
       sleep 0.1
       [200, {}, ["Hello World"]]
     }
 
-    skip_unless :mri # This feature only makes sense on MRI
     @ios = []
     @server = nil
   end
