@@ -99,7 +99,7 @@ class TestIntegration < Minitest::Test
 
     env['PUMA_DEBUG'] = 'true' if puma_debug
 
-    @server, @server_err, @pid = popen2(env, cmd)
+    @server, @server_err, @pid = spawn_puma env, cmd
     # =below helpful may be helpful for debugging
     # STDOUT.syswrite "\nPID #{@pid} #{self.class.to_s}##{name}\n"
 
@@ -346,7 +346,6 @@ class TestIntegration < Minitest::Test
   end
 
   def hot_restart_does_not_drop_connections(num_threads: 1, total_requests: 500)
-    skipped = true
     skip_if :jruby, suffix: <<-MSG
  - file descriptors are not preserved on exec on JRuby; connection reset errors are expected during restarts
     MSG
@@ -359,7 +358,6 @@ class TestIntegration < Minitest::Test
       cli_server args
     end
 
-    skipped = false
     replies = Hash.new 0
     refused = thread_run_refused unix: false
     message = 'A' * 16_256  # 2^14 - 128
@@ -478,7 +476,7 @@ class TestIntegration < Minitest::Test
     end
 
   ensure
-    return if skipped
+    return if skipped?
     if passed?
      refused = replies[:refused]
       reset   = replies[:reset]
@@ -490,7 +488,7 @@ class TestIntegration < Minitest::Test
     end
   end
 
-  def popen2(env = {}, cmd)
+  def spawn_puma(env = {}, cmd)
     opts = {}
 
     out_r, out_w = IO.pipe
