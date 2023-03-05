@@ -118,7 +118,7 @@ class TestIntegrationSingle < TestIntegration
 
     refute_nil Process.getpgid(@pid) # ensure server is still running
 
-    assert_match(/Slept 10/, read_response(skt))
+    assert_match(/Slept 10/, read_response(skt, 12))
 
     Process.wait(@pid)
     @server.close unless @server.closed?
