@@ -475,15 +475,16 @@ class TestIntegration < Minitest::Test
     end
 
   ensure
-    return if skipped?
-    if passed?
-     refused = replies[:refused]
-      reset   = replies[:reset]
-      msg = "    #{restart_count} restarts, #{reset} resets, #{refused} refused, #{replies[:restart]} success after restart, #{replies[:write_error]} write error"
-      $debugging_info << "#{full_name}\n#{msg}\n"
-    else
-      client_threads.each { |thr| thr.kill if thr.is_a? Thread }
-      $debugging_info << "#{full_name}\n#{msg}\n"
+    unless skipped?
+      if passed?
+       refused = replies[:refused]
+        reset   = replies[:reset]
+        msg = "    #{restart_count} restarts, #{reset} resets, #{refused} refused, #{replies[:restart]} success after restart, #{replies[:write_error]} write error"
+        $debugging_info << "#{full_name}\n#{msg}\n"
+      else
+        client_threads.each { |thr| thr.kill if thr.is_a? Thread }
+        $debugging_info << "#{full_name}\n#{msg}\n"
+      end
     end
   end
 
