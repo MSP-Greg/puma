@@ -196,7 +196,7 @@ RUBY
   def curl_and_get_response(url, method: :get, args: nil)
     cmd = "curl -s -v --show-error #{args} -X #{method.to_s.upcase} -k #{url}"
     begin
-      io_out, io_err, pid = popen2(cmd)
+      io_out, io_err, pid = spawn_cmd cmd
     rescue Errno::ENOENT
       flunk "curl not available, make sure curl binary is installed and available on $PATH"
     end
