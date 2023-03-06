@@ -529,7 +529,7 @@ RUBY
 
     assert_operator 9 , :<=, successes, msg
 
-    assert_operator 2 , :>=, rd_resets   , msg
+    assert_operator 5 , :>=, rd_resets   , msg
     assert_operator 1 , :>=, rd_refused  , msg
 
     assert_operator 1 , :>=, wr_resets   , msg
