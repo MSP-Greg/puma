@@ -403,10 +403,10 @@ RUBY
   end
 
   def test_culling_strategy_oldest_fork_worker
-    cli_server "-w 2 test/rackup/hello.ru", config: <<RUBY
-worker_culling_strategy :oldest
-fork_worker
-RUBY
+    cli_server "-w 2 test/rackup/hello.ru", config: <<~RUBY
+      worker_culling_strategy :oldest
+      fork_worker
+    RUBY
 
     get_worker_pids # to consume server logs
 
