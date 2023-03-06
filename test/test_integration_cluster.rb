@@ -518,8 +518,8 @@ RUBY
     #                "\n  wr_refused #{wr_refused}\n"
 
     r_success = replies.rindex :success
-    l_reset   = replies.index  :wr_reset
-    r_reset   = replies.rindex :wr_reset
+    l_reset   = replies.index  :rd_reset
+    r_reset   = replies.rindex :rd_reset
     l_refused = replies.index  :wr_refused
 
     msg = "#{successes} successes, #{wr_resets} wr_resets, #{wr_refused} wr_refused,  #{rd_resets} rd_resets, #{rd_refused} rd_refused, #{failures} failures, #{read_timeouts} read timeouts"
@@ -529,7 +529,7 @@ RUBY
 
     assert_operator 9 , :<=, successes, msg
 
-    assert_operator 1 , :>=, rd_resets   , msg
+    assert_operator 2 , :>=, rd_resets   , msg
     assert_operator 1 , :>=, rd_refused  , msg
 
     assert_operator 1 , :>=, wr_resets   , msg
