@@ -138,19 +138,23 @@ class TestIntegration < Minitest::Test
 
   # Returns true if and when server log includes str.
   # Will timeout or raise an error otherwise
-  def wait_for_server_to_include(str, log: false)
-    sleep 0.05 until @server.is_a?(IO)
+  def wait_for_server_to_include(str, io: @server, ret_false_str: nil, log: false)
+    sleep 0.05 until io.is_a?(IO)
     retry_cntr = 0
     begin
-      @server.wait_readable 1
+      io.wait_readable 1
       if log
         puts "Waiting for '#{str}'"
         begin
-          line = @server&.gets
+          line = io&.gets
           puts line if !line&.strip.empty?
         end until line&.include?(str)
       else
-        true until (@server.gets || '').include?(str)
+        while true do
+          line = io&.gets || ''
+          return true if line.include?(str)
+          return false if (ret_false_str && line.include?(ret_false_str))
+        end
       end
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
       retry_cntr += 1
@@ -158,14 +162,13 @@ class TestIntegration < Minitest::Test
       sleep 0.1
       retry
     end
-    true
   end
 
   # Returns line if and when server log matches re, unless idx is specified,
   # then returns regex match.
   # Will timeout or raise an error otherwise
-  def wait_for_server_to_match(re, idx = nil, log: false)
-    sleep 0.05 until @server.is_a?(IO)
+  def wait_for_server_to_match(re, idx = nil, io: @server, log: false, ret_false_re: nil)
+    sleep 0.05 until io.is_a?(IO)
     retry_cntr = 0
     line = nil
     begin
@@ -175,9 +178,16 @@ class TestIntegration < Minitest::Test
         begin
           line = @server&.gets
           puts line if !line&.strip.empty?
+          return false if ret_false_re && line.match(ret_false_re)
         end until line&.match?(re)
       else
-        true until (line = @server.gets || '').match?(re)
+        while true do
+          line = io.gets || ''
+          if line.match?(re)
+            return idx ? line[re, idx] : line
+          end
+          return false if (ret_false_re && line.match?(ret_false_re))
+        end
       end
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
       retry_cntr += 1
