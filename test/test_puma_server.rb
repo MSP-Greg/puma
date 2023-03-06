@@ -1377,7 +1377,8 @@ EOF
     bad = 0
     connections.each do |s|
       begin
-        assert_equal 'DONE', s.read_body
+        # don't use read_nonblock
+        assert_equal 'DONE', s.sysread(1024).split("\r\n\r\n", 2).last
       rescue
         bad += 1
       end
