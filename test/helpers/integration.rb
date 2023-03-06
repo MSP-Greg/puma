@@ -35,7 +35,6 @@ class TestIntegration < Minitest::Test
       if @server_err.wait_readable 0.1
         err_out = @server_err.read
       end
-      @server_err&.close
     end
 
     if @server && defined?(@control_tcp_port) && Puma.windows?
@@ -44,7 +43,7 @@ class TestIntegration < Minitest::Test
       stop_server @pid, signal: :INT
     end
 
-    @ios_to_close&.each do |io|
+    @ios_to_close.each do |io|
       begin
         io.close if io.respond_to?(:close) && !io.closed?
       rescue
@@ -58,15 +57,6 @@ class TestIntegration < Minitest::Test
       File.unlink(@bind_path) rescue nil
     end
 
-    # wait until the end for OS buffering?
-    if @server
-      begin
-        @server.close unless @server.closed?
-      rescue
-      ensure
-        @server = nil
-      end
-    end
     STDOUT.syswrite("\n-----------------------------------err_out\n#{err_out}\n") unless err_out.empty?
   end
 
@@ -102,6 +92,8 @@ class TestIntegration < Minitest::Test
     @server, @server_err, @pid = spawn_cmd env, cmd
     # =below helpful may be helpful for debugging
     # STDOUT.syswrite "\nPID #{@pid} #{self.class.to_s}##{name}\n"
+
+    @ios_to_close << @server << @server_err
 
     wait_for_server_to_boot(log: log) unless no_wait
     @server
