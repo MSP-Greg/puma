@@ -1300,8 +1300,7 @@ EOF
     server_run(lowlevel_error_handler: handler) { [200, {}, ['Hello World']] }
 
     # valid req & read, close
-    sock = TCPSocket.new @host, @port
-    sock << "GET / HTTP/1.0\r\n\r\n"
+    sock = send_http "GET / HTTP/1.0\r\n\r\n"
     sleep 0.05  # macOS TruffleRuby may not get the body without
     resp = sock.sysread 256
     sock.close
@@ -1310,16 +1309,12 @@ EOF
     assert_empty @log_writer.stdout.string
 
     # valid req, close
-    sock = TCPSocket.new @host, @port
-    sock << "GET / HTTP/1.0\r\n\r\n"
-    sock.close
+    send_http("GET / HTTP/1.0\r\n\r\n").close
     sleep 0.5
     assert_empty @log_writer.stdout.string
 
     # invalid req, close
-    sock = TCPSocket.new @host, @port
-    sock << "GET / HTTP"
-    sock.close
+    send_http("GET / HTTP").close
     sleep 0.5
     assert_empty @log_writer.stdout.string
   end
@@ -1382,8 +1377,8 @@ EOF
     bad = 0
     connections.each do |s|
       begin
-        assert_equal 'DONE', s.read.split("\r\n\r\n").last
-      rescue Errno::ECONNRESET
+        assert_equal 'DONE', s.read_body
+      rescue
         bad += 1
       end
     end
