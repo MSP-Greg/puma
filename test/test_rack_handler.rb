@@ -334,9 +334,12 @@ module TestRackUp
       log = +''
       @io = Dir.chdir('tmp/rackup') { IO.popen "bundle exec rackup -p 0" }
 
-      while @io.wait_readable wait_time
-        log << @io.sysread(2_048)
-        wait_time = 1
+      begin
+        while @io.wait_readable wait_time
+          log << (@io.read_nonblock(2_048) || '')
+          wait_time = 1
+        end
+      rescue
       end
 
       @pid = (log[/ PID: (\d+)/, 1] || @io.pid).to_i
