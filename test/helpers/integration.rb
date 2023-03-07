@@ -31,8 +31,8 @@ class TestIntegration < Minitest::Test
   def teardown
     err_out = ''
     if @server_err.is_a?(IO) && @check_server_err
-      if @server_err.wait_readable 0.1
-        err_out = @server_err.read
+      if @server_err.wait_readable 0.25
+        err_out = @server_err.read_nonblock(2_048, exception: false) || ''
       end
     end
 
@@ -460,7 +460,6 @@ class TestIntegration < Minitest::Test
     reset   = replies[:reset]
 
     if Puma.windows?
-      # 5 is default thread count in Puma?
       reset_max = num_threads * restart_count
       assert_operator reset_max, :>=, reset, "#{msg}Expected reset_max >= reset errors"
       assert_operator 40, :>=,  refused, "#{msg}Too many refused connections"
@@ -472,11 +471,7 @@ class TestIntegration < Minitest::Test
     assert_equal 0, replies[:unexpected_response], "#{msg}Unexpected response"
     assert_equal 0, replies[:read_timeout], "#{msg}Expected no read timeouts"
 
-    if Puma.windows?
-      assert_equal (num_threads * num_requests) - reset - refused, replies[:success]
-    else
-      assert_operator replies[:success], :>=, (num_threads * num_requests) - 1, "No more than 1 refused connection"
-    end
+    assert_equal (num_threads * num_requests) - reset - refused, replies[:success]
 
   ensure
     return if skipped
