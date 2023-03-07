@@ -36,25 +36,25 @@ class TestIntegrationSSLSession < TestIntegration
   end
 
   def set_reuse(reuse)
-<<RUBY
-  key  = '#{File.expand_path '../examples/puma/client-certs/server.key', __dir__}'
-  cert = '#{File.expand_path '../examples/puma/client-certs/server.crt', __dir__}'
-  ca   = '#{File.expand_path '../examples/puma/client-certs/ca.crt', __dir__}'
+    <<~RUBY
+      key  = '#{File.expand_path '../examples/puma/client-certs/server.key', __dir__}'
+      cert = '#{File.expand_path '../examples/puma/client-certs/server.crt', __dir__}'
+      ca   = '#{File.expand_path '../examples/puma/client-certs/ca.crt', __dir__}'
 
-  ssl_bind '#{HOST}', '#{bind_port}', {
-    cert: cert,
-    key:  key,
-    ca: ca,
-    verify_mode: 'none',
-    reuse: #{reuse}
-  }
+      ssl_bind '#{HOST}', '#{bind_port}', {
+        cert: cert,
+        key:  key,
+        ca: ca,
+        verify_mode: 'none',
+        reuse: #{reuse}
+      }
 
-  activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
 
-  app do |env|
-    [200, {}, [env['rack.url_scheme']]]
-  end
-RUBY
+      app do |env|
+        [200, {}, [env['rack.url_scheme']]]
+      end
+    RUBY
   end
 
   def with_server(config)
@@ -72,12 +72,9 @@ RUBY
     yield
 
   ensure
-    # stop server
-    sock = TCPSocket.new HOST, control_tcp_port
-    @ios_to_close << sock
-    sock.syswrite "GET /stop?token=#{TOKEN} HTTP/1.1\r\n\r\n"
-    sock.read
-    assert_match 'Goodbye!', @server.read
+    cli_pumactl 'stop'
+    @server.wait_readable 1
+    assert wait_for_server_to_include 'Goodbye!'
   end
 
   def run_session(reuse, tls = nil)
