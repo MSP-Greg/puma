@@ -1254,13 +1254,15 @@ EOF
   def test_http11_connection_header_queue
     server_run { [200, {}, [""]] }
 
-    sock = send_http "GET / HTTP/1.1\r\n\r\n"
-    assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], header(sock)
+    headers = send_http_and_read("GET / HTTP/1.1\r\n\r\n")
+      .split("\r\n\r\n").first.split "\r\n"
 
-    sock << "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
-    assert_equal ["HTTP/1.1 200 OK", "Connection: close", "Content-Length: 0"], header(sock)
+    assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], headers
 
-    sock.close
+    headers = send_http_and_read("GET / HTTP/1.1\r\nConnection: close\r\n\r\n")
+      .split("\r\n\r\n").first.split "\r\n"
+
+    assert_equal ["HTTP/1.1 200 OK", "Connection: close", "Content-Length: 0"], headers
   end
 
   def test_http10_connection_header_queue
