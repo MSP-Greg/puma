@@ -11,14 +11,15 @@ module PumaTest
     HOST = '127.0.0.1'
 
     def header(skt)
-      header = []
+      headers = []
       while true
+        skt.wait_readable 1
         line = skt.gets
         break if line == "\r\n"
-        header << line.strip
+        headers << line.strip
       end
 
-      header
+      headers
     end
 
     def send_http_and_read(req)
