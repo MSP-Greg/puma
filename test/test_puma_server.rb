@@ -1380,7 +1380,8 @@ EOF
     connections.each do |s|
       begin
         # don't use read_nonblock
-        assert_equal 'DONE', s.sysread(1024).split("\r\n\r\n", 2).last
+        s.wait_readable 1
+        bad += 1 unless 'DONE' == s.sysread(1024).split("\r\n\r\n", 2).last
       rescue
         bad += 1
       end
