@@ -330,10 +330,15 @@ module TestRackUp
       Dir.mkdir 'tmp/rackup' unless Dir.exist? 'tmp/rackup'
       FileUtils.copy_file 'test/rackup/hello.ru', 'tmp/rackup/config.ru'
 
+      wait_time = 2
+      log = +''
       @io = Dir.chdir('tmp/rackup') { IO.popen "bundle exec rackup -p 0" }
-      @io.wait_readable 2
-      sleep (::Puma::IS_OSX ? 1.5 : 0.7)
-      log = @io.sysread 2_048
+
+      while @io.wait_readable wait_time
+        log << @io.sysread(2_048)
+        wait_time = 1
+      end
+
       @pid = (log[/ PID: (\d+)/, 1] || @io.pid).to_i
       assert_includes log, 'Puma version'
       assert_includes log, 'Use Ctrl-C to stop'
