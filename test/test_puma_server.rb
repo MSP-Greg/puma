@@ -1376,21 +1376,28 @@ EOF
     connections = Array.new(num_connections) {send_http "GET / HTTP/1.0\r\n\r\n"}
     @server.stop
     wait.close
-    bad = 0
+    threads =  []
+    bad = Queue.new
+
     connections.each do |s|
-      begin
-        # don't use read_nonblock
-        s.wait_readable 1
-        bad += 1 unless 'DONE' == s.sysread(1024).split("\r\n\r\n", 2).last
-      rescue
-        bad += 1
-      end
+      threads << Thread.new {
+        begin
+          # don't use read_nonblock
+          s.wait_readable 1
+          bad.push nil unless 'DONE' == s.sysread(1024).split("\r\n\r\n", 2).last
+        rescue
+          bad.push nil
+        end
+      }
     end
+    threads.each { |th| th.join }
+
     if drain
-      assert_equal 0, bad
+      assert_equal 0, bad.length
     else
-      refute_equal 0, bad
+      refute_equal 0, bad.length
     end
+    bad.close
   end
 
   def test_not_drain_on_shutdown
