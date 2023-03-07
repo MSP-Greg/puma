@@ -336,7 +336,7 @@ module TestRackUp
 
       begin
         while @io.wait_readable wait_time
-          log << (@io.read_nonblock(2_048) || '')
+          log << (@io.sysread(2_048) || '')
           wait_time = 1
         end
       rescue
