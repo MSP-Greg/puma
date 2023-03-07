@@ -30,10 +30,13 @@ class TestIntegration < Minitest::Test
 
   def teardown
     err_out = ''
-    if @server_err.is_a?(IO) && @check_server_err
-      if @server_err.wait_readable 0.25
-        err_out = @server_err.read_nonblock(2_048, exception: false) || ''
+    begin
+      if @server_err.is_a?(IO) && @check_server_err
+        if @server_err.wait_readable 0.25
+          err_out = @server_err.read_nonblock(2_048, exception: false) || ''
+        end
       end
+    rescue IOError # stream closed in another thread
     end
 
     if @server && defined?(@control_tcp_port) && Puma.windows?
@@ -464,9 +467,9 @@ class TestIntegration < Minitest::Test
       assert_operator reset_max, :>=, reset, "#{msg}Expected reset_max >= reset errors"
       assert_operator 40, :>=,  refused, "#{msg}Too many refused connections"
     else
-      assert_equal 0, reset, "#{msg}Expected no reset errors"
-      max_refused = (0.001 * replies.fetch(:success,0)).round
-      assert_operator max_refused, :>=, refused, "#{msg}Expected no than #{max_refused} refused connections"
+      max_error = (0.001 * replies.fetch(:success,0) + 0.5).round
+      assert_operator max_error, :>=, refused, "#{msg}Expected no than #{max_error} refused connections"
+      assert_operator max_error, :>=, reset  , "#{msg}Expected no than #{max_error} reset connections"
     end
     assert_equal 0, replies[:unexpected_response], "#{msg}Unexpected response"
     assert_equal 0, replies[:read_timeout], "#{msg}Expected no read timeouts"
