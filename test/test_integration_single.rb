@@ -52,11 +52,7 @@ class TestIntegrationSingle < TestIntegration
   def test_on_booted
     cli_server "-C test/config/event_on_booted.rb -C test/config/event_on_booted_exit.rb test/rackup/hello.ru", no_wait: true
 
-    output = []
-
-    output << $_ while @server.gets
-
-    assert output.any? { |msg| msg == "on_booted called\n" } != nil
+    assert wait_for_server_to_include "on_booted called"
   end
 
   def test_term_suppress
