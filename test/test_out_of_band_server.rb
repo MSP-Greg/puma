@@ -41,7 +41,7 @@ class TestOutOfBandServer < Minitest::Test
   def send_http_and_read(req)
     skt = send_http req
     skt.wait_readable 2
-    skt.read_nonblock 2_048
+    skt.read_nonblock 1_024
   end
 
   def oob_server(**options)
@@ -72,11 +72,13 @@ class TestOutOfBandServer < Minitest::Test
 
     options[:min_threads] ||= 1
     options[:max_threads] ||= 1
-    options[:log_writer]  ||= Puma::LogWriter.strings
+    @log_writer = Puma::LogWriter.strings
+    options[:log_writer] = @log_writer
 
     @server = Puma::Server.new app, nil, out_of_band: [oob], **options
-    @port = (@server.add_tcp_listener '127.0.0.1', 0).addr[1]
+    @port = @server.add_tcp_listener('127.0.0.1', 0).addr[1]
     @server.run
+    sleep 0.20
     sleep 0.15 if Puma.jruby?
   end
 
@@ -97,14 +99,27 @@ class TestOutOfBandServer < Minitest::Test
   # Stream of requests on concurrent connections should trigger
   # out_of_band hooks only once after the final request.
   def test_stream
+    req_str = "GET / HTTP/1.0\r\n\r\n"
     oob_server app_wait: true, max_threads: 2
     n = 100
-    Array.new(n) {send_http("GET / HTTP/1.0\r\n\r\n")}
-    Thread.pass until @request_count == n
+    skts = Thread::Queue.new
+    n.times { skts.push send_http(req_str) }
+#=begin
+    Array.new(2) do |i|
+      Thread.new do
+        until skts.empty? do
+          skt = skts.pop
+          skt.wait_readable 1
+          skt.read
+        end
+      end
+    end.each(&:join)
+#=end
     @mutex.synchronize do
       @app_finished.signal
       @oob_finished.wait(@mutex, 1)
     end
+
     assert_equal n, @request_count
     assert_equal 1, @oob_count
   end
