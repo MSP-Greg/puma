@@ -89,33 +89,33 @@ class TestIntegrationSSLSession < TestIntegration
       curl = ''
       IO.popen(curl_cmd, :err=>[:child, :out]) { |io| curl = io.read }
 
-      curl.include? '* SSL re-using session ID'
+      curl
     end
   end
 
   def test_dflt
-    reused = run_session true
-    assert reused, 'session was not reused'
+    curl_out = run_session true
+    assert_includes curl_out, '* SSL re-using session ID', 'session was not reused'
   end
 
   def test_dflt_tls1_2
-    reused = run_session true, '--tls-max 1.2'
-    assert reused, 'session was not reused'
+    curl_out = run_session true, '--tls-max 1.2'
+    assert_includes curl_out, '* SSL re-using session ID', 'session was not reused'
   end
 
   def test_1000_tls1_2
-    reused = run_session '{size: 1_000}', '--tls-max 1.2'
-    assert reused, 'session was not reused'
+    curl_out = run_session '{size: 1_000}', '--tls-max 1.2'
+    assert_includes curl_out, '* SSL re-using session ID', 'session was not reused'
   end
 
   def test_1000_10_tls1_2
-    reused = run_session '{size: 1000, timeout: 10}', '--tls-max 1.2'
-    assert reused, 'session was not reused'
+    curl_out = run_session '{size: 1000, timeout: 10}', '--tls-max 1.2'
+    assert_includes curl_out, '* SSL re-using session ID', 'session was not reused'
   end
 
   def test__10_tls1_2
-    reused = run_session '{timeout: 10}', '--tls-max 1.2'
-    assert reused, 'session was not reused'
+    curl_out = run_session '{timeout: 10}', '--tls-max 1.2'
+    assert_includes curl_out, '* SSL re-using session ID', 'session was not reused'
   end
 
   # session reuse has always worked with TLSv1.3
@@ -123,13 +123,13 @@ class TestIntegrationSSLSession < TestIntegration
     ssl_vers = Puma::MiniSSL::OPENSSL_LIBRARY_VERSION
     old_ssl = ssl_vers.include?(' 1.0.') || ssl_vers.match?(/ 1\.1\.1[ a-e]/)
     skip 'Requires 1.1.1f or later' if old_ssl
-    reused = run_session 'nil', '--tls-max 1.2'
-    refute reused, 'session was reused'
+    curl_out = run_session 'nil', '--tls-max 1.2'
+    refute_includes curl_out, '* SSL re-using session ID', 'session was reused'
   end
 
   def test_off_tls1_3
     skip 'TLSv1.3 unavailable' unless Puma::MiniSSL::HAS_TLS1_3
-    reused = run_session 'nil'
-    assert reused, 'TLSv1.3 session was not reused'
+    curl_out = run_session 'nil'
+    assert_includes curl_out, '* SSL re-using session ID', 'TLSv1.3 session was not reused'
   end
 end if Puma::HAS_SSL && Puma::IS_MRI
