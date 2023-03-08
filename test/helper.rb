@@ -145,6 +145,7 @@ if ENV['CI']
       }
     end
   end
+  Minitest::Retry.use!
 end
 
 module TestSkips
