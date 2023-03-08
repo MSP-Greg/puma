@@ -332,7 +332,7 @@ module TestRackUp
 
       wait_time = 2
       log = +''
-      @io = Dir.chdir('tmp/rackup') { IO.popen "bundle exec rackup -p 0" }
+      Dir.chdir('tmp/rackup') { @io = IO.popen "bundle exec rackup -p 0" }
 
       begin
         while @io.wait_readable wait_time
