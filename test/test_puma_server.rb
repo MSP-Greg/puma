@@ -1520,14 +1520,14 @@ class TestPumaServerS < TestPumaServerBase
     end
 
     @server.run
-    new_connection
-    sleep 0.02
+    @skt = new_connection
+    sleep 0.03
   end
 
   # System-resource errors such as EMFILE should not be silently swallowed by accept loop.
   def test_accept_emfile
     stub_accept_nonblock Errno::EMFILE.new('accept(2)')
-    refute_empty @log_writer.stderr.string, "Expected EMFILE error not logged"
+    refute_empty @log_writer.stderr.string, "Expected EMFILE error was not logged"
   end
 
   # Retryable errors such as ECONNABORTED should be silently swallowed by accept loop.
