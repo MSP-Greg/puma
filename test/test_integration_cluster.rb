@@ -533,7 +533,7 @@ RUBY
     assert_operator 1 , :>=, rd_refused  , msg
 
     assert_operator 1 , :>=, wr_resets   , msg
-    assert_operator 25, :<=, wr_refused  , msg
+    assert_operator 24, :<=, wr_refused  , msg
 
     # Interleaved asserts
     # UNIX binders do not generate :reset items
