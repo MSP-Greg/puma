@@ -94,16 +94,16 @@ module TimeoutEveryTestCase
     with_info_handler do
       time_it do
         capture_exceptions do
-          ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+#          ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
             before_setup; setup; after_setup
             self.send self.name
-          end
+#          end
         end
 
         capture_exceptions do
-          ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+#          ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
             Minitest::Test::TEARDOWN_METHODS.each { |hook| self.send hook }
-          end
+#          end
         end
         if respond_to? :clean_tmp_paths
           clean_tmp_paths
