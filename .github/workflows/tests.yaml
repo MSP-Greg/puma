@@ -54,9 +54,11 @@ jobs:
 
         exclude:
           - { os: windows-2022 , ruby: head }
-          - { os: macos-11     , ruby: 2.4  }
-          - { os: macos-11     , ruby: 2.5  }
-          - { os: macos-11     , ruby: head }
+          - { os: macos-11     , ruby:  2.5  }
+          - { os: macos-11     , ruby:  2.6  }
+          - { os: macos-11     , ruby: '3.0' }
+          - { os: macos-11     , ruby: '3.1' }
+          - { os: macos-11     , ruby:  head }
 
     steps:
       - name: repo checkout
