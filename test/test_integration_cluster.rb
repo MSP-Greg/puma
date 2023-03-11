@@ -165,7 +165,7 @@ class TestIntegrationCluster < TestIntegration
       # spread out, so all aren't killed at once
       phase0_worker_pids.each do |pid|
         Process.kill :TERM, pid
-        sleep 4 unless pid == last
+        Process.wait(pid, Process::WNOHANG) rescue nil
       end
     end
   end
