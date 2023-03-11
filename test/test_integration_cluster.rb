@@ -579,6 +579,7 @@ RUBY
     resets        = replies.count { |r| r == :reset    }
     refused       = replies.count { |r| r == :refused  }
     read_timeouts = replies.count { |r| r == :read_timeout }
+    unknown       = replies.count { |r| r == :unknown  }
 
     # get pids from replies, generate uniq array
     t = replies.map { |body| body[/\d+\z/] }
@@ -590,13 +591,15 @@ RUBY
     assert_equal 25, responses, msg
     assert_operator qty_pids, :>, 2, msg
 
-    msg = "#{responses} responses, #{resets} resets, #{refused} refused, #{read_timeouts} read timeouts"
+    msg = "#{responses} responses, #{resets} resets, #{refused} refused, #{read_timeouts} read timeouts, #{unknown} unknown"
 
     assert_equal 0, refused, msg
 
     assert_equal 0, resets, msg
 
     assert_equal 0, read_timeouts, msg
+
+    assert_equal 0, unknown, msg
   ensure
     unless passed?
       $debugging_info << "#{full_name}\n    #{msg}\n#{replies.inspect}\n"
@@ -679,6 +682,8 @@ RUBY
       mutex.synchronize { replies << :refused }
     rescue Timeout::Error
       mutex.synchronize { replies << :read_timeout }
+    rescue
+      mutex.synchronize { replies << :unknown }
     end
   end
 
