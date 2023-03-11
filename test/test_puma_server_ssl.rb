@@ -241,6 +241,8 @@ class TestPumaServerSSL < Minitest::Test
     assert_empty body_http
     assert_equal "https", body_https
 
+    # CI - may need some time to drop connection
+    sleep 1
     thread_pool = @server.instance_variable_get(:@thread_pool)
     busy_threads = thread_pool.spawned - thread_pool.waiting
 
