@@ -325,7 +325,8 @@ module TestRackUp
         rescue Errno::ECHILD
         end
       end
-      @io.close unless @io.closed?
+      @out.close unless @out.closed?
+      @err.close unless @err.closed?
     end
 
     def test_bin
@@ -335,11 +336,10 @@ module TestRackUp
       Dir.mkdir 'tmp/rackup' unless Dir.exist? 'tmp/rackup'
       FileUtils.copy_file 'test/rackup/hello.ru', 'tmp/rackup/config.ru'
 
-      Dir.chdir('tmp/rackup') { @io = IO.popen "bundle exec rackup -p 0" }
+      Dir.chdir('tmp/rackup') { @out, @err, @pid = spawn_cmd "bundle exec rackup -p 0" }
 
-      @pid = @io.pid.to_i
-      assert wait_for_server_to_include 'Puma version', io: @io
-      assert wait_for_server_to_include 'Use Ctrl-C to stop', io: @io
+      assert wait_for_server_to_include 'Puma version', io: @out
+      assert wait_for_server_to_include 'Use Ctrl-C to stop', io: @out
     end
   end
 end
