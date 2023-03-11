@@ -1,4 +1,5 @@
 require_relative "helper"
+require_relative "helpers/integration"
 
 # Most tests check that ::Rack::Handler::Puma works by itself
 # RackUp#test_bin runs Puma using the rackup bin file
@@ -304,7 +305,11 @@ module TestRackUp
   end
 
   # Run using IO.popen so we don't load Rack and/or Rackup in the main process
-  class RackUp < Minitest::Test
+#  class RackUp < Minitest::Test
+  class RackUp < TestIntegration
+    def setup
+    end
+
     def teardown
       return if skipped?
       Dir.chdir "tmp/rackup" do
@@ -330,21 +335,11 @@ module TestRackUp
       Dir.mkdir 'tmp/rackup' unless Dir.exist? 'tmp/rackup'
       FileUtils.copy_file 'test/rackup/hello.ru', 'tmp/rackup/config.ru'
 
-      wait_time = 2
-      log = +''
       Dir.chdir('tmp/rackup') { @io = IO.popen "bundle exec rackup -p 0" }
 
-      begin
-        while @io.wait_readable wait_time
-          log << (@io.sysread(2_048) || '')
-          wait_time = 1
-        end
-      rescue
-      end
-
-      @pid = (log[/ PID: (\d+)/, 1] || @io.pid).to_i
-      assert_includes log, 'Puma version'
-      assert_includes log, 'Use Ctrl-C to stop'
+      @pid = @io.pid.to_i
+      assert wait_for_server_to_include 'Puma version', io: @io
+      assert wait_for_server_to_include 'Use Ctrl-C to stop', io: @io
     end
   end
 end
