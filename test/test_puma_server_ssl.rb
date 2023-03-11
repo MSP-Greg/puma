@@ -222,7 +222,10 @@ class TestPumaServerSSL < Minitest::Test
     tcp = Thread.new do
       skt_tcp = TCPSocket.new @host, @server.connected_ports[0]
       skt_tcp.syswrite "GET / HTTP/1.1\r\n\r\n"
-      body_http << skt_tcp.read_nonblock(1_024) while skt_tcp.wait_readable 6
+      begin
+        body_http << skt_tcp.read_nonblock(1_024) while skt_tcp.wait_readable 6
+      rescue EOFError
+      end
     end
 
     ssl = Thread.new do
