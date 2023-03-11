@@ -330,7 +330,6 @@ module TestRackUp
     end
 
     def test_bin
-      # JRuby & TruffleRuby take a long time using IO.popen
       skip_unless :mri
 
       Dir.mkdir 'tmp/rackup' unless Dir.exist? 'tmp/rackup'
