@@ -215,15 +215,15 @@ class TestPumaServerSSL < Minitest::Test
 
     start_server
 
-    http = Net::HTTP.new @host, @server.connected_ports[0]
-    http.use_ssl = false
-    http.read_timeout = 6
+    body_http = +''
+    skt_tcp = nil
 
+    # nothing to read after 6 seconds
     tcp = Thread.new do
-      req_http = Net::HTTP::Get.new "/", {}
-      # Net::ReadTimeout - TruffleRuby
-      assert_raises(Errno::ECONNREFUSED, EOFError, Net::ReadTimeout, Net::OpenTimeout) do
-        http.start.request(req_http) { |rep| body_http = rep.body }
+      skt_tcp = TCPSocket.new @host, @server.connected_ports[0]
+      skt_tcp.syswrite "GET / HTTP/1.1\r\n\r\n"
+      while skt_tcp.wait_readable 6
+        body_http << skt_tcp.read_nonblock(1_024)
       end
     end
 
@@ -236,16 +236,16 @@ class TestPumaServerSSL < Minitest::Test
 
     tcp.join
     ssl.join
-    http.finish
-    sleep 1.0
 
-    assert_nil body_http
+    assert_empty body_http
     assert_equal "https", body_https
 
     thread_pool = @server.instance_variable_get(:@thread_pool)
     busy_threads = thread_pool.spawned - thread_pool.waiting
 
     assert busy_threads.zero?, "Our connection is wasn't dropped"
+  ensure
+    skt_tcp.close if skt_tcp.respond_to? :close
   end
 
   unless Puma.jruby?
