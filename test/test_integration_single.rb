@@ -211,13 +211,15 @@ class TestIntegrationSingle < TestIntegration
     cli_server "test/rackup/close_listeners.ru"
     connection = fast_connect
 
+    body = +''
+
     if DARWIN && RUBY_VERSION < '2.6' || TRUFFLE
       begin
-        read_body connection
+        body = read_body connection
       rescue EOFError
       end
     else
-      read_body connection
+      body = read_body connection
     end
 
     time_limit = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5.0
@@ -233,6 +235,8 @@ class TestIntegrationSingle < TestIntegration
     rescue EOFError
       server_err = nil
     end
+
+    STDOUT.syswrite "\n#{body}\n"
 
     begin
       until Process.wait2(@pid, Process::WNOHANG)
