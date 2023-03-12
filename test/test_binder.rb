@@ -489,17 +489,17 @@ class TestBinderSingle < TestBinderBase
 
     host = '127.0.0.1'
     port = UniquePort.call
+    backlog_set = 0
     tcp_server = TCPServer.new(host, port)
     tcp_server.define_singleton_method(:listen) do |backlog|
-      Thread.current[:backlog] = backlog
-      super(backlog)
+      backlog_set = backlog
+      super backlog
     end
 
     TCPServer.stub(:new, tcp_server) do
       @binder.parse ["ssl://#{host}:#{port}?#{ssl_query}&backlog=2048"], @log_writer
     end
-
-    assert_equal 2048, Thread.current[:backlog]
+    assert_equal 2048, backlog_set
   end
 end
 
