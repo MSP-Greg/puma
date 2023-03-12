@@ -109,8 +109,11 @@ class TestOutOfBandServer < Minitest::Test
       Thread.new do
         until skts.empty? do
           skt = skts.pop
-          skt.wait_readable 1
-          skt.read
+          begin
+            skt.wait_readable 1
+            skt.read
+          rescue  # macOS Errno::EBADF
+          end
         end
       end
     end.each(&:join)
