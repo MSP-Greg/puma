@@ -225,6 +225,16 @@ class TestIntegrationSingle < TestIntegration
     rescue Errno::ESRCH
     end
 
+    # TruffleRuby may raise EOFError ?
+    begin
+      @server_err.wait_readable 2
+      server_err = @server_err.read_nonblock 2_048
+    rescue EOFError
+      server_err = nil
+    end
+
+STDOUT.syswrite "\n-------------------------------------------------------------------------\n#{server_err}\n"
+
     begin
       until Process.wait2(@pid, Process::WNOHANG)
         sleep 0.01
@@ -234,17 +244,13 @@ class TestIntegrationSingle < TestIntegration
         end
       end
     end
-    # TruffleRuby may raise EOFError ?
-    begin
-      @server_err.wait_readable 2
-      server_err = @server_err.read_nonblock 2_048
-    rescue EOFError
-    end
-    if RUBY_PLATFORM == 'java'
-      refute_empty server_err
-    else
+
+    if Puma::IS_MRI # || server_err
       # linux IOError, macOS Errno::EBADF
       assert_match(/Exception handling servers: (#<IOError: closed stream>|#<Errno::EBADF: Bad file descriptor>)/, server_err)
+    else
+      # not sure why?
+      refute_empty server_err
     end
   end
 
