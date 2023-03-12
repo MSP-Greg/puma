@@ -114,7 +114,7 @@ jobs:
 
       - name: test
         if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
-        timeout-minutes: 10
+        timeout-minutes: 6
         run: bundle exec rake test:all
 
   test_non_mri:
@@ -138,12 +138,12 @@ jobs:
           - { tto: 6 , os: ubuntu-20.04 , ruby: jruby }
           - { tto: 6 , os: ubuntu-20.04 , ruby: jruby, no-ssl: ' no SSL' }
           - { tto: 6 , os: ubuntu-20.04 , ruby: jruby-head, allow-failure: true }
-          - { tto: 6 , os: ubuntu-20.04 , ruby: truffleruby, allow-failure: true } # Until https://github.com/oracle/truffleruby/issues/2700 is solved
-          - { tto: 6 , os: ubuntu-20.04 , ruby: truffleruby-head, allow-failure: true }
-          - { tto: 6 , os: ubuntu-22.04 , ruby: truffleruby, allow-failure: true } # Until https://github.com/oracle/truffleruby/issues/2700 is solved
-          - { tto: 6 , os: ubuntu-22.04 , ruby: truffleruby-head, allow-failure: true }
+          - { tto: 7 , os: ubuntu-20.04 , ruby: truffleruby, allow-failure: true } # Until https://github.com/oracle/truffleruby/issues/2700 is solved
+          - { tto: 7 , os: ubuntu-20.04 , ruby: truffleruby-head, allow-failure: true }
+          - { tto: 7 , os: ubuntu-22.04 , ruby: truffleruby, allow-failure: true } # Until https://github.com/oracle/truffleruby/issues/2700 is solved
+          - { tto: 7 , os: ubuntu-22.04 , ruby: truffleruby-head, allow-failure: true }
           - { tto: 8 , os: macos-12     , ruby: jruby }
-          - { tto: 6 , os: macos-12     , ruby: truffleruby, allow-failure: true }
+          - { tto: 7 , os: macos-12     , ruby: truffleruby, allow-failure: true }
 
     steps:
       - name: repo checkout
