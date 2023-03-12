@@ -207,6 +207,7 @@ class TestIntegrationSingle < TestIntegration
   # listener is closed 'externally' while Puma is in the IO.select statement
   def test_closed_listener
     skip_unless_signal_exist? :TERM
+    skip_if :jruby    # ObjectSpace.each_object(::TCPServer) doesn't work
     cli_server "test/rackup/close_listeners.ru"
     connection = fast_connect
 
@@ -233,8 +234,6 @@ class TestIntegrationSingle < TestIntegration
       server_err = nil
     end
 
-STDOUT.syswrite "\n-------------------------------------------------------------------------\n#{server_err}\n"
-
     begin
       until Process.wait2(@pid, Process::WNOHANG)
         sleep 0.01
@@ -245,13 +244,8 @@ STDOUT.syswrite "\n-------------------------------------------------------------
       end
     end
 
-    if Puma::IS_MRI # || server_err
-      # linux IOError, macOS Errno::EBADF
-      assert_match(/Exception handling servers: (#<IOError: closed stream>|#<Errno::EBADF: Bad file descriptor>)/, server_err)
-    else
-      # not sure why?
-      refute_empty server_err
-    end
+    # linux IOError, macOS Errno::EBADF
+    assert_match(/Exception handling servers: (#<IOError: closed stream>|#<Errno::EBADF: Bad file descriptor>)/, server_err)
   end
 
   def test_puma_debug_loaded_exts
