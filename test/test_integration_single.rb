@@ -236,8 +236,6 @@ class TestIntegrationSingle < TestIntegration
       server_err = nil
     end
 
-    STDOUT.syswrite "\n#{body}\n"
-
     begin
       until Process.wait2(@pid, Process::WNOHANG)
         sleep 0.01
