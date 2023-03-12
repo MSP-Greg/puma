@@ -103,8 +103,8 @@ class TestOutOfBandServer < Minitest::Test
     oob_server app_wait: true, max_threads: 2
     n = 100
     skts = Thread::Queue.new
-    n.times { skts.push send_http(req_str) }
-#=begin
+    n.times { skts.push send_http(req_str); sleep 0.0001 }
+
     Array.new(2) do |i|
       Thread.new do
         until skts.empty? do
@@ -114,7 +114,7 @@ class TestOutOfBandServer < Minitest::Test
         end
       end
     end.each(&:join)
-#=end
+
     @mutex.synchronize do
       @app_finished.signal
       @oob_finished.wait(@mutex, 1)
@@ -163,8 +163,8 @@ class TestOutOfBandServer < Minitest::Test
   def test_partial_concurrent
     oob_server max_threads: 2
     @mutex.synchronize do
-      send_http("GET / HTTP/1.0\r\n\r\n")
-      100.times {new_connection.close}
+      send_http "GET / HTTP/1.0\r\n\r\n"
+      100.times { send_http("GET").close; sleep 0.0001 }
       @oob_finished.wait(@mutex, 1)
     end
     assert_equal 1, @oob_count
