@@ -230,12 +230,16 @@ class TestIntegrationSingle < TestIntegration
         sleep 0.01
         if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_limit
           Process.kill :SIGKILL, @pid
-          assert false, "Process froze"
+          flunk "Process froze"
         end
       end
     end
-    @server_err.wait_readable 2
-    server_err = @server_err.read_nonblock 2_048
+    # TruffleRuby may raise EOFError ?
+    begin
+      @server_err.wait_readable 2
+      server_err = @server_err.read_nonblock 2_048
+    rescue EOFError
+    end
     if RUBY_PLATFORM == 'java'
       refute_empty server_err
     else
