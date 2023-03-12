@@ -338,7 +338,13 @@ class TestIntegration < Minitest::Test
         %W[-C tcp://#{HOST}:#{@control_tcp_port} -T #{TOKEN} #{argv}]
       end
     r, w = IO.pipe
-    Thread.new { Puma::ControlCLI.new(arg, w, w).run }.join
+    Thread.new {
+      # Puma::ControlCLI may call exit
+      begin
+        Puma::ControlCLI.new(arg, w, w).run
+      rescue Exception
+      end
+    }.join
     w.close
     @ios_to_close << r
     r
