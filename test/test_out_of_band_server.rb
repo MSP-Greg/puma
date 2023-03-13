@@ -1,7 +1,10 @@
 require_relative "helper"
+require_relative "helpers/socket_tcp"
 
 class TestOutOfBandServer < Minitest::Test
   parallelize_me!
+
+  include PumaTest::SocketTCP
 
   def setup
     @ios = []
@@ -17,31 +20,13 @@ class TestOutOfBandServer < Minitest::Test
 
     @ios.each do |io|
       begin
-        io.close if io.is_a?(IO) && !io.closed?
-      rescue
+        io.close if io.respond_to?(:close) && !io.closed?
+        File.unlink io.path if io.is_a? File
+      rescue Errno::EBADF
       ensure
         io = nil
       end
     end
-  end
-
-  def new_connection
-    TCPSocket.new('127.0.0.1', @port).tap {|s| @ios << s}
-  rescue IOError
-    Puma::Util.purge_interrupt_queue
-    retry
-  end
-
-  def send_http(req)
-    skt = new_connection
-    skt.syswrite req
-    skt
-  end
-
-  def send_http_and_read(req)
-    skt = send_http req
-    skt.wait_readable 2
-    skt.read_nonblock 1_024
   end
 
   def oob_server(**options)
@@ -110,8 +95,7 @@ class TestOutOfBandServer < Minitest::Test
         until skts.empty? do
           skt = skts.pop
           begin
-            skt.wait_readable 1
-            skt.read
+            skt.read_response
           rescue  # macOS Errno::EBADF
           end
         end
@@ -150,7 +134,7 @@ class TestOutOfBandServer < Minitest::Test
       @oob_finished.signal # exit OOB
     end
 
-    refute_match(/OOB conflict/, req2.read)
+    refute_match(/OOB conflict/, req2.read_response)
   end
 
   # Partial requests should not trigger OOB.
