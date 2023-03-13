@@ -97,9 +97,9 @@ module PumaTest
     def new_connection
       @host ||= HOST
       skt = TCPSocket.new @host, @port
-      skt.singleton_class.send :define_method, :read_response, READ_RESPONSE
-      skt.singleton_class.send :define_method, :read_body, READ_BODY
-      skt.singleton_class.send :define_method, :<<, REQ_WRITE
+      skt.define_singleton_method :read_response, READ_RESPONSE
+      skt.define_singleton_method :read_body, READ_BODY
+      skt.define_singleton_method :<<, REQ_WRITE
       @ios << skt
       skt
     end
