@@ -77,10 +77,8 @@ class TestIntegration < Minitest::Test
       puma_debug: nil,  # set env['PUMA_DEBUG'] = 'true'
       env: {})          # pass env setting to Puma process in IO.popen
     if config
-      config_file = Tempfile.new(%w(config .rb))
-      config_file.write config
-      config_file.close
-      config = "-C #{config_file.path}"
+      path = tmp_path_write %w(config .rb), config
+      config = "-C #{path}"
     end
     puma_path = File.expand_path '../../../bin/puma', __FILE__
     if unix
