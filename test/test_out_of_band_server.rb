@@ -96,7 +96,7 @@ class TestOutOfBandServer < Minitest::Test
           skt = skts.pop
           begin
             skt.read_response
-          rescue  # macOS Errno::EBADF
+          rescue Exception
           end
         end
       end
