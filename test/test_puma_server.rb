@@ -28,7 +28,7 @@ class TestPumaServerBase < Minitest::Test
   end
 
   def teardown
-    @server.stop(true)
+    @server.stop true
     # Errno::EBADF raised on macOS
     @ios.each do |io|
       begin
@@ -566,9 +566,9 @@ EOF
 
     sock << "Hello" unless sock.wait_readable(1.15)
 
-    data = sock.gets
+    data = sock.read_response
 
-    assert_equal "HTTP/1.1 408 Request Timeout\r\n", data
+    assert_match(/\AHTTP\/1\.1 408 Request Timeout\r\n/, data)
   end
 
   def test_timeout_data_no_queue
