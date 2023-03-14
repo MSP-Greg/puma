@@ -112,7 +112,7 @@ class TestIntegrationSingle < TestIntegration
 
     refute_nil Process.getpgid(@pid) # ensure server is still running
 
-    resp = read_response skt, 12
+    resp = read_response skt
     assert_includes resp, 'Slept 10'
 
     Process.wait @pid
@@ -207,7 +207,7 @@ class TestIntegrationSingle < TestIntegration
   # listener is closed 'externally' while Puma is in the IO.select statement
   def test_closed_listener
     skip_unless_signal_exist? :TERM
-    skip_if :jruby    # ObjectSpace.each_object(::TCPServer) doesn't work
+    skip_unless :mri    # ObjectSpace.each_object(::TCPServer) ??
     cli_server "test/rackup/close_listeners.ru"
     connection = fast_connect
 
