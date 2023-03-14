@@ -92,7 +92,7 @@ class TestPumaServerHijack < Minitest::Test
     sock.syswrite "this should echo"
     assert_equal "this should echo", sock.sysread(256)
 
-    sleep 0.001 # intermittent failure, may need to increase in CI
+    sleep 0.005 # intermittent failure, may need to increase in CI
     assert @body_closed, "Reponse body must be closed"
   end
 
