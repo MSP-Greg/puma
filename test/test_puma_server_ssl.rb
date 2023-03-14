@@ -26,6 +26,7 @@ end
 class TestPumaServerSSL < Minitest::Test
   parallelize_me!
   def setup
+    @app = nil
     @http = nil
     @server = nil
   end
@@ -39,7 +40,7 @@ class TestPumaServerSSL < Minitest::Test
   def start_server
     @host = "127.0.0.1"
 
-    app = lambda { |env| [200, {}, [env['rack.url_scheme']]] }
+    app = @app || lambda { |env| [200, {}, [env['rack.url_scheme']]] }
 
     ctx = Puma::MiniSSL::Context.new
 
@@ -102,14 +103,14 @@ class TestPumaServerSSL < Minitest::Test
   end
 
   def test_very_large_return
-    start_server
-    giant = "x" * 2056610
-
-    @server.app = proc do
+    giant = "x" * 2_056_610
+    @app = proc do
       [200, {}, [giant]]
     end
 
-    body = nil
+    start_server
+
+    body = ''
     @http.start do
       req = Net::HTTP::Get.new "/"
       @http.request(req) do |rep|
