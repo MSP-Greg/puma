@@ -140,10 +140,8 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    socket = TCPSocket.open HOST, @port
-    socket.puts "GET /test HTTP/1.1\r\n"
-    socket.puts "Connection: Keep-Alive\r\n"
-    socket.puts "\r\n"
+    socket = TCPSocket.new HOST, @port
+    socket.syswrite "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
 
     headers = header_hash socket
 
@@ -199,10 +197,9 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    socket = TCPSocket.open HOST, @port
-    socket.puts "GET /test HTTP/1.1\r\n"
-    socket.puts "Connection: Keep-Alive\r\n"
-    socket.puts "\r\n"
+
+    socket = TCPSocket.new HOST, @port
+    socket.syswrite "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
 
     headers = header_hash socket
 
