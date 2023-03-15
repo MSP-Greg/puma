@@ -223,7 +223,7 @@ class Minitest::Test
 end
 
 Minitest.after_run do
-  puts "UniquePort::SELECTED_PORTS #{UniquePort::SELECTED_PORTS.length}", UniquePort::SELECTED_PORTS.sort
+  # puts "UniquePort::SELECTED_PORTS #{UniquePort::SELECTED_PORTS.length}", UniquePort::SELECTED_PORTS.sort
   # needed for TestCLI#test_control_clustered
   if !$debugging_hold && ENV['PUMA_TEST_DEBUG']
     $debugging_info.sort!
