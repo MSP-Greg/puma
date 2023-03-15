@@ -1373,19 +1373,19 @@ EOF
       wait.pop
       [200, {}, ["DONE"]]
     end
-    connections = Array.new(num_connections) {send_http "GET / HTTP/1.0\r\n\r\n"}
+    connections = Array.new(num_connections) { send_http "GET / HTTP/1.0\r\n\r\n" }
     @server.stop
+    sleep 0.01
     wait.close
+
     threads =  []
     bad = Queue.new
 
     connections.each do |s|
       threads << Thread.new {
         begin
-          # don't use read_nonblock
-          s.wait_readable 1
-          bad.push nil unless 'DONE' == s.sysread(1024).split("\r\n\r\n", 2).last
-        rescue
+          bad.push nil unless 'DONE' == s.read_body
+        rescue Exception
           bad.push nil
         end
       }
