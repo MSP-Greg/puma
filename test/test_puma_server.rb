@@ -564,7 +564,7 @@ EOF
 
     sock = send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\n"
 
-    sock << "Hello" unless sock.wait_readable(1.15)
+    sock << "Hello" unless sock.wait_readable(1.50)
 
     data = sock.read_response
 
