@@ -22,7 +22,7 @@ class TestIntegrationSSLSession < TestIntegration
   CERT_PATH = File.expand_path "../examples/puma/client-certs", __dir__
 
   def teardown
-    @server.close unless @server&.closed?
+    @server.close unless @server.is_a?(IO) && @server.closed?
     @server = nil
     super
   end
@@ -58,19 +58,8 @@ class TestIntegrationSSLSession < TestIntegration
   end
 
   def with_server(config)
-    config_file = Tempfile.new %w(config .rb)
-    config_file.write config
-    config_file.close
-    config_file.path
-
-    # start server
-    cmd = "#{BASE} bin/puma -C #{config_file.path}"
-    @server = IO.popen cmd, 'r'
-    wait_for_server_to_boot
-    @pid = @server.pid
-
+    cli_server '', config: config, config_bind: true
     yield
-
   ensure
     cli_pumactl 'stop'
     @server.wait_readable 1

@@ -69,24 +69,31 @@ class TestIntegration < Minitest::Test
     assert system(*args, out: File::NULL, err: File::NULL)
   end
 
-  def cli_server(argv,  # rubocop:disable Metrics/ParameterLists
-      unix: false,      # uses a UNIXSocket for the server listener when true
-      config: nil,      # string to use for config file
-      log: false,       # output server log to console (for debugging)
-      no_wait: false,   # don't wait for server to boot
-      puma_debug: nil,  # set env['PUMA_DEBUG'] = 'true'
-      env: {})          # pass env setting to Puma process in IO.popen
+  def cli_server(argv,    # rubocop:disable Metrics/ParameterLists
+      unix: false,        # uses a UNIXSocket for the server listener when true
+      config: nil,        # string to use for config file
+      log: false,         # output server log to console (for debugging)
+      no_wait: false,     # don't wait for server to boot
+      puma_debug: nil,    # set env['PUMA_DEBUG'] = 'true'
+      config_bind: false, # use bind from config
+      env: {})            # pass env setting to Puma process in IO.popen
     if config
       path = tmp_path_write %w(config .rb), config
       config = "-C #{path}"
     end
+
     puma_path = File.expand_path '../../../bin/puma', __FILE__
-    if unix
-      cmd = "#{BASE} #{puma_path} #{config} -b unix://#{@bind_path} #{argv}"
-    else
-      @tcp_port = UniquePort.call
-      cmd = "#{BASE} #{puma_path} #{config} -b tcp://#{HOST}:#{@tcp_port} #{argv}"
+    cmd = +"#{BASE} #{puma_path} #{config}"
+
+    unless config_bind
+      if unix
+        cmd << " -b unix://#{@bind_path}"
+      else
+        @tcp_port = UniquePort.call
+        cmd << " -b tcp://#{HOST}:#{@tcp_port}"
+      end
     end
+    cmd << " #{argv}" if argv
 
     env['PUMA_DEBUG'] = 'true' if puma_debug
 
