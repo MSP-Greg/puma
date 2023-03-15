@@ -941,10 +941,10 @@ EOF
   end
 
   def test_chunked_keep_alive_two_back_to_back
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       [200, {}, [""]]
     }
@@ -962,9 +962,9 @@ EOF
 
     h = header(sock)
     assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], h
-    assert_equal "hello", body
+    assert_equal "hello", req_body
     assert_equal "5", content_length
-    sleep 0.05 if TRUFFLE
+    sleep 0.05
     assert_equal true, last_crlf_written
 
     last_crlf_writer.join
@@ -975,7 +975,7 @@ EOF
     h = header(sock)
 
     assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], h
-    assert_equal "goodbye", body
+    assert_equal "goodbye", req_body
     assert_equal "7", content_length
 
     sock.close
