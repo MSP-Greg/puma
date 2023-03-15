@@ -77,6 +77,7 @@ class TestOutOfBandServer < Minitest::Test
         @oob_finished.wait(@mutex, 1)
       end
     end
+    sleep 0.1 # fix intermittent @request_count = 99 ?
     assert_equal n, @request_count
     assert_equal n, @oob_count
   end
