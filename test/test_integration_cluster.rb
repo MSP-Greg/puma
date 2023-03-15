@@ -68,13 +68,9 @@ class TestIntegrationCluster < TestIntegration
 
     cli_server "-w #{workers} -q test/rackup/hello.ru"
     worker_pids = get_worker_pids
-    output = []
-    t = Thread.new { output << @server.readlines }
-    Process.kill :INFO, worker_pids.first
-    Process.kill :INT , @pid
-    t.join
 
-    assert_match "Thread: TID", output.join
+    Process.kill :INFO, worker_pids.first
+    assert wait_for_server_to_include("Thread: TID")
   end
 
   def test_usr2_restart
@@ -586,12 +582,10 @@ RUBY
     t.uniq!; t.compact!
     qty_pids = t.length
 
-    msg = "#{responses} responses, #{qty_pids} uniq pids"
+    msg = "#{responses} responses, #{qty_pids} uniq pids, #{resets} resets, #{refused} refused, #{read_timeouts} read timeouts, #{unknown} unknown"
 
     assert_equal 25, responses, msg
     assert_operator qty_pids, :>, 2, msg
-
-    msg = "#{responses} responses, #{resets} resets, #{refused} refused, #{read_timeouts} read timeouts, #{unknown} unknown"
 
     assert_equal 0, refused, msg
 
