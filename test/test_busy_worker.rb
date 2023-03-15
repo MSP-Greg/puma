@@ -65,10 +65,7 @@ class TestBusyWorker < Minitest::Test
     skts = Array.new(n) { send_http "GET / HTTP/1.0\r\n\r\n" }
 
     Array.new(n) do |i|
-      Thread.new {
-        skts[i].wait_readable 2
-        skts[i].read_nonblock 1024
-      }
+      Thread.new { skts[i].read_body }
     end.each(&:join)
   end
 
@@ -76,7 +73,7 @@ class TestBusyWorker < Minitest::Test
   # sequentially as a small delay is introduced
   def test_multiple_requests_waiting_on_less_busy_worker
     with_server(wait_for_less_busy_worker: 1.0)
-    n = 3
+    n = 4
     run_requests n
 
     assert_equal n, @requests_count, "number of requests needs to match"
