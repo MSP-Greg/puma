@@ -68,11 +68,19 @@ def hit(uris)
   end
 end
 
+# Some platforms may repeat port numbers when selecting several at once.
 module UniquePort
+  SELECTED_PORTS = []
   def self.call
-    TCPServer.open('127.0.0.1', 0) do |server|
-      server.connect_address.ip_port
-    end
+    port = 0
+    begin
+      TCPServer.open('127.0.0.1', 0) { |server|
+        port = server.connect_address.ip_port
+        server.close
+      }
+    end while SELECTED_PORTS.include? port
+    SELECTED_PORTS << port
+    port
   end
 end
 
@@ -199,6 +207,7 @@ class Minitest::Test
 end
 
 Minitest.after_run do
+  puts "UniquePort::SELECTED_PORTS #{UniquePort::SELECTED_PORTS.length}", UniquePort::SELECTED_PORTS.sort
   # needed for TestCLI#test_control_clustered
   if !$debugging_hold && ENV['PUMA_TEST_DEBUG']
     $debugging_info.sort!
