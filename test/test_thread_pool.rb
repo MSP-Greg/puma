@@ -47,7 +47,7 @@ class TestThreadPool < Minitest::Test
     # If +wait+ is true, wait until the trim request is completed before returning.
     def trim(force=false, wait: true)
       super(force)
-      Thread.pass until @trim_requested == 0 if wait
+      Thread.pass until @trim_requested.zero? if wait
     end
   end
 
