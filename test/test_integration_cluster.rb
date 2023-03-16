@@ -332,12 +332,10 @@ RUBY
   end
 
   def test_application_is_loaded_exactly_once_if_using_preload_app
-    cli_server "-w #{workers} --preload test/rackup/write_to_stdout_on_boot.ru"
+    cli_server "-w #{workers} --preload test/rackup/write_to_stdout_on_boot.ru", no_wait: true
 
-    worker_load_count = 0
-    worker_load_count += 1 while @server.gets =~ /^Loading app/
-
-    assert_equal 0, worker_load_count
+    assert wait_for_server_to_match(/^Loading app/)
+    refute wait_for_server_to_match(/^Loading app/, ret_false_re: /Worker 1 \(PID:/)
   end
 
   def test_warning_message_outputted_when_single_worker
