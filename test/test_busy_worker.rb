@@ -1,10 +1,10 @@
 require_relative "helper"
-require_relative "helpers/socket_tcp"
+require_relative "helpers/puma_socket"
 
 class TestBusyWorker < Minitest::Test
   parallelize_me! if ::Puma.mri?
 
-  include PumaTest::SocketTCP
+  include PumaTest::PumaSocket
 
   def setup
     skip_unless :mri # This feature only makes sense on MRI

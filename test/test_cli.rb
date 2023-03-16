@@ -1,7 +1,7 @@
 require_relative "helper"
 require_relative "helpers/ssl" if ::Puma::HAS_SSL
 require_relative "helpers/tmp_path"
-require_relative "helpers/socket_tcp"
+require_relative "helpers/puma_socket"
 
 require "puma/cli"
 require "json"
@@ -10,7 +10,7 @@ require "psych"
 class TestCLI < Minitest::Test
   include SSLHelper if ::Puma::HAS_SSL
   include TmpPath
-  include PumaTest::SocketTCP
+  include PumaTest::PumaSocket
 
   def setup
     @environment = 'production'

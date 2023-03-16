@@ -3,7 +3,7 @@
 # Copyright (c) 2005 Zed A. Shaw
 
 require_relative "helper"
-require_relative "helpers/socket_tcp"
+require_relative "helpers/puma_socket"
 
 require "puma/server"
 
@@ -20,7 +20,7 @@ end
 class WebServerTest < Minitest::Test
   parallelize_me!
 
-  include PumaTest::SocketTCP
+  include PumaTest::PumaSocket
 
   VALID_REQUEST = "GET / HTTP/1.1\r\nHost: www.zedshaw.com\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n"
 

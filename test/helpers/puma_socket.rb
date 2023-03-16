@@ -4,7 +4,7 @@ module PumaTest
 
   # Note: no setup or teardown, make sure to initialize @ios = []
   #
-  module SocketTCP
+  module PumaSocket
     RESP_READ_LEN = 65_536
     RESP_READ_TIMEOUT = 10
     RESP_SPLIT = "\r\n\r\n"

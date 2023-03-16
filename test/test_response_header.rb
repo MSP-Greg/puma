@@ -1,5 +1,5 @@
 require_relative "helper"
-require_relative "helpers/socket_tcp"
+require_relative "helpers/puma_socket"
 
 require "puma/events"
 require "net/http"
@@ -8,7 +8,7 @@ require "nio"
 class TestResponseHeader < Minitest::Test
   parallelize_me!
 
-  include PumaTest::SocketTCP
+  include PumaTest::PumaSocket
 
   def setup
     @host = "127.0.0.1"

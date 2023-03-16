@@ -1,10 +1,10 @@
 require_relative "helper"
-require_relative "helpers/socket_tcp"
+require_relative "helpers/puma_socket"
 
 class TestOutOfBandServer < Minitest::Test
   parallelize_me!
 
-  include PumaTest::SocketTCP
+  include PumaTest::PumaSocket
 
   def setup
     @server = nil
