@@ -212,6 +212,8 @@ class TestPumaControlCli < TestConfigFileBase
     assert_command_cli_output opts + ["stop"], "Command stop sent success"
 
     assert_kind_of Thread, t.join, "server didn't stop"
+  ensure
+    s.close
   end
 
   # This checks that a 'signal only' command is sent
