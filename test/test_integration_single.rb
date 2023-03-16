@@ -211,15 +211,13 @@ class TestIntegrationSingle < TestIntegration
     cli_server "test/rackup/close_listeners.ru"
     connection = fast_connect
 
-    body = +''
-
     if DARWIN && RUBY_VERSION < '2.6' || TRUFFLE
       begin
-        body = read_body connection
+        read_body connection
       rescue EOFError
       end
     else
-      body = read_body connection
+      read_body connection
     end
 
     time_limit = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5.0
