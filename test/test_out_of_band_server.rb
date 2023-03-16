@@ -7,7 +7,6 @@ class TestOutOfBandServer < Minitest::Test
   include PumaTest::SocketTCP
 
   def setup
-    @ios = []
     @server = nil
     @oob_finished = ConditionVariable.new
     @app_finished = ConditionVariable.new
@@ -17,16 +16,6 @@ class TestOutOfBandServer < Minitest::Test
     @oob_finished.broadcast
     @app_finished.broadcast
     @server&.stop true
-
-    @ios.each do |io|
-      begin
-        io.close if io.respond_to?(:close) && !io.closed?
-        File.unlink io.path if io.is_a? File
-      rescue Errno::EBADF
-      ensure
-        io = nil
-      end
-    end
   end
 
   def oob_server(**options)
