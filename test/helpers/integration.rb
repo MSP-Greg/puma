@@ -187,7 +187,7 @@ class TestIntegration < Minitest::Test
         begin
           line = @server&.gets
           puts line if !line&.strip.empty?
-          return false if ret_false_re && line.match(ret_false_re)
+          return false if ret_false_re && line.match?(ret_false_re)
         end until line&.match?(re)
       else
         while true do
@@ -195,7 +195,7 @@ class TestIntegration < Minitest::Test
           if line.match?(re)
             return idx ? line[re, idx] : line
           end
-          return false if (ret_false_re && line.match?(ret_false_re))
+          return false if ret_false_re && line.match?(ret_false_re)
         end
       end
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
