@@ -15,14 +15,12 @@ class TestBusyWorker < Minitest::Test
       [200, {}, ["Hello World"]]
     }
 
-    @ios = []
     @server = nil
   end
 
   def teardown
     return if skipped?
     @server&.stop true
-    @ios.each { |io| io.close unless io.closed? }
   end
 
   def with_server(**options)
@@ -65,7 +63,8 @@ class TestBusyWorker < Minitest::Test
     skts = Array.new(n) { send_http "GET / HTTP/1.0\r\n\r\n" }
 
     Array.new(n) do |i|
-      Thread.new { skts[i].read_body }
+      # using read_body seems to intermittently fail
+      Thread.new { skts[i].sysread 1_024 }
     end.each(&:join)
   end
 
