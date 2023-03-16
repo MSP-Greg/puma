@@ -43,9 +43,10 @@ class WebServerTest < Minitest::Test
   end
 
   def test_requests_count
+    req = "GET /test HTTP/1.1\r\n\r\n"
     assert_equal @server.requests_count, 0
-    3.times { send_http_and_read "GET /test HTTP/1.1\r\n\r\n" }
-    assert_equal @server.requests_count, 3
+    3.times { send_http_and_read req }
+    assert_equal 3, @server.requests_count
   end
 
   def test_trickle_attack
