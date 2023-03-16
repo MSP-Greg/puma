@@ -10,6 +10,27 @@ module PumaTest
     RESP_SPLIT = "\r\n\r\n"
     HOST = '127.0.0.1'
 
+    def before_setup
+      @ios_to_close = []
+      super
+    end
+
+    def after_teardown
+      # Errno::EBADF raised on macOS
+      @ios_to_close.each do |io|
+        begin
+          io.close if io.respond_to?(:close) && !io.closed?
+          File.unlink io.path if io.is_a? File
+        rescue Errno::EBADF
+        ensure
+          io = nil
+        end
+      end
+
+      super
+    end
+
+
     def header(skt)
       headers = []
       while true
@@ -100,7 +121,7 @@ module PumaTest
       skt.define_singleton_method :read_response, READ_RESPONSE
       skt.define_singleton_method :read_body, READ_BODY
       skt.define_singleton_method :<<, REQ_WRITE
-      @ios << skt
+      @ios_to_close << skt
       skt
     end
 
