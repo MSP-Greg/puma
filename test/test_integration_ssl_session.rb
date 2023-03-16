@@ -75,10 +75,12 @@ class TestIntegrationSSLSession < TestIntegration
 
       curl_cmd = %(curl -k -v --http1.1 -H "Connection: close" #{tls} #{uri} #{uri})
 
-      curl = ''
-      IO.popen(curl_cmd, :err=>[:child, :out]) { |io| curl = io.read }
-
-      curl
+      out, err, pid = spawn_cmd curl_cmd
+      Process.wait pid
+      err.read
+    ensure
+      out.close
+      err.close
     end
   end
 
