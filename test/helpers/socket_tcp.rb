@@ -26,10 +26,8 @@ module PumaTest
           io = nil
         end
       end
-
       super
     end
-
 
     def header(skt)
       headers = []
