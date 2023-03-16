@@ -69,6 +69,9 @@ class TestIntegrationSSLSession < TestIntegration
   def run_session(reuse, tls = nil)
     config = set_reuse reuse
 
+    out = nil
+    err = nil
+
     with_server(config) do
 
       uri = "https://#{HOST}:#{@bind_port}/"
@@ -78,10 +81,10 @@ class TestIntegrationSSLSession < TestIntegration
       out, err, pid = spawn_cmd curl_cmd
       Process.wait pid
       err.read
-    ensure
-      out.close
-      err.close
     end
+  ensure
+    out.close if out.is_a? IO
+    err.close if err.is_a? IO
   end
 
   def test_dflt
