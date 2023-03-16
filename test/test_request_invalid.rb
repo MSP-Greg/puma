@@ -1,4 +1,5 @@
 require_relative "helper"
+require_relative "helpers/socket_tcp"
 
 # These tests check for invalid request headers and metadata.
 # Content-Length, Transfer-Encoding, and chunked body size
@@ -14,13 +15,13 @@ class TestRequestInvalid < Minitest::Test
   # running parallel seems to take longer...
   # parallelize_me! unless JRUBY_HEAD
 
+  include PumaTest::SocketTCP
+
   GET_PREFIX = "GET / HTTP/1.1\r\nConnection: close\r\n"
   CHUNKED = "1\r\nH\r\n4\r\nello\r\n5\r\nWorld\r\n0\r\n\r\n"
 
   def setup
     @host = '127.0.0.1'
-
-    @ios = []
 
     # this app should never be called, used for debugging
     app = ->(env) {
@@ -43,19 +44,6 @@ class TestRequestInvalid < Minitest::Test
 
   def teardown
     @server.stop(true)
-    @ios.each { |io| io.close if io && !io.closed? }
-  end
-
-  def send_http_and_read(req)
-    send_http(req).read
-  end
-
-  def send_http(req)
-    new_connection << req
-  end
-
-  def new_connection
-    TCPSocket.new(@host, @port).tap {|sock| @ios << sock}
   end
 
   def assert_status(str, status = 400)
