@@ -11,7 +11,7 @@ module PumaTest
     HOST = '127.0.0.1'
 
     def before_setup
-      @ios_to_close = []
+      @ios_to_close ||= []
       super
     end
 
