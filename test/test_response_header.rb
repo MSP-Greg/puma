@@ -1,4 +1,6 @@
 require_relative "helper"
+require_relative "helpers/socket_tcp"
+
 require "puma/events"
 require "net/http"
 require "nio"
@@ -6,13 +8,10 @@ require "nio"
 class TestResponseHeader < Minitest::Test
   parallelize_me!
 
-  # this file has limited response length, so 10kB works.
-  CLIENT_SYSREAD_LENGTH = 10_240
+  include PumaTest::SocketTCP
 
   def setup
     @host = "127.0.0.1"
-
-    @ios = []
 
     @app = ->(env) { [200, {}, [env['rack.url_scheme']]] }
 
@@ -22,7 +21,6 @@ class TestResponseHeader < Minitest::Test
 
   def teardown
     @server.stop(true)
-    @ios.each { |io| io.close if io && !io.closed? }
   end
 
   def server_run(app: @app, early_hints: false)
@@ -30,20 +28,6 @@ class TestResponseHeader < Minitest::Test
     @port = (@server.add_tcp_listener @host, 0).addr[1]
     @server.instance_variable_set(:@early_hints, true) if early_hints
     @server.run
-  end
-
-  def send_http_and_read(req)
-    send_http(req).sysread CLIENT_SYSREAD_LENGTH
-  end
-
-  def send_http(req)
-    skt = new_connection
-    skt.syswrite req
-    skt
-  end
-
-  def new_connection
-    TCPSocket.new(@host, @port).tap {|sock| @ios << sock}
   end
 
   # The header keys must be Strings
