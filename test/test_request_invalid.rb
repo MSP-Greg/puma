@@ -1,5 +1,5 @@
 require_relative "helper"
-require_relative "helpers/socket_tcp"
+require_relative "helpers/puma_socket"
 
 # These tests check for invalid request headers and metadata.
 # Content-Length, Transfer-Encoding, and chunked body size
@@ -15,7 +15,7 @@ class TestRequestInvalid < Minitest::Test
   # running parallel seems to take longer...
   # parallelize_me! unless JRUBY_HEAD
 
-  include PumaTest::SocketTCP
+  include PumaTest::PumaSocket
 
   GET_PREFIX = "GET / HTTP/1.1\r\nConnection: close\r\n"
   CHUNKED = "1\r\nH\r\n4\r\nello\r\n5\r\nWorld\r\n0\r\n\r\n"
