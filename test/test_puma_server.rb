@@ -133,7 +133,7 @@ class TestPumaServerP < TestPumaServerBase
     assert_equal random_bytes.bytesize, ary.last.bytesize
     assert_equal random_bytes, ary.last
   ensure
-    tf.close
+    tf.close if tf.respond_to? :close
   end
 
   def test_file_to_path
@@ -154,7 +154,7 @@ class TestPumaServerP < TestPumaServerBase
     assert_equal random_bytes.bytesize, ary.last.bytesize
     assert_equal random_bytes, ary.last
   ensure
-    tf.close
+    tf.close if tf.respond_to? :close
   end
 
   def test_proper_stringio_body
