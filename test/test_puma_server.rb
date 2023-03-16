@@ -18,8 +18,6 @@ class TestPumaServerBase < Minitest::Test
   def setup
     @host = "127.0.0.1"
 
-    @ios = []
-
     @app = ->(env) { [200, {}, [env['rack.url_scheme']]] }
 
     @log_writer = Puma::LogWriter.strings
@@ -29,16 +27,6 @@ class TestPumaServerBase < Minitest::Test
 
   def teardown
     @server.stop true
-    # Errno::EBADF raised on macOS
-    @ios.each do |io|
-      begin
-        io.close if io.respond_to?(:close) && !io.closed?
-        File.unlink io.path if io.is_a? File
-      rescue Errno::EBADF
-      ensure
-        io = nil
-      end
-    end
   end
 
   def server_run(**options, &block)
