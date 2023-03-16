@@ -41,13 +41,13 @@ module PumaTest
       headers
     end
 
-    def send_http_and_read(req)
-      skt = send_http req
+    def send_http_and_read(req, port: nil, path: nil)
+      skt = send_http req, port: port, path: path
       skt.read_response
     end
 
-    def send_http(req)
-      skt = new_connection
+    def send_http(req, port: nil, path: nil)
+      skt = new_connection port: port, path: path
       skt.syswrite req
       skt
     end
@@ -113,9 +113,10 @@ module PumaTest
 
     REQ_WRITE = -> (str) { self.syswrite str }
 
-    def new_connection
+    def new_connection(port: nil, path: nil)
+      port  ||= @port
       @host ||= HOST
-      skt = TCPSocket.new @host, @port
+      skt = path ? UNIXSocket.new(path) : TCPSocket.new(@host, port)
       skt.define_singleton_method :read_response, READ_RESPONSE
       skt.define_singleton_method :read_body, READ_BODY
       skt.define_singleton_method :<<, REQ_WRITE
