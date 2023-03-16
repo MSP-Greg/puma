@@ -1,4 +1,6 @@
 require_relative "helper"
+require_relative "helpers/socket_tcp"
+
 require "puma/events"
 require "puma/server"
 require "net/http"
@@ -16,6 +18,8 @@ require "rack/body_proxy"
 
 class TestPumaServerHijack < Minitest::Test
   parallelize_me!
+
+  include PumaTest::SocketTCP
 
   def setup
     @host = "127.0.0.1"
@@ -51,25 +55,6 @@ class TestPumaServerHijack < Minitest::Test
     @server = Puma::Server.new block || @app, @events, options
     @port = (@server.add_tcp_listener @host, 0).addr[1]
     @server.run
-  end
-
-  # only for shorter bodies!
-  def send_http_and_sysread(req)
-    send_http(req).sysread 2_048
-  end
-
-  def send_http_and_read(req)
-    send_http(req).read
-  end
-
-  def send_http(req)
-    t = new_connection
-    t.syswrite req
-    t
-  end
-
-  def new_connection
-    TCPSocket.new(@host, @port).tap {|sock| @ios << sock}
   end
 
   # Full hijack does not return headers
@@ -119,7 +104,7 @@ class TestPumaServerHijack < Minitest::Test
     sock = send_http "GET / HTTP/1.1\r\n\r\n"
     resp = sock.sysread 1_024
     echo_msg = "This should echo..."
-    sock.syswrite echo_msg
+    sock << echo_msg
 
     assert_includes resp, 'Connection: Upgrade'
     assert_equal echo_msg, sock.sysread(256)
@@ -147,7 +132,7 @@ class TestPumaServerHijack < Minitest::Test
     sock = send_http "GET / HTTP/1.1\r\n\r\n"
     resp = sock.sysread 1_024
     echo_msg = "This should echo..."
-    sock.syswrite echo_msg
+    sock << echo_msg
 
     assert_includes resp, 'Connection: Upgrade'
     assert_equal echo_msg, sock.sysread(256)
