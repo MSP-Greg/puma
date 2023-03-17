@@ -20,7 +20,8 @@ class TestIntegration < Minitest::Test
   BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -Ilib" :
     "#{Gem.ruby} -Ilib"
 
-  def setup
+  def before_setup
+    super
     @server = nil
     @server_err = nil
     @check_server_err = true
@@ -29,15 +30,17 @@ class TestIntegration < Minitest::Test
     @bind_path    = tmp_path('.sock')
   end
 
-  def teardown
+  def after_teardown
+    super
     err_out = ''
-    begin
-      if @server_err.is_a?(IO) && @check_server_err
+
+    if @server_err.is_a?(IO) && @check_server_err
+      begin
         if @server_err.wait_readable 0.25
           err_out = @server_err.read_nonblock(2_048, exception: false) || ''
         end
+      rescue IOError, Errno::EBADF
       end
-    rescue IOError # stream closed in another thread
     end
 
     if @server && defined?(@control_tcp_port) && Puma.windows?
