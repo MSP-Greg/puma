@@ -49,18 +49,31 @@ class TestBusyWorker < Minitest::Test
 
     options[:min_threads] = 4
     options[:max_threads] = 4
-    options[:log_writer]  ||= Puma::LogWriter.strings
+    options[:log_writer] = log_writer ||= Puma::LogWriter.strings
 
     @server = Puma::Server.new request_handler, nil, **options
     @port = (@server.add_tcp_listener '127.0.0.1', 0).addr[1]
     @server.run
     # server is running in thread, and creating threads
-    sleep 0.25
+    sleep 0.1 until @server.running == 4
   end
 
   def run_requests(n)
     # send all requests first, read later
-    skts = Array.new(n) { send_http "GET / HTTP/1.0\r\n\r\n" }
+    skts = Array.new(n) {
+      max_retries = 5
+      retries = 0
+      begin
+        send_http "GET / HTTP/1.0\r\n\r\n"
+      rescue Errno::ECONNREFUSED => e
+        retries += 1
+        if retries < max_retries
+          retry
+        else
+          flunk "TestBusyWorker#run_requests failed via #{e.class}"
+        end
+      end
+    }
 
     Array.new(n) do |i|
       # using read_body seems to intermittently fail
