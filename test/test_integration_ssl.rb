@@ -109,9 +109,9 @@ RUBY
 
     server.run(true)
     begin
-      ca = File.expand_path('../examples/puma/client-certs/ca.crt', __dir__)
-      cert = File.expand_path('../examples/puma/client-certs/client.crt', __dir__)
-      key = File.expand_path('../examples/puma/client-certs/client.key', __dir__)
+      ca   = File.expand_path '../examples/puma/client-certs/ca.crt'    , __dir__
+      cert = File.expand_path '../examples/puma/client-certs/client.crt', __dir__
+      key  = File.expand_path '../examples/puma/client-certs/client.key', __dir__
       # NOTE: JRuby used to end up in a hang with TLS peer verification enabled
       # it's easier to reproduce using an external client such as CURL (using net/http client the bug isn't triggered)
       # also the "hang", being buffering related, seems to showcase better with TLS 1.2 than 1.3
@@ -184,6 +184,7 @@ RUBY
 
   def curl_and_get_response(url, method: :get, args: nil)
     cmd = "curl -s -v --show-error #{args} -X #{method.to_s.upcase} -k #{url}"
+
     begin
       io_out, io_err, pid = spawn_cmd cmd
     rescue Errno::ENOENT
@@ -192,16 +193,17 @@ RUBY
 
     _, status = Process.wait2 pid
     out = io_out.read
+    err = io_err.read
     if status.success?
-      http_status = io_err.read.match(/< HTTP\/1.1 (.*?)/)[1] || '0' # < HTTP/1.1 200 OK\r\n
+      http_status = err.match(/< HTTP\/1.1 (.*?)/)[1] || '0' # < HTTP/1.1 200 OK\r\n
       if http_status.strip[0].to_i > 2
         warn out
-        flunk "#{cmd.inspect} unexpected response: #{http_status}\n\n#{err}"
+        flunk "#{cmd.inspect} unexpected response: #{http_status}\n#{err}\n"
       end
       return out
     else
       warn out
-      flunk "#{cmd.inspect} process failed: #{status}\n\n#{err}"
+      flunk "#{cmd.inspect} process failed: #{status}\n#{err}\n"
     end
   end
 
