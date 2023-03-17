@@ -94,11 +94,11 @@ module Puma
 
       begin
         if SUPPORTED_HTTP_METHODS.include?(env[REQUEST_METHOD])
-          status, headers, app_body = @thread_pool.with_force_shutdown do
-            Fiber.new do
+          status, headers, app_body = Fiber.new do
+            @thread_pool.with_force_shutdown do
               @app.call(env)
-            end.resume
-          end
+            end
+          end.resume
         else
           @log_writer.log "Unsupported HTTP method used: #{env[REQUEST_METHOD]}"
           status, headers, app_body = [501, {}, ["#{env[REQUEST_METHOD]} method is not supported"]]

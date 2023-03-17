@@ -19,6 +19,8 @@ class FiberStorageApplicationTest < Minitest::Test
   parallelize_me!
 
   def setup
+    skip "Fiber Storage is not supported on this Ruby" unless Fiber.respond_to?(:[])
+
     @tester = FiberStorageApplication.new
     @server = Puma::Server.new @tester, nil, {log_writer: Puma::LogWriter.strings}
     @port = (@server.add_tcp_listener "127.0.0.1", 0).addr[1]
