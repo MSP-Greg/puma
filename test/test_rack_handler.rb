@@ -28,9 +28,8 @@ module TestRackUp
 
       # Wait for launcher to boot
       Timeout.timeout(10) do
-        sleep 0.5 until launcher
+        sleep 0.5 until launcher && launcher.log_writer.stdout.string.include?('Use Ctrl-C to stop')
       end
-      sleep 1.5 unless Puma::IS_MRI
 
       launcher.stop
       thread.join
