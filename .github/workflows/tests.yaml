@@ -78,6 +78,10 @@ jobs:
           setup-ruby-ref: MSP-Greg/setup-ruby/00-gem-cache
         timeout-minutes: 10
 
+      - name: Repo & Commit Info
+        if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
+        run: ruby .github/workflows/github_actions_info.rb
+
       # fixes 'has a bug that prevents `required_ruby_version`'
       - name: update rubygems for Ruby 2.4 - 2.5
         if: |
@@ -109,9 +113,6 @@ jobs:
           (needs.skip_duplicate_runs.outputs.should_skip != 'true')
         shell: bash
         run: echo 'RUBYOPT=--yjit' >> $GITHUB_ENV
-
-      - name: Repo & Commit Info
-        run: ruby .github/workflows/github_actions_info.rb
 
       - name: test
         if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
