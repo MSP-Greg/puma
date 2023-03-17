@@ -75,6 +75,7 @@ jobs:
           # below is only needed for Ruby 2.4
           mingw: openssl
           bundler-cache: true
+          setup-ruby-ref: MSP-Greg/setup-ruby/00-gem-cache
         timeout-minutes: 10
 
       # fixes 'has a bug that prevents `required_ruby_version`'
@@ -167,6 +168,7 @@ jobs:
           brew: ragel
           bundler: none
           bundler-cache: true
+          setup-ruby-ref: MSP-Greg/setup-ruby/00-gem-cache
         timeout-minutes: 10
 
       - name: Compile Puma without SSL support
