@@ -144,7 +144,7 @@ class TestIntegration < Minitest::Test
   def wait_for_server_to_boot(log: false, no_error: false)
     wait_for_server_to_include 'Ctrl-C', log: log
   rescue => e
-    flunk "Server didn't boot in a timely manner #{e.class}"
+    flunk "Server didn't boot in a timely manner #{e.class}" unless no_error
   end
 
   # Returns true if and when server log includes str.
