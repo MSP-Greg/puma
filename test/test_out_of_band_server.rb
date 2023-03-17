@@ -52,7 +52,7 @@ class TestOutOfBandServer < Minitest::Test
     @server = Puma::Server.new app, nil, out_of_band: [oob], **options
     @port = @server.add_tcp_listener('127.0.0.1', 0).addr[1]
     @server.run
-    sleep 0.20
+    sleep 0.1 until @server.running == options[:min_threads]
     sleep 0.15 if Puma.jruby?
   end
 
