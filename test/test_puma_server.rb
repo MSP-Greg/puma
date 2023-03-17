@@ -35,6 +35,7 @@ class TestPumaServerBase < Minitest::Test
     @server = Puma::Server.new block || @app, @events, options
     @port = (@server.add_tcp_listener @host, 0).addr[1]
     @server.run
+    sleep 0.1 until @server.running == options[:min_threads]
   end
 
   def send_proxy_v1_http(req, remote_ip, multisend = false)
