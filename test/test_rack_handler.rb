@@ -1,5 +1,6 @@
 require_relative "helper"
 require_relative "helpers/integration"
+require_relative "helpers/puma_socket"
 
 # Most tests check that ::Rack::Handler::Puma works by itself
 # RackUp#test_bin runs Puma using the rackup bin file
@@ -39,6 +40,8 @@ module TestRackUp
   end
 
   class TestPathHandler < Minitest::Test
+    include PumaTest::PumaSocket
+
     def app
       Proc.new {|env| @input = env; [200, {}, ["hello world"]]}
     end
@@ -82,7 +85,7 @@ module TestRackUp
       port = UniquePort.call
       opts = { Host: host, Port: port }
       in_handler(app, opts) do |launcher|
-        hit(["http://#{host}:#{port}/test"])
+        send_http_and_read "GET /test HTTP/1.1\r\n\r\n", port: port
         assert_equal("/test", @input["PATH_INFO"])
       end
     end
