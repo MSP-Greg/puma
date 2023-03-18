@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require_relative "helper"
+require_relative "helpers/puma_socket"
 require "net/http"
 
 # don't load Rack, as it autoloads everything
@@ -16,6 +17,8 @@ require "nio"
 
 class TestRackServer < Minitest::Test
   parallelize_me!
+
+  include PumaTest::PumaSocket
 
   HOST = '127.0.0.1'
 
@@ -80,7 +83,7 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    hit(["#{@tcp}/test"])
+    send_http_and_read "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -108,7 +111,7 @@ class TestRackServer < Minitest::Test
     @server.app = lambda { |env| input = env; @simple.call(env) }
     @server.run
 
-    hit(["#{@tcp}/test/a/b/c"])
+    send_http_and_read "GET /test/a/b/c HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -125,7 +128,7 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    hit(["#{@tcp}/test"])
+    send_http_and_read "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -180,7 +183,7 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    hit(["#{@tcp}/test"])
+    send_http_and_read "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -221,7 +224,7 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    hit(["#{@tcp}/test"])
+    send_http_and_read "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
