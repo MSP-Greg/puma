@@ -184,11 +184,11 @@ class TestIntegration < Minitest::Test
     retry_cntr = 0
     line = nil
     begin
-      @server.wait_readable 1
+      io.wait_readable 1
       if log
         puts "Waiting for '#{re.inspect}'"
         begin
-          line = @server&.gets
+          line = io&.gets
           puts line if !line&.strip.empty?
           return false if ret_false_re && line.match?(ret_false_re)
         end until line&.match?(re)
