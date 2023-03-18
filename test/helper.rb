@@ -70,7 +70,7 @@ end
 
 # Some platforms may repeat port numbers when selecting several at once.
 module UniquePort
-  SELECTED_PORTS = []
+  SELECTED_PORTS = {}
   def self.call
     port = 0
     begin
@@ -78,8 +78,8 @@ module UniquePort
         port = server.connect_address.ip_port
         server.close
       }
-    end while SELECTED_PORTS.include? port
-    SELECTED_PORTS << port
+    end while SELECTED_PORTS.key? port
+    SELECTED_PORTS[port] = nil
     port
   end
 end
