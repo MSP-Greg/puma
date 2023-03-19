@@ -2,12 +2,9 @@
 
 require "puma/control_cli"
 require "json"
-require "open3"
-require "io/wait"
+require "io/wait" unless Puma::HAS_NATIVE_IO_WAIT
 require_relative 'tmp_path'
 
-# Only single mode tests go here. Cluster and pumactl tests
-# have their own files, use those instead
 class TestIntegration < Minitest::Test
   include TmpPath
   DARWIN = RUBY_PLATFORM.include? 'darwin'
