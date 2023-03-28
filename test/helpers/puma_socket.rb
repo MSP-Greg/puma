@@ -12,6 +12,7 @@ module PumaTest
 
     def before_setup
       @ios_to_close ||= []
+      @port = nil
       super
     end
 
