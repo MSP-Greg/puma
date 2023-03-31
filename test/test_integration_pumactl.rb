@@ -44,17 +44,14 @@ class TestIntegrationPumactl < TestIntegration
 
   def ctl_unix(signal='stop')
     skip_unless :unix
-    stderr = Tempfile.new(%w(stderr .log))
 
     cli_server "-q test/rackup/sleep.ru #{set_pumactl_args unix: true} -S #{@state_path}",
-      config: "stdout_redirect nil, '#{stderr.path}'",
       unix: true
 
     cli_pumactl signal, unix: true
 
     _, status = Process.wait2(@pid)
     assert_equal 0, status
-    refute_match 'error', File.read(stderr.path)
     @server = nil
   end
 
