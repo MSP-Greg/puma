@@ -295,7 +295,7 @@ module TestTempFile
     fio.write data
     fio.flush
     fio.rewind
-    @ios << fio
+    @ios_to_close << fio if defined?(@ios_to_close)
     fio
   end
 end
