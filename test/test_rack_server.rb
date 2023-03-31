@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require_relative "helper"
+require_relative "helpers/puma_socket"
 require "net/http"
 
 # don't load Rack, as it autoloads everything
@@ -17,7 +18,7 @@ require "nio"
 class TestRackServer < Minitest::Test
   parallelize_me!
 
-  HOST = '127.0.0.1'
+  include PumaTest::PumaSocket
 
   STR_1KB = "──#{SecureRandom.hex 507}─\n".freeze
 
@@ -53,10 +54,16 @@ class TestRackServer < Minitest::Test
 
   def setup
     @simple = lambda { |env| [200, { "x-header" => "Works" }, ["Hello"]] }
-    @server = Puma::Server.new @simple
+    @server = Puma::Server.new @simple, nil, { min_threads: 1 }
     @port = (@server.add_tcp_listener HOST, 0).addr[1]
     @tcp = "http://#{HOST}:#{@port}"
     @stopped = false
+  end
+
+  def server_run
+    @server.run
+    # server is running in thread, and creating threads
+    sleep 0.05 until @server.running == 1
   end
 
   def stop
@@ -78,9 +85,9 @@ class TestRackServer < Minitest::Test
     @checker = ErrorChecker.new ServerLint.new(@simple)
     @server.app = @checker
 
-    @server.run
+    server_run
 
-    hit(["#{@tcp}/test"])
+    send_http_read_response "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -91,7 +98,7 @@ class TestRackServer < Minitest::Test
     @checker = ErrorChecker.new ServerLint.new(@simple)
     @server.app = @checker
 
-    @server.run
+    server_run
 
     big = "x" * (1024 * 16)
 
@@ -106,9 +113,9 @@ class TestRackServer < Minitest::Test
   def test_path_info
     input = nil
     @server.app = lambda { |env| input = env; @simple.call(env) }
-    @server.run
+    server_run
 
-    hit(["#{@tcp}/test/a/b/c"])
+    send_http_read_response "GET /test/a/b/c HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -123,9 +130,9 @@ class TestRackServer < Minitest::Test
       @simple.call(env)
     end
 
-    @server.run
+    server_run
 
-    hit(["#{@tcp}/test"])
+    send_http_read_response "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -138,12 +145,9 @@ class TestRackServer < Minitest::Test
       @simple.call(env)
     end
 
-    @server.run
+    server_run
 
-    socket = TCPSocket.open HOST, @port
-    socket.puts "GET /test HTTP/1.1\r\n"
-    socket.puts "Connection: Keep-Alive\r\n"
-    socket.puts "\r\n"
+    socket = send_http "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
 
     headers = header_hash socket
 
@@ -180,9 +184,9 @@ class TestRackServer < Minitest::Test
 
     @server.app = lambda { |env| [200, { "X-Header" => "Works" }, body] }
 
-    @server.run
+    server_run
 
-    hit(["#{@tcp}/test"])
+    send_http_read_response "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -197,12 +201,10 @@ class TestRackServer < Minitest::Test
 
     @server.app = lambda { |env| [200, { "X-Header" => "Works" }, body] }
 
-    @server.run
+    server_run
 
-    socket = TCPSocket.open HOST, @port
-    socket.puts "GET /test HTTP/1.1\r\n"
-    socket.puts "Connection: Keep-Alive\r\n"
-    socket.puts "\r\n"
+
+    socket = send_http "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
 
     headers = header_hash socket
 
@@ -222,9 +224,9 @@ class TestRackServer < Minitest::Test
 
     @server.app = logger
 
-    @server.run
+    server_run
 
-    hit(["#{@tcp}/test"])
+    send_http_read_response "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -236,7 +238,7 @@ class TestRackServer < Minitest::Test
     app = lambda { |env| [200, { 'content-type' => 'text/plain; charset=utf-8' }, body] }
     rack_app = Rack::Chunked.new app
     @server.app = rack_app
-    @server.run
+    server_run
 
     resp = Net::HTTP.get_response URI(@tcp)
     assert_equal 'chunked', resp['transfer-encoding']
@@ -248,7 +250,7 @@ class TestRackServer < Minitest::Test
     app = lambda { |env| [200, { 'content-type' => 'text/plain; charset=utf-8' }, body] }
     rack_app = Rack::Chunked.new app
     @server.app = rack_app
-    @server.run
+    server_run
 
     resp = Net::HTTP.get_response URI(@tcp)
     assert_equal 'chunked', resp['transfer-encoding']
@@ -258,7 +260,7 @@ class TestRackServer < Minitest::Test
   def test_puma_enum
     body = Array.new(10, STR_1KB).to_enum
     @server.app = lambda { |env| [200, { 'content-type' => 'text/plain; charset=utf-8' }, body] }
-    @server.run
+    server_run
 
     resp = Net::HTTP.get_response URI(@tcp)
     assert_equal 'chunked', resp['transfer-encoding']
