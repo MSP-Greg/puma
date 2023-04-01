@@ -16,6 +16,8 @@ class TestThreadPool < Minitest::Test
       pool_shutdown_grace_time: grace_time
     }
     @pool = Puma::ThreadPool.new('tst', options, &block)
+    sleep 0.05 until @pool.spawned == min.to_i # TruffleRuby
+    @pool
   end
 
   def mutex_pool(min, max, grace_time = nil, &block)
@@ -26,6 +28,8 @@ class TestThreadPool < Minitest::Test
       pool_shutdown_grace_time: grace_time
     }
     @pool = MutexPool.new('tst', options, &block)
+    sleep 0.05 until @pool.spawned == min.to_i # TruffleRuby
+    @pool
   end
 
   # Wraps ThreadPool work in mutex for better concurrency control.
