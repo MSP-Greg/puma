@@ -1,6 +1,7 @@
 require_relative "helper"
 
 class TestPersistent < Minitest::Test
+  parallelize_me!
 
   HOST = "127.0.0.1"
 
@@ -23,11 +24,11 @@ class TestPersistent < Minitest::Test
       [status, @headers, @body]
     end
 
-    opts = {max_threads: 1}
+    opts = {min_threads: 1, max_threads: 1}
     @server = Puma::Server.new @simple, nil, opts
     @port = (@server.add_tcp_listener HOST, 0).addr[1]
     @server.run
-    sleep 0.15 if Puma.jruby?
+    sleep 0.05 until @server.running == 1 # opts[:min_threads]
     @client = TCPSocket.new HOST, @port
   end
 
