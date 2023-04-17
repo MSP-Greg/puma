@@ -12,12 +12,11 @@ AllCops:
     - 'pkg/**/*'
     - 'Rakefile'
   SuggestExtensions: false
-  NewCops: disable
+  NewCops: enable
 
 # ————————————————————————————————————————— disabled cops
 
 # ————————————————————————————————————————— enabled cops
-
 Layout/AccessModifierIndentation:
   EnforcedStyle: indent
 
