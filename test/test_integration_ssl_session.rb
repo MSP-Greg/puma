@@ -28,14 +28,7 @@ class TestIntegrationSSLSession < TestIntegration
 
   def teardown
     return if skipped?
-    # stop server
-    sock = TCPSocket.new HOST, control_tcp_port
-    @ios_to_close << sock
-    sock.syswrite "GET /stop?token=#{TOKEN} HTTP/1.1\r\n\r\n"
-    sock.read
-    assert_match 'Goodbye!', @server.read
-
-    @server.close unless @server&.closed?
+    @server.close unless @server.is_a?(IO) && @server.closed?
     @server = nil
     super
   end
@@ -71,18 +64,12 @@ class TestIntegrationSSLSession < TestIntegration
   end
 
   def with_server(config)
-    config_file = Tempfile.new %w(config .rb)
-    config_file.write config
-    config_file.close
-    config_file.path
-
-    # start server
-    cmd = "#{BASE} bin/puma -C #{config_file.path}"
-    @server = IO.popen cmd, 'r'
-    wait_for_server_to_boot log: false
-    @pid = @server.pid
-
+    cli_server '', config: config, config_bind: true
     yield
+  ensure
+    cli_pumactl 'stop'
+    @server.wait_readable 1
+    assert wait_for_server_to_include 'Goodbye!'
   end
 
   def run_session(reuse, tls = nil)
