@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 require_relative "helper"
+require_relative "helpers/puma_socket"
 require "net/http"
 
 # don't load Rack, as it autoloads everything
@@ -20,6 +21,8 @@ require "nio"
 
 class TestRackServer < Minitest::Test
   parallelize_me!
+
+  include PumaTest::PumaSocket
 
   HOST = '127.0.0.1'
 
@@ -84,7 +87,7 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    hit(["#{@tcp}/test"])
+    send_http_read_response "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -112,7 +115,7 @@ class TestRackServer < Minitest::Test
     @server.app = lambda { |env| input = env; @simple.call(env) }
     @server.run
 
-    hit(["#{@tcp}/test/a/b/c"])
+    send_http_read_response "GET /test/a/b/c HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -129,7 +132,7 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    hit(["#{@tcp}/test"])
+    send_http_read_response "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -144,15 +147,12 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    socket = TCPSocket.open HOST, @port
-    socket.puts "GET /test HTTP/1.1\r\n"
-    socket.puts "Connection: Keep-Alive\r\n"
-    socket.puts "\r\n"
+    skt = send_http "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
 
-    headers = header_hash socket
+    headers = header_hash skt
 
     content_length = headers["Content-Length"].to_i
-    real_response_body = socket.read(content_length)
+    real_response_body = skt.read(content_length)
 
     assert_equal "Hello", real_response_body
 
@@ -169,11 +169,9 @@ class TestRackServer < Minitest::Test
     #   the erroneous 500 response wasn't/won't be written.
     sleep 0.1
     assert_raises IO::WaitReadable do
-      content = socket.read_nonblock(12)
+      content = skt.read_nonblock(12)
       refute_includes content, "500"
     end
-
-    socket.close
 
     stop
   end
@@ -186,7 +184,7 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    hit(["#{@tcp}/test"])
+    send_http_read_response "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
@@ -195,7 +193,7 @@ class TestRackServer < Minitest::Test
 
   def test_rack_body_proxy_content_length
     str_ary = %w[0123456789 0123456789 0123456789 0123456789]
-    str_ary_bytes = str_ary.to_ary.inject(0) { |sum, el| sum + el.bytesize }
+    str_ary_bytes = str_ary.sum(&:bytesize)
 
     body = Rack::BodyProxy.new(str_ary) { }
 
@@ -203,14 +201,9 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    socket = TCPSocket.open HOST, @port
-    socket.puts "GET /test HTTP/1.1\r\n"
-    socket.puts "Connection: Keep-Alive\r\n"
-    socket.puts "\r\n"
+    skt = send_http "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
 
-    headers = header_hash socket
-
-    socket.close
+    headers = header_hash skt
 
     stop
 
@@ -230,7 +223,7 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    hit(["#{@tcp}/test"])
+    send_http_read_response "GET /test HTTP/1.1\r\n\r\n"
 
     stop
 
