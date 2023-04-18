@@ -68,11 +68,19 @@ def hit(uris)
   end
 end
 
+# Some platforms may repeat port numbers when selecting several at once.
 module UniquePort
+  SELECTED_PORTS = {}
   def self.call
-    TCPServer.open('127.0.0.1', 0) do |server|
-      server.connect_address.ip_port
-    end
+    port = 0
+    begin
+      TCPServer.open('127.0.0.1', 0) { |server|
+        port = server.connect_address.ip_port
+        server.close
+      }
+    end while SELECTED_PORTS.key? port
+    SELECTED_PORTS[port] = nil
+    port
   end
 end
 
@@ -85,16 +93,32 @@ module TimeoutEveryTestCase
   def run
     with_info_handler do
       time_it do
-        capture_exceptions do
-          ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
-            before_setup; setup; after_setup
-            self.send self.name
+        # remove ::Timeout.timeout when (if) tests become stable
+        if ::Puma::IS_MRI
+          capture_exceptions do
+            ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+              before_setup; setup; after_setup
+              self.send self.name
+            end
           end
-        end
 
-        capture_exceptions do
-          ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
-            Minitest::Test::TEARDOWN_METHODS.each { |hook| self.send hook }
+          capture_exceptions do
+            ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+              Minitest::Test::TEARDOWN_METHODS.each { |hook| self.send hook }
+            end
+          end
+        else
+          capture_exceptions do
+            ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+              before_setup; setup; after_setup
+              self.send self.name
+            end
+          end
+
+          capture_exceptions do
+            ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+              Minitest::Test::TEARDOWN_METHODS.each { |hook| self.send hook }
+            end
           end
         end
         if respond_to? :clean_tmp_paths
@@ -225,6 +249,7 @@ class Minitest::Test
 end
 
 Minitest.after_run do
+  # puts "UniquePort::SELECTED_PORTS #{UniquePort::SELECTED_PORTS.length}", UniquePort::SELECTED_PORTS.sort
   # needed for TestCLI#test_control_clustered
   if !$debugging_hold && ENV['PUMA_TEST_DEBUG']
     $debugging_info.sort!
@@ -295,7 +320,7 @@ module TestTempFile
     fio.write data
     fio.flush
     fio.rewind
-    @ios << fio
+    @ios_to_close << fio if defined?(@ios_to_close)
     fio
   end
 end
