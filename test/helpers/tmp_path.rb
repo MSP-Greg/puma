@@ -29,6 +29,16 @@ module TmpPath
     path
   end
 
+  def tmp_path_write(basename, data, mode: File::BINARY)
+    fio = Tempfile.create basename, mode: mode
+    path = fio.path
+    fio.write data
+    fio.flush
+    fio.close
+    tmp_paths << path
+    path
+  end
+
   def tmp_paths
     @tmp_paths ||= []
   end
