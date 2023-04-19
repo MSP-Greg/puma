@@ -193,8 +193,9 @@ class TestPersistent < Minitest::Test
 
     @client << req
 
-    expected = "HTTP/1.1 200 OK\r\nX-Header: Works\r\nContent-Length: #{@cl}\r\n\r\n#{@body[0]}" * 2
+    expected = "HTTP/1.1 200 OK\r\nX-Header: Works\r\nContent-Length: #{@cl}\r\n\r\n#{@body[0]}"
 
+    assert_equal expected, @client.read_response(len: expected.bytesize)
     assert_equal expected, @client.read_response
   end
 
@@ -205,8 +206,9 @@ class TestPersistent < Minitest::Test
 
     @client << req
 
-    expected = "HTTP/1.1 200 OK\r\nX-Header: Works\r\nContent-Length: #{@cl}\r\n\r\nHello" * 2
+    expected = "HTTP/1.1 200 OK\r\nX-Header: Works\r\nContent-Length: #{@cl}\r\n\r\nHello"
 
+    assert_equal expected, @client.read_response(len: expected.bytesize)
     assert_equal expected, @client.read_response
   end
 
