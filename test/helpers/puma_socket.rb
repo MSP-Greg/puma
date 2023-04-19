@@ -43,14 +43,14 @@ module PumaTest
       headers
     end
 
-    def send_http_read_resp_body(req, port: nil, path: nil)
+    def send_http_read_resp_body(req, port: nil, path: nil, len: nil)
       skt = send_http req, port: port, path: path
-      skt.read_body
+      skt.read_body len: len
     end
 
-    def send_http_read_response(req, port: nil, path: nil)
+    def send_http_read_response(req, port: nil, path: nil, len: nil)
       skt = send_http req, port: port, path: path
-      skt.read_response
+      skt.read_response len: len
     end
 
     def send_http(req, port: nil, path: nil)
@@ -59,11 +59,11 @@ module PumaTest
       skt
     end
 
-    READ_BODY = -> (timeout = nil) {
-      self.read_response(timeout).split(RESP_SPLIT, 2).last
+    READ_BODY = -> (timeout = nil, len: nil) {
+      self.read_response(timeout, len: len).split(RESP_SPLIT, 2).last
     }
 
-    READ_RESPONSE = -> (timeout = nil) do
+    READ_RESPONSE = -> (timeout = nil, len: nil) do
       timeout ||= RESP_READ_TIMEOUT
       content_length = nil
       chunked = nil
@@ -71,10 +71,11 @@ module PumaTest
       no_body = nil
       response = +''
       t_st = Process.clock_gettime Process::CLOCK_MONOTONIC
+      read_len = len || RESP_READ_LEN
       if self.to_io.wait_readable timeout
         loop do
           begin
-            part = self.read_nonblock(RESP_READ_LEN, exception: false)
+            part = self.read_nonblock(read_len, exception: false)
             case part
             when String
               status ||= part[/\AHTTP\/1\.[01] (\d{3})/, 1]
