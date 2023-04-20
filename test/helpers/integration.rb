@@ -142,7 +142,7 @@ class TestIntegration < Minitest::Test
   def wait_for_server_to_boot(log: false, no_error: false)
     wait_for_server_to_include 'Ctrl-C', log: log
   rescue => e
-    flunk "Server didn't boot in a timely manner #{e.class}" unless no_error
+    raise e.message unless no_error
   end
 
   # Returns true if and when server log includes str.
@@ -167,7 +167,7 @@ class TestIntegration < Minitest::Test
       end
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
       retry_cntr += 1
-      flunk "server did not output '#{str}' in allowed time #{e.class}" if retry_cntr > 20
+      raise "server did not output '#{str}' in allowed time #{e.class}\n#{e.message}" if retry_cntr > 20
       sleep 0.1
       retry
     end
