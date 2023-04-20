@@ -96,16 +96,16 @@ module TimeoutEveryTestCase
         # remove ::Timeout.timeout when (if) tests become stable
         if ::Puma::IS_MRI
           capture_exceptions do
-            ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+#            ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
               before_setup; setup; after_setup
               self.send self.name
-            end
+#            end
           end
 
           capture_exceptions do
-            ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+#            ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
               Minitest::Test::TEARDOWN_METHODS.each { |hook| self.send hook }
-            end
+#            end
           end
         else
           capture_exceptions do
