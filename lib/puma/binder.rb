@@ -48,7 +48,7 @@ module Puma
 
       @envs = {}
       @ios = []
-      localhost_authority
+      # localhost_authority
     end
 
     attr_reader :ios
@@ -307,8 +307,8 @@ module Puma
     def localhost_authority_context
       return unless localhost_authority
 
-      key_path, crt_path = if [:key_path, :certificate_path].all? { |m| localhost_authority.respond_to?(m) }
-        [localhost_authority.key_path, localhost_authority.certificate_path]
+      key_path, crt_path = if [:key_path, :certificate_path].all? { |m| @localhost_authority.respond_to?(m) }
+        [@localhost_authority.key_path, @localhost_authority.certificate_path]
       else
         local_certificates_path = File.expand_path("~/.localhost")
         [File.join(local_certificates_path, "localhost.key"), File.join(local_certificates_path, "localhost.crt")]
