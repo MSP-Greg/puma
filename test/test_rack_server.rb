@@ -7,6 +7,7 @@ require "rack/body_proxy"
 require "rack/lint"
 require "rack/version"
 require "rack/common_logger"
+require "rack/sendfile"
 
 # Rack::Chunked is loaded by Rack v2, needs to be required by Rack 3.0,
 # and is removed in Rack 3.1
@@ -53,7 +54,7 @@ class TestRackServer < Minitest::Test
 
   def setup
     @simple = lambda { |env| [200, { "x-header" => "Works" }, ["Hello"]] }
-    @server = Puma::Server.new @simple
+    @server = ::Puma::Server.new @simple
     @port = (@server.add_tcp_listener HOST, 0).addr[1]
     @tcp = "http://#{HOST}:#{@port}"
     @stopped = false
@@ -263,5 +264,50 @@ class TestRackServer < Minitest::Test
     resp = Net::HTTP.get_response URI(@tcp)
     assert_equal 'chunked', resp['transfer-encoding']
     assert_equal STR_1KB * 10, resp.body.force_encoding(Encoding::UTF_8)
+  end
+
+  def test_sendfile
+    fn = "#{__dir__}/rackup/hello.ru"
+    body = File.open fn, 'rb'
+
+    app = ->(env) { [200, { 'content-type' => 'text/plain; charset=utf-8' }, body] }
+
+    @server.app = Rack::Sendfile.new app
+    @server.run
+
+    skt = TCPSocket.open HOST, @port
+    skt.syswrite "GET /test HTTP/1.1\r\nx-sendfile-type: x-accel-redirect\r\n" \
+      "x-accel-mapping: a=a\r\n\r\n"
+
+    expected = "HTTP/1.1 200 OK\r\ncontent-type: text/plain; charset=utf-8\r\n" \
+      "x-accel-redirect: #{fn}\r\nContent-Length: 0\r\n\r\n"
+
+    skt.wait_readable 2
+    assert_equal expected, skt.read_nonblock(1_024)
+    assert body.closed?
+    skt.close
+  end
+
+  def test_sendfile_no_hdr
+    fn = "#{__dir__}/rackup/hello.ru"
+    body = File.open fn, 'rb'
+
+    str = body.read
+    body.rewind
+
+    app = ->(env) {  [200, { 'content-type' => 'text/plain; charset=utf-8' }, body] }
+    @server.app = Rack::Sendfile.new app
+    @server.run
+
+    skt = TCPSocket.open HOST, @port
+    skt.syswrite "GET /test HTTP/1.1\r\n\r\n"
+
+    expected = "HTTP/1.1 200 OK\r\ncontent-type: text/plain; charset=utf-8\r\n" \
+      "Content-Length: #{str.bytesize}\r\n\r\n#{str}"
+
+    skt.wait_readable 2
+    assert_equal expected, skt.read_nonblock(1_024)
+    assert body.closed?
+    skt.close
   end
 end
