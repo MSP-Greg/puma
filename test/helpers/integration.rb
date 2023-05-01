@@ -16,8 +16,8 @@ class TestIntegration < Minitest::Test
   RESP_READ_TIMEOUT = 10
   RESP_SPLIT = "\r\n\r\n"
 
-  BASE = defined?(Bundler) ? "#{Gem.ruby} -rbundler/setup -Ilib" :
-    "#{Gem.ruby} -Ilib"
+  BASE = defined?(Bundler) ? "ruby -rbundler/setup -Ilib" :
+    "ruby -Ilib"
 
   def setup
     @server = nil
