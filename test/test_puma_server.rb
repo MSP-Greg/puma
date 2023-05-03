@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "helper"
 require_relative "helpers/puma_socket"
 
@@ -56,7 +58,7 @@ class TestPumaServerBase < Minitest::Test
   end
 end
 
-class TestPumaServer < TestPumaServerBase
+class TestPumaServer_P < TestPumaServerBase
   parallelize_me!
 
   def test_normalize_host_header_missing
@@ -184,7 +186,7 @@ class TestPumaServer < TestPumaServerBase
     body = "HTTP/1.1 750 Upgraded to Awesome\r\nDone: Yep!\r\n"
     server_run do |env|
       io = env['puma.socket']
-      io.write body
+      io.syswrite body
       io.close
       [-1, {}, []]
     end
@@ -201,16 +203,9 @@ class TestPumaServer < TestPumaServerBase
       [200, {}, [giant]]
     end
 
-    sock = send_http "GET / HTTP/1.0\r\n\r\n"
+    body = send_http_read_resp_body "GET / HTTP/1.0\r\n\r\n"
 
-    while true
-      line = sock.gets
-      break if line == "\r\n"
-    end
-
-    out = sock.read_response
-
-    assert_equal giant.bytesize, out.bytesize
+    assert_equal giant.bytesize, body.bytesize
   end
 
   def test_respect_x_forwarded_proto
@@ -1219,6 +1214,7 @@ class TestPumaServer < TestPumaServerBase
 
     assert s2.wait_readable(10), 'timeout waiting for response'
     s2_result = begin
+      assert s2.wait_readable(10), 'timeout waiting for s2 response'
       s2.gets
     rescue Errno::ECONNABORTED, Errno::ECONNRESET
       # Some platforms raise errors instead of returning a response/EOF when a TCP connection is aborted.
@@ -1360,106 +1356,6 @@ class TestPumaServer < TestPumaServerBase
     selector = @server.instance_variable_get(:@reactor).instance_variable_get(:@selector)
 
     assert_equal selector.backend, backend
-  end
-
-  def test_drain_on_shutdown_http10(drain = true)
-    req = "GET / HTTP/1.0\r\n\r\n"
-    good_response = "HTTP/1.0 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
-    dropped = "Errno::ECONNRESET EOFError"
-
-    num_connections = 10
-
-    wait = Queue.new
-    server_run(drain_on_shutdown: drain, min_threads: 2, max_threads: 2) do
-      wait.pop
-      [200, {}, ["DONE"]]
-    end
-    connections = Array.new(num_connections) { send_http req }
-    @server.stop
-    wait.close
-
-    results = connections.map { |skt|
-      begin
-        skt.read_response
-      rescue StandardError => e
-        e.class.to_s
-      end
-    }
-    results_msg = results.map(&:inspect).join "\n"
-
-    good    = results.count { |e| e == good_response }
-    dropped = results.count { |e| dropped.include? e }
-
-    msg = "#{results_msg}\nGood req (#{good}) and Dropped req (#{dropped}) should total #{num_connections}"
-    assert_equal num_connections, (good + dropped), msg
-
-    if drain
-      assert_equal 0, dropped, "#{results_msg}\nThere should be no dropped requests, there were #{dropped}"
-    else
-      refute_equal 0, dropped, "#{results_msg}\nThere should be at least 1 dropped request, there were #{dropped}"
-    end
-  end
-
-  def test_not_drain_on_shutdown_http10
-    test_drain_on_shutdown_http10 false
-  end
-
-  # send two requests with each client/socket
-  def test_drain_on_shutdown_http11(drain = true)
-    req = "GET / HTTP/1.1\r\n\r\n"
-    good_response   = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
-    closed_response = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nDONE"
-    dropped = "Errno::ECONNRESET EOFError"
-
-    num_connections = 10
-
-    wait = Queue.new
-    server_run(drain_on_shutdown: drain, min_threads: 2, max_threads: 2) do
-      wait.pop
-      [200, {}, ["DONE"]]
-    end
-    connections = Array.new(num_connections) { send_http (req * 2) }
-    @server.stop
-    wait.close
-    sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
-
-    results = connections.map { |skt|
-      begin
-        skt.read_response
-      rescue StandardError => e
-        e.class.to_s
-      end
-    }
-    results_msg = results.map(&:inspect).join "\n"
-
-    good        = results.count { |e| e == (good_response) }
-    good_good   = results.count { |e| e == (good_response * 2) }
-    good_closed = results.count { |e| e == "#{good_response}#{closed_response}" }
-    closed      = results.count { |e| e == closed_response }
-    dropped     = results.count { |e| dropped.include? e }
-
-    if drain
-      msg = "#{results_msg}\n#{good} good + #{good_good} good_good " \
-        "+ #{good_closed} good_closed + #{closed} closed should equal #{num_connections}"
-      assert_equal num_connections, (good + good_good + good_closed + closed), msg
-
-      msg = "#{results_msg}\nThere should be 8 or more good_good responses, there were #{good_good}"
-      assert_operator 8, :<=, good_good, msg
-
-      msg = "#{results_msg}\nNo requests should have been dropped"
-      assert_equal 0, dropped, msg
-    else
-      msg = "#{results_msg}\n#{good} good + #{good_good} good_good " \
-        "+ #{good_closed} good_closed + #{closed} closed + #{dropped} dropped should equal #{num_connections}"
-      assert_equal num_connections, (good + good_good + good_closed + closed + dropped), msg
-
-      msg = "#{results_msg}\nSome requests should have been dropped"
-      refute_equal 0, dropped, msg
-    end
-  end
-
-  def test_not_drain_on_shutdown_http11
-    test_drain_on_shutdown_http11 false
   end
 
   def test_remote_address_header
@@ -1686,6 +1582,134 @@ class TestPumaServer < TestPumaServerBase
     pid = spawn(env, cmd, opts)
     [out_w, err_w].each(&:close)
     [out_r, err_r, pid]
+  end
+end
+
+class TestPumaServer_S < TestPumaServerBase
+  def test_drain_on_shutdown_http10(drain = true)
+    req = "GET / HTTP/1.0\r\n\r\n"
+    good_response = "HTTP/1.0 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
+    results = []
+    num_connections = 10
+    wait = Queue.new
+
+    server_run(drain_on_shutdown: drain, min_threads: 2, max_threads: 2) do
+      wait.pop
+      [200, {}, ["DONE"]]
+    end
+
+    connections = Array.new(num_connections) { send_http req }
+    @server.stop
+    wait.close
+
+    until connections.empty?
+      connections.each_with_index do |skt, idx|
+        if skt.wait_readable 0.000_5
+          begin
+            results << skt.read_response.inspect
+          rescue StandardError => e
+            results << e.class.to_s
+          end
+          connections[idx] = nil
+        end
+      end
+      connections.compact!
+    end
+
+    results_count = {}
+    results.uniq.sort.each { |e| results_count[e] = results.count(e) }
+
+    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join "\n"
+
+    good    = results_count[good_response.inspect] || 0
+    dropped = num_connections - good
+
+    msg = "#{results_msg}\nGood req (#{good}) and Dropped req (#{dropped}) should total #{num_connections}"
+    assert_equal num_connections, (good + dropped), msg
+
+    if drain
+      assert_equal 0, dropped, "There should be no dropped requests, there were #{dropped}\n#{results_msg}"
+    else
+      refute_equal 0, dropped, "There should be at least 1 dropped request, there were #{dropped}\n#{results_msg}"
+    end
+  end
+
+  def test_not_drain_on_shutdown_http10
+    test_drain_on_shutdown_http10 false
+  end
+
+  # send two requests with each client/socket
+  def test_drain_on_shutdown_http11(drain = true)
+    req = "GET / HTTP/1.1\r\n\r\n"
+    good_response   = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
+    closed_response = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nDONE"
+    results = []
+    num_connections = 10
+    wait = Queue.new
+
+    server_run(drain_on_shutdown: drain, min_threads: 2, max_threads: 2) do
+      wait.pop
+      [200, {}, ["DONE"]]
+    end
+
+    connections = Array.new(num_connections) { send_http (req * 2) }
+    @server.stop
+    wait.close
+
+    sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
+
+    until connections.empty?
+      connections.each_with_index do |skt, idx|
+        if skt.wait_readable 0.000_5
+          begin
+            body = skt.read_response.inspect.dup
+            if body == good_response.inspect # received only 1st response
+              skt.wait_readable 0.005
+              body << skt.read_response.inspect
+            end
+            results << body
+          rescue StandardError => e
+            results << e.class.to_s
+          end
+          connections[idx] = nil
+        end
+      end
+      connections.compact!
+    end
+
+    results_count = {}
+    results.uniq.sort.each { |e| results_count[e] = results.count(e) }
+
+    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join "\n"
+
+    good        = results_count[good_response.inspect] || 0
+    good_good   = results_count[(good_response * 2).inspect] || 0
+    good_closed = results_count[(good_response + closed_response).inspect] || 0
+    closed      = results_count[closed_response.inspect] || 0
+    dropped     = num_connections - good - good_good - good_closed - closed
+
+    if drain
+      msg = "#{results_msg}\n#{good} good + #{good_good} good_good " \
+        "+ #{good_closed} good_closed + #{closed} closed should equal #{num_connections}"
+      assert_equal num_connections, (good + good_good + good_closed + closed), msg
+
+      msg = "#{results_msg}\nThere should be 8 or more good_good responses, there were #{good_good}"
+      assert_operator 8, :<=, good_good, msg
+
+      msg = "#{results_msg}\nNo requests should have been dropped"
+      assert_equal 0, dropped, msg
+    else
+      msg = "#{results_msg}\n#{good} good + #{good_good} good_good " \
+        "+ #{good_closed} good_closed + #{closed} closed + #{dropped} dropped should equal #{num_connections}"
+      assert_equal num_connections, (good + good_good + good_closed + closed + dropped), msg
+
+      msg = "#{results_msg}\nSome requests should have been dropped"
+      refute_equal 0, dropped, msg
+    end
+  end
+
+  def test_not_drain_on_shutdown_http11
+    test_drain_on_shutdown_http11 false
   end
 
   def stub_accept_nonblock(error)
