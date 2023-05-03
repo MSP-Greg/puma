@@ -79,6 +79,7 @@ class TestIntegration < Minitest::Test
   def cli_server(argv,    # rubocop:disable Metrics/ParameterLists
       unix: false,        # uses a UNIXSocket for the server listener when true
       config: nil,        # string to use for config file
+      log: false,         # output server log to console (for debugging)
       no_wait: false,     # don't wait for server to boot
       puma_debug: nil,    # set env['PUMA_DEBUG'] = 'true'
       config_bind: false, # use bind from config
@@ -110,7 +111,7 @@ class TestIntegration < Minitest::Test
 
     @ios_to_close << @server << @server_err
 
-    wait_for_server_to_boot unless no_wait
+    wait_for_server_to_boot(log: log) unless no_wait
     @server
   end
 
@@ -129,8 +130,8 @@ class TestIntegration < Minitest::Test
     end
   end
 
-  def restart_server_and_listen(argv)
-    cli_server argv
+  def restart_server_and_listen(argv, log: false)
+    cli_server argv, log: log
     connection = connect
     initial_reply = read_body(connection)
     restart_server connection
@@ -138,34 +139,40 @@ class TestIntegration < Minitest::Test
   end
 
   # reuses an existing connection to make sure that works
-  def restart_server(connection)
+  def restart_server(connection, log: false)
     Process.kill :USR2, @pid
-    connection.write "GET / HTTP/1.1\r\n\r\n" # trigger it to start by sending a new request
-    wait_for_server_to_boot
+    connection.syswrite "GET / HTTP/1.1\r\n\r\n" # trigger it to start by sending a new request
+    wait_for_server_to_boot log: log
   end
 
   # wait for server to say it booted
   # @server and/or @server.gets may be nil on slow CI systems
-  def wait_for_server_to_boot(no_error: false)
-    wait_for_server_to_include 'Ctrl-C'
+  def wait_for_server_to_boot(no_error: false, log: false)
+    wait_for_server_to_include 'Ctrl-C', log: log
   rescue => e
+    if @server_err.wait_readable 1
+      STDOUT.syswrite "\n------------------ Server Error log:\n#{@server_err.read}\n"
+    end
     raise e.message unless no_error
   end
 
   # Returns true if and when server log includes str.
   # Will timeout or raise an error otherwise
-  def wait_for_server_to_include(str, io: @server, ret_false_str: nil)
+  def wait_for_server_to_include(str, io: @server, log: false, ret_false_str: nil)
     wait_readable_timeouts = 0
     log_out = +''
-    log_out << "Waiting for '#{str}'"
+    log_out << "Waiting for '#{str}'\n"
     sleep 0.05 until io.is_a?(IO)
     t_end = Process.clock_gettime(Process::CLOCK_MONOTONIC) + WAIT_SERVER_TIMEOUT
     begin
       loop do
         if io.wait_readable 2
           line = io&.gets
-          log_out << line
-          return true if line&.include?(str)
+          log_out << line if line
+          if line&.include? str
+            STDOUT.syswrite "\n#{log_out}\n" if log
+            return true
+          end
         elsif t_end < Process.clock_gettime(Process::CLOCK_MONOTONIC)
           unless wait_readable_timeouts.zero?
             log_out << "#{wait_readable_timeouts} io.wait_readable timeouts, 2 sec each\n"
@@ -185,19 +192,25 @@ class TestIntegration < Minitest::Test
   # Returns line if and when server log matches re, unless idx is specified,
   # then returns regex match.
   # Will timeout or raise an error otherwise
-  def wait_for_server_to_match(re, idx = nil, io: @server, ret_false_re: nil)
+  def wait_for_server_to_match(re, idx = nil, io: @server, log: false, ret_false_re: nil)
     wait_readable_timeouts = 0
     log_out = +''
-    log_out << "Waiting for '#{re.inspect}'"
+    log_out << "Waiting for '#{re.inspect}'\n"
     sleep 0.05 until io.is_a?(IO)
     t_end = Process.clock_gettime(Process::CLOCK_MONOTONIC) + WAIT_SERVER_TIMEOUT
     begin
       loop do
         if io.wait_readable 2
           line = io&.gets
-          log_out << line
-          return false if ret_false_re&.match? line
-          return (idx ? line[re, idx] : line) if line&.match?(re)
+          log_out << line if line
+          if ret_false_re&.match? line
+            STDOUT.syswrite "\n#{log_out}\n" if log
+            return false
+          end
+          if line&.match?(re)
+            STDOUT.syswrite "\n#{log_out}\n" if log
+            return (idx ? line[re, idx] : line)
+          end
         elsif t_end < Process.clock_gettime(Process::CLOCK_MONOTONIC)
           unless wait_readable_timeouts.zero?
             log_out << "#{wait_readable_timeouts} io.wait_readable timeouts, 2 sec each\n"
@@ -368,10 +381,12 @@ class TestIntegration < Minitest::Test
   end
 
   def hot_restart_does_not_drop_connections(num_threads: 1, total_requests: 500)
+    puma_skipped = true
     skip_if :jruby, suffix: "- JRuby file descriptors are not preserved on exec, " \
       "connection reset errors are expected during restarts"
 
     skip_if :truffleruby, suffix: ' - Undiagnosed failures on TruffleRuby'
+    puma_skipped = false
 
     args = "-w#{workers} -t5:5 -q test/rackup/hello_with_delay.ru"
     if Puma.windows?
@@ -493,7 +508,7 @@ class TestIntegration < Minitest::Test
     assert_equal (num_threads * num_requests) - reset - refused, replies[:success]
 
   ensure
-    unless @skip
+    unless puma_skipped
       if passed?
         refused = replies[:refused]
         reset   = replies[:reset]
