@@ -97,8 +97,8 @@ class TestIntegration < Minitest::Test
         @bind_path ||= tmp_path '.bind'
         cmd << " -b unix://#{@bind_path}"
       else
-        @tcp_port = UniquePort.call
-        cmd << " -b tcp://#{HOST}:#{@tcp_port}"
+        #@tcp_port = UniquePort.call
+        cmd << " -b tcp://#{HOST}:0"
       end
     end
     cmd << " #{argv}" if argv
@@ -148,7 +148,12 @@ class TestIntegration < Minitest::Test
   # wait for server to say it booted
   # @server and/or @server.gets may be nil on slow CI systems
   def wait_for_server_to_boot(no_error: false, log: false)
-    wait_for_server_to_include 'Ctrl-C', log: log
+    host_re = Regexp.escape HOST
+    t1 = wait_for_server_to_include 'Ctrl-C', log: log
+    if (t2 = @log_out[/(#{host_re}|\[::1\]):(\d{4,5})$/, 2])
+      @tcp_port = t2
+    end
+    t1
   rescue => e
     if @server_err.wait_readable 1
       STDOUT.syswrite "\n------------------ Server Error log:\n#{@server_err.read}\n"
@@ -160,31 +165,31 @@ class TestIntegration < Minitest::Test
   # Will timeout or raise an error otherwise
   def wait_for_server_to_include(str, io: @server, log: false, ret_false_str: nil)
     wait_readable_timeouts = 0
-    log_out = +''
-    log_out << "Waiting for '#{str}'\n"
+    @log_out = +''
+    @log_out << "Waiting for '#{str}'\n"
     sleep 0.05 until io.is_a?(IO)
     t_end = Process.clock_gettime(Process::CLOCK_MONOTONIC) + WAIT_SERVER_TIMEOUT
     begin
       loop do
         if io.wait_readable 2
           line = io&.gets
-          log_out << line if line
+          @log_out << line if line
           if line&.include? str
-            STDOUT.syswrite "\n#{log_out}\n" if log
+            STDOUT.syswrite "\n#{@log_out}\n" if log
             return true
           end
         elsif t_end < Process.clock_gettime(Process::CLOCK_MONOTONIC)
           unless wait_readable_timeouts.zero?
-            log_out << "#{wait_readable_timeouts} io.wait_readable timeouts, 2 sec each\n"
+            @log_out << "#{wait_readable_timeouts} io.wait_readable timeouts, 2 sec each\n"
           end
-          STDOUT.syswrite "\n#{log_out}\n"
+          STDOUT.syswrite "\n#{@log_out}\n"
           raise "Waited too long for server log to include '#{str}'"
         else
           wait_readable_timeouts += 1
         end
       end
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
-      STDOUT.syswrite "\n#{log_out}\n"
+      STDOUT.syswrite "\n#{@log_out}\n"
       raise "#{e.class} #{e.message}\n  while waiting for server log to include '#{str}'"
     end
   end
