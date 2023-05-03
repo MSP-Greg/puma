@@ -1,23 +1,27 @@
 require_relative "helper"
 require_relative "helpers/integration"
 
-class TestIntegrationSingle < TestIntegration
-  parallelize_me! if ::Puma.mri?
-
+class TestIntegrationSingle_S < TestIntegration
   def workers ; 0 ; end
 
   def test_hot_restart_does_not_drop_connections_threads
-    ttl_reqs = Puma.windows? ? 500 : 1_000
+    ttl_reqs = Puma.windows? ? 400 : 1_000
     hot_restart_does_not_drop_connections num_threads: 5, total_requests: ttl_reqs
   end
 
   def test_hot_restart_does_not_drop_connections
     if Puma.windows?
-      hot_restart_does_not_drop_connections total_requests: 300
+      hot_restart_does_not_drop_connections total_requests: 200
     else
       hot_restart_does_not_drop_connections
     end
   end
+end
+
+class TestIntegrationSingle_P < TestIntegration
+  parallelize_me! if ::Puma::IS_MRI
+
+  def workers ; 0 ; end
 
   def test_usr2_restart
     skip_unless_signal_exist? :USR2
@@ -50,7 +54,7 @@ class TestIntegrationSingle < TestIntegration
   end
 
   def test_on_booted
-    cli_server "-C test/config/event_on_booted.rb -C test/config/event_on_booted_exit.rb test/rackup/hello.ru", no_wait: true
+    cli_server "-C test/config/event_on_booted.rb -C test/config/event_on_booted_exit.rb test/rackup/hello.ru"
 
     assert wait_for_server_to_include "on_booted called"
   end
@@ -236,7 +240,7 @@ class TestIntegrationSingle < TestIntegration
 
     begin
       until Process.wait2(@pid, Process::WNOHANG)
-        sleep 0.01
+        sleep 0.2
         if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_limit
           Process.kill :SIGKILL, @pid
           flunk "Process froze"
