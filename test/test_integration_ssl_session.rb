@@ -33,10 +33,6 @@ class TestIntegrationSSLSession < TestIntegration
     super
   end
 
-  def bind_port
-    @bind_port ||= UniquePort.call
-  end
-
   def control_tcp_port
     @control_tcp_port ||= UniquePort.call
   end
@@ -47,7 +43,7 @@ class TestIntegrationSSLSession < TestIntegration
       cert = '#{File.expand_path '../examples/puma/client-certs/server.crt', __dir__}'
       ca   = '#{File.expand_path '../examples/puma/client-certs/ca.crt', __dir__}'
 
-      ssl_bind '#{HOST}', '#{bind_port}', {
+      ssl_bind '#{HOST}', 0, {
         cert: cert,
         key:  key,
         ca: ca,
@@ -138,7 +134,7 @@ class TestIntegrationSSLSession < TestIntegration
     end
     ctx.session_new_cb = ->(ary) { session_pems << ary.last.to_pem }
 
-    skt = OSSL::SSLSocket.new TCPSocket.new(HOST, bind_port), ctx
+    skt = OSSL::SSLSocket.new TCPSocket.new(HOST, @tcp_port), ctx
     skt.sync_close = true
     skt
   end

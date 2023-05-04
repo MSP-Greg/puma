@@ -150,7 +150,7 @@ class TestIntegration < Minitest::Test
   def wait_for_server_to_boot(no_error: false, log: false)
     host_re = Regexp.escape HOST
     t1 = wait_for_server_to_include 'Ctrl-C', log: log
-    if (t2 = @log_out[/(#{host_re}|\[::1\]):(\d{4,5})$/, 2])
+    if (t2 = @log_out[/Listening on (http|ssl):\/\/(#{host_re}|\[::1\]):(\d{4,5})($|\?)/, 3])
       @tcp_port = t2
     end
     t1
