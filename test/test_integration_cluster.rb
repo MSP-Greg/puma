@@ -3,9 +3,7 @@ require_relative "helpers/integration"
 
 require "time"
 
-class TestIntegrationCluster < TestIntegration
-  parallelize_me! if ::Puma.mri?
-
+class TestIntegrationClusterBase < TestIntegration
   def workers ; 2 ; end
 
   def setup
@@ -17,6 +15,20 @@ class TestIntegrationCluster < TestIntegration
     return if skipped?
     super
   end
+end
+
+class TestIntegrationCluster_S < TestIntegrationClusterBase
+  def test_hot_restart_does_not_drop_connections_threads
+    hot_restart_does_not_drop_connections num_threads: 10, total_requests: 3_000
+  end
+
+  def test_hot_restart_does_not_drop_connections
+    hot_restart_does_not_drop_connections num_threads: 1, total_requests: 1_000
+  end
+end
+
+class TestIntegrationCluster_P < TestIntegrationClusterBase
+  parallelize_me! if ::Puma::IS_MRI && ::Puma::HAS_FORK
 
   def test_hot_restart_does_not_drop_connections_threads
     hot_restart_does_not_drop_connections num_threads: 10, total_requests: 3_000
@@ -52,11 +64,10 @@ class TestIntegrationCluster < TestIntegration
 
     File.open(@bind_path, mode: 'wb') { |f| f.puts 'pre existing' }
 
-    cli_server "-w #{workers} -q test/rackup/sleep_step.ru", unix: :unix
-    connection = connect(nil, unix: true)
+    cli_server "-w #{workers} -t1:5 -q test/rackup/sleep_step.ru", unix: :unix
+    connection = connect unix: true
     restart_server connection
 
-    connect(nil, unix: true)
     stop_server
 
     assert File.exist?(@bind_path)
@@ -133,11 +144,7 @@ class TestIntegrationCluster < TestIntegration
   def test_on_booted
     cli_server "-w #{workers} -C test/config/event_on_booted.rb -C test/config/event_on_booted_exit.rb test/rackup/hello.ru", no_wait: true
 
-    output = []
-
-    output << $_ while @server.gets
-
-    assert output.any? { |msg| msg == "on_booted called\n" } != nil
+    assert wait_for_server_to_include "on_booted called"
   end
 
   def test_term_worker_clean_exit
@@ -244,6 +251,7 @@ class TestIntegrationCluster < TestIntegration
   def test_fork_worker_on_refork
     refork = Tempfile.new 'refork'
     wrkrs = 3
+
     cli_server "-w #{wrkrs} test/rackup/hello_with_delay.ru", config: <<~RUBY
       fork_worker 20
       on_refork { File.write '#{refork.path}', 'Reforked' }
@@ -292,8 +300,14 @@ class TestIntegrationCluster < TestIntegration
     cli_server "-w #{workers} -C test/config/prune_bundler_with_deps.rb test/rackup/hello.ru"
 
     load_path = []
-    while (line = @server.gets) =~ /^LOAD_PATH/
-      load_path << line.gsub(/^LOAD_PATH: /, '')
+
+    while @server.wait_readable 3
+      line = @server.gets
+      if line.start_with? 'LOAD_PATH: '
+        load_path << line.sub('LOAD_PATH: ', '')
+      else
+        break
+      end
     end
     assert_match(%r{gems/minitest-[\d.]+/lib$}, load_path.last)
   end
@@ -302,8 +316,14 @@ class TestIntegrationCluster < TestIntegration
     cli_server "-w #{workers} -C test/config/prune_bundler_with_deps.rb test/rackup/hello.ru"
 
     load_path = []
-    while (line = @server.gets) =~ /^LOAD_PATH/
-      load_path << line.gsub(/^LOAD_PATH: /, '')
+
+    while @server.wait_readable 3
+      line = @server.gets
+      if line.start_with? 'LOAD_PATH: '
+        load_path << line.sub('LOAD_PATH: ', '')
+      else
+        break
+      end
     end
 
     load_path.each do |path|
@@ -314,6 +334,7 @@ class TestIntegrationCluster < TestIntegration
   def test_json_gem_not_required_in_master_process
     cli_server "-w #{workers} -C test/config/prune_bundler_print_json_defined.rb test/rackup/hello.ru"
 
+    @server.wait_readable 3
     line = @server.gets
     assert_match(/defined\?\(::JSON\): nil/, line)
   end
@@ -321,6 +342,7 @@ class TestIntegrationCluster < TestIntegration
   def test_nio4r_gem_not_required_in_master_process
     cli_server "-w #{workers} -C test/config/prune_bundler_print_nio_defined.rb test/rackup/hello.ru"
 
+    @server.wait_readable 3
     line = @server.gets
     assert_match(/defined\?\(::NIO\): nil/, line)
   end
@@ -329,9 +351,11 @@ class TestIntegrationCluster < TestIntegration
     @control_tcp_port = UniquePort.call
     cli_server "-w #{workers} #{set_pumactl_args} -C test/config/prune_bundler_print_nio_defined.rb test/rackup/hello.ru"
 
+    @server.wait_readable 3
     line = @server.gets
     assert_match(/Starting control server/, line)
 
+    @server.wait_readable 3
     line = @server.gets
     assert_match(/defined\?\(::NIO\): nil/, line)
   end
@@ -410,11 +434,13 @@ class TestIntegrationCluster < TestIntegration
 
     Process.kill :TTIN, @pid
 
+    @server.wait_readable 3
     line = @server.gets
     assert_match(/Worker 2 \(PID: \d+\) booted in/, line)
 
     Process.kill :TTOU, @pid
 
+    @server.wait_readable 3
     line = @server.gets
     assert_match(/Worker 1 \(PID: \d+\) terminating/, line)
   end
@@ -477,7 +503,7 @@ class TestIntegrationCluster < TestIntegration
   def term_closes_listeners(unix: false)
     skip_unless_signal_exist? :TERM
 
-    cli_server "-w #{workers} -t 0:6 -q test/rackup/sleep_step.ru", unix: unix
+    cli_server "-w #{workers} -t 1:6 -q test/rackup/sleep_step.ru", unix: unix
     threads = []
     replies = Array.new 41, nil
     mutex = Mutex.new
@@ -553,7 +579,7 @@ class TestIntegrationCluster < TestIntegration
   # Send requests 1 per second.  Send 1, then :USR1 server, then send another 24.
   # All should be responded to, and at least three workers should be used
   def usr1_all_respond(unix: false, config: '')
-    cli_server "-w #{workers} -t 0:5 -q test/rackup/sleep_pid.ru #{config}", unix: unix
+    cli_server "-w #{workers} -t 2:5 -q test/rackup/sleep_pid.ru #{config}", unix: unix
     threads = []
     replies = []
     mutex = Mutex.new
