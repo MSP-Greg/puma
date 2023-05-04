@@ -21,6 +21,17 @@ jobs:
       - name: rubocop
         run: bundle exec rake rubocop
 
+#      macOS MRI jobs
+#       11   12   13
+# 2.4    x         x
+# 2.5         x
+# 2.6         x
+# 2.7    x         x
+# 3.0         x
+# 3.1         x
+# 3.2    x         x
+# head        x
+
   test_mri:
     name: >-
       MRI: ${{ matrix.os }} ${{ matrix.ruby }}${{ matrix.no-ssl }}${{ matrix.yjit }}${{ matrix.rack-v }}
@@ -64,6 +75,9 @@ jobs:
           - { os: macos-11     , ruby: '3.0' }
           - { os: macos-11     , ruby:  3.1  }
           - { os: macos-11     , ruby:  head }
+          - { os: macos-12     , ruby:  2.4  }
+          - { os: macos-12     , ruby:  2.7  }
+          - { os: macos-12     , ruby:  3.2  }
           - { os: macos-13     , ruby:  2.5  }
           - { os: macos-13     , ruby:  2.6  }
           - { os: macos-13     , ruby: '3.0' }
