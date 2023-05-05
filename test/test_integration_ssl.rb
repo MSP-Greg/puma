@@ -20,10 +20,6 @@ class TestIntegrationSSL < TestIntegration
     @server = nil
   end
 
-  def bind_port
-    @bind_port ||= UniquePort.call
-  end
-
   def control_tcp_port
     @control_tcp_port ||= UniquePort.call
   end
@@ -31,7 +27,7 @@ class TestIntegrationSSL < TestIntegration
   def with_server(config)
     cli_server '', config: config, config_bind: true
 
-    http = Net::HTTP.new HOST, bind_port
+    http = Net::HTTP.new HOST, @tcp_port
     http.use_ssl = true
     http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 
@@ -41,8 +37,9 @@ class TestIntegrationSSL < TestIntegration
     sock = TCPSocket.new HOST, control_tcp_port
     @ios_to_close << sock
     sock.syswrite "GET /stop?token=#{TOKEN} HTTP/1.1\r\n\r\n"
-    sock.read
-    assert_match 'Goodbye!', @server.read
+    sock.wait_readable 3
+    sock.read_nonblock 1_024
+    assert wait_for_server_to_include('Goodbye!')
   end
 
   def test_ssl_run
@@ -105,8 +102,7 @@ class TestIntegrationSSL < TestIntegration
     ssl_params['verify_mode'] = 'force_peer' # 'peer'
     out_err = StringIO.new
     ssl_context = Puma::MiniSSL::ContextBuilder.new(ssl_params, Puma::LogWriter.new(out_err, out_err)).context
-    server.add_ssl_listener(HOST, bind_port, ssl_context)
-
+    @tcp_port = server.add_ssl_listener(HOST, 0, ssl_context).addr[1]
     server.run(true)
     begin
       ca   = File.expand_path '../examples/puma/client-certs/ca.crt'    , __dir__
@@ -115,7 +111,7 @@ class TestIntegrationSSL < TestIntegration
       # NOTE: JRuby used to end up in a hang with TLS peer verification enabled
       # it's easier to reproduce using an external client such as CURL (using net/http client the bug isn't triggered)
       # also the "hang", being buffering related, seems to showcase better with TLS 1.2 than 1.3
-      body = curl_and_get_response "https://localhost:#{bind_port}",
+      body = curl_and_get_response "https://localhost:#{@tcp_port}",
                                    args: "--cacert #{ca} --cert #{cert} --key #{key} --tlsv1.2 --tls-max 1.2"
 
       warn out_err.string unless out_err.string.empty?
