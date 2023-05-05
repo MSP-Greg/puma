@@ -500,8 +500,8 @@ class TestIntegration < Minitest::Test
 
     if Puma.windows?
       reset_max = num_threads * restart_count
-      assert_operator reset_max, :>=, reset, "#{msg}Expected reset_max >= reset errors"
-      assert_operator 40, :>=,  refused, "#{msg}Too many refused connections"
+      assert_operator reset_max, :>=, reset  , "#{msg}Expected reset_max >= reset errors"
+      assert_operator reset_max, :>=, refused, "#{msg}Too many refused connections"
     else
       max_error = (0.002 * replies.fetch(:success,0) + 0.5).round
       assert_operator max_error, :>=, refused, "#{msg}Expected no more than #{max_error} refused connections"
