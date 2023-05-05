@@ -346,6 +346,7 @@ class TestPumaServer_P < TestPumaServerBase
     sock = send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 19\r\n\r\n"
     sock << "hello world foo bar"
 
+    sock.wait_readable 3
     data = sock.gets
 
     # Content Too Large
@@ -579,6 +580,7 @@ class TestPumaServer_P < TestPumaServerBase
     sleep 0.5
     sock << "!"
 
+    sock.wait_readable 3
     data = sock.gets
 
     assert_equal "HTTP/1.1 200 OK\r\n", data
@@ -596,6 +598,7 @@ class TestPumaServer_P < TestPumaServerBase
 
     h = header sock
 
+    sock.wait_readable 3
     body = sock.gets
 
     assert_equal ["HTTP/1.1 200 OK", "Content-Type: plain/text", "Content-Length: 6"], h
@@ -641,6 +644,7 @@ class TestPumaServer_P < TestPumaServerBase
 
     h = header sock
 
+    sock.wait_readable 3
     body = sock.gets
 
     assert_equal ["HTTP/1.0 200 OK", "Content-Type: plain/text", "Connection: Keep-Alive", "Content-Length: 6"], h
@@ -1049,6 +1053,7 @@ class TestPumaServer_P < TestPumaServerBase
     sleep 1
     sock << "ello"
 
+    sock.wait_readable 3
     sock.gets
 
     assert request_body_wait.is_a?(Float)
@@ -1068,6 +1073,7 @@ class TestPumaServer_P < TestPumaServerBase
     sleep 3
     sock << "4\r\nello\r\n0\r\n\r\n"
 
+    sock.wait_readable 3
     sock.gets
 
     # Could be 1000 but the tests get flaky. We don't care if it's extremely precise so much as that
@@ -1207,12 +1213,13 @@ class TestPumaServer_P < TestPumaServerBase
     @server.stop
     Thread.pass until pool.instance_variable_get(:@shutdown)
 
+    assert s1.wait_readable(10), 'timeout waiting for s1 response'
     assert_match(s1_response, s1.gets) if s1_response
 
     # Send s2 after shutdown begins
     s2.syswrite "\r\n" unless s2.wait_readable(0.2)
 
-    assert s2.wait_readable(10), 'timeout waiting for response'
+    assert s2.wait_readable(10), 'timeout waiting for s2 response'
     s2_result = begin
       assert s2.wait_readable(10), 'timeout waiting for s2 response'
       s2.gets
