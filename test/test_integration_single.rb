@@ -212,6 +212,7 @@ class TestIntegrationSingle_P < TestIntegration
   def test_closed_listener
     skip_unless_signal_exist? :TERM
     skip_unless :mri    # ObjectSpace.each_object(::TCPServer) ??
+    skip if DARWIN && RUBY_VERSION.start_with?('2.4')
     cli_server "test/rackup/close_listeners.ru"
     connection = fast_connect
 
