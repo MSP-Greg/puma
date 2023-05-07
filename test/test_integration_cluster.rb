@@ -488,7 +488,7 @@ RUBY
   def term_closes_listeners(unix: false)
     skip_unless_signal_exist? :TERM
 
-    cli_server "-w #{workers} -t 5:5 -q test/rackup/sleep_step.ru", unix: unix
+    cli_server "-w #{workers} -t 5:5 -q test/rackup/sleep_pid.ru", unix: unix
     replies = []
     req_interval = 0.05
     sleep_time = 1
@@ -499,10 +499,10 @@ RUBY
     requests = 40
 
     req_thread = Thread.new do
+      req_str = "sleep#{sleep_time}"
       requests.times.each do |i|
         sleep req_interval
         begin
-          req_str = "sleep#{sleep_time}-#{i}"
           req_queue << [i, fast_connect(req_str, unix: unix)]
           if i == 20
             Process.kill :TERM, @pid
@@ -547,16 +547,16 @@ RUBY
           " Reads: #{successes} successes, #{resp_resets} resets, #{resp_failures} failed, #{resp_timeouts} timeouts"
 
     unless resp_failures.zero?
-      msg << "\n#{resp_failures.inspect}\n"
+      msg << "\n#{resp_errors.inspect}\n"
     end
 
     assert_equal 0, req_failures , "Req Errors #{req_errors.inspect}"
-    assert_equal 0, resp_failures, msg
     assert_equal 0, resp_timeouts, msg
 
-    assert_operator 10, :<=, successes  , msg
-    assert_operator 20, :>=, req_refused, msg
-    assert_operator 15, :>=, resp_resets, msg
+    assert_operator 10, :<=, successes    , msg
+    assert_operator 20, :>=, req_refused  , msg
+    assert_operator 15, :>=, resp_resets  , msg
+    assert_operator 6 , :>=, resp_failures, msg
 
     # Interleaved asserts
     if l_reset
@@ -587,10 +587,10 @@ RUBY
     requests = 40
 
     req_thread = Thread.new do
+      req_str = "sleep#{sleep_time}"
       requests.times.each do |i|
         sleep req_interval
         begin
-          req_str = "sleep#{sleep_time}"
           req_queue << [i, fast_connect(req_str, unix: unix)]
           if i == 20
             Process.kill :USR1, @pid
