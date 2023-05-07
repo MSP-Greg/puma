@@ -93,6 +93,7 @@ class TestIntegrationCluster < TestIntegration
 
   def test_term_closes_listeners_unix
     skip_unless_signal_exist? :TERM
+    skip_unless :unix
     term_closes_listeners unix: true
   end
 
@@ -112,6 +113,7 @@ class TestIntegrationCluster < TestIntegration
 
   def test_usr1_all_respond_unix
     skip_unless_signal_exist? :USR1
+    skip_unless :unix
     usr1_all_respond unix: true
   end
 
@@ -492,7 +494,8 @@ RUBY
     sleep_time = 1
     mutex = Mutex.new
     req_queue = Thread::Queue.new
-    req_errors = []
+    req_errors  = Hash.new 0
+    resp_errors = Hash.new 0
     requests = 40
 
     req_thread = Thread.new do
@@ -504,103 +507,18 @@ RUBY
           if i == 20
             Process.kill :TERM, @pid
           end
-        rescue Errno::ECONNREFUSED, Errno::ENOENT # Errno::ENOENT UNIXS0cket
+        rescue Errno::ECONNREFUSED, Errno::ENOENT # Errno::ENOENT UNIXSocket
           mutex.synchronize { replies[i] = :req_refused }
         rescue => e
-          req_errors << e.class
+          req_errors[e.class] += 1
           mutex.synchronize { replies[i] = :req_failure }
         end
       end
     end
 
-    refused = thread_run_refused unix: unix
-
     resp_thread = Thread.new do
       while (skt_info = req_queue.pop)
-        resp_status replies, skt_info, mutex, refused
-        break if req_queue.empty? && req_queue.closed?
-      end
-    end
-
-    req_thread.join
-    req_queue.close
-    resp_thread.join
-
-    resp_info = replies.uniq.sort.map { |n| [n, replies.count(n)] }.to_h
-    resp_info.default_proc = proc { |_, _| 0 }
-
-    req_refused   = resp_info[:req_refused]
-    req_failures  = resp_info[:req_failure]
-    successes     = resp_info[:resp_success]
-    resp_resets   = resp_info[:resp_reset]
-    resp_refused  = resp_info[:resp_refused]
-    resp_timeouts = resp_info[:resp_timeout]
-
-    r_success = replies.rindex :resp_success
-    l_reset   = replies.index  :resp_reset
-    l_refused = replies.index  :resp_refused
-
-    msg = "Writes: #{req_refused} refused, #{req_failures} failures\n" \
-          " Reads: #{successes} successes, #{resp_resets} resets, #{resp_refused} refused, #{resp_timeouts} timeouts"
-
-    assert_equal 0, req_failures , "#{req_errors.inspect}"
-    assert_equal 0, resp_timeouts, msg
-    assert_equal 0, resp_refused , msg
-
-    assert_operator 10,  :<=, successes , msg
-    assert_operator 15, :>=, resp_resets, msg
-    assert_operator 20, :>=, req_refused , msg
-
-    # Interleaved asserts
-    if l_reset
-      assert_operator r_success, :<, l_reset  , "Interleaved success and reset"
-    elsif l_refused
-      assert_operator r_success, :<, l_refused, "Interleaved success and refused"
-    end
-
-  ensure
-    if passed?
-      $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n"
-    else
-      $debugging_info << "#{full_name}\n    #{msg}\n#{replies.inspect}\n"
-    end
-  end
-
-  # Send requests 40 per second.  Send 20, then :USR1 server, then send another 20.
-  # All should be responded to, and at least three workers should be used
-  def usr1_all_respond(unix: false, config: '')
-    cli_server "-w #{workers} -t 5:5 -q test/rackup/sleep_pid.ru #{config}", unix: unix
-    replies = []
-    req_interval = 0.05
-    sleep_time = 1
-    mutex = Mutex.new
-    req_queue = Thread::Queue.new
-    req_errors = []
-    requests = 40
-
-    req_thread = Thread.new do
-      requests.times.each do |i|
-        sleep req_interval
-        begin
-          req_str = "sleep#{sleep_time}"
-          req_queue << [i, fast_connect(req_str, unix: unix)]
-          if i == 20
-            Process.kill :USR1, @pid
-          end
-        rescue Errno::ECONNREFUSED, Errno::ENOENT # Errno::ENOENT UNIXS0cket
-          mutex.synchronize { replies[i] = :req_refused }
-        rescue => e
-          req_errors << e.class
-          mutex.synchronize { replies[i] = :req_failure }
-        end
-      end
-    end
-
-    refused = thread_run_refused unix: unix
-
-    resp_thread = Thread.new do
-      while (skt_info = req_queue.pop)
-        resp_pid replies, skt_info, mutex, refused
+        resp_status replies, resp_errors, skt_info, mutex
         break if req_queue.empty? && req_queue.closed?
       end
     end
@@ -615,31 +533,122 @@ RUBY
     resp_info.default_proc = proc { |_, _| 0 }
 
     req_refused   = resp_info[:req_refused]
-    req_failures  = resp_info[:req_failure]
-    responses     = resp_bodies.length
+    req_failures  = req_errors.values.sum
+    successes     = resp_bodies.length
     resp_resets   = resp_info[:resp_reset]
-    resp_refused  = resp_info[:resp_refused]
+    resp_failures = resp_errors.values.sum
+    resp_timeouts = resp_info[:resp_timeout]
+
+    r_success = replies.rindex { |e| e.is_a? String }
+    l_reset   = replies.index  :resp_reset
+    l_failure = replies.index  :resp_failure
+
+    msg = "Writes: #{req_refused} refused, #{req_failures} failures\n" \
+          " Reads: #{successes} successes, #{resp_resets} resets, #{resp_failures} failed, #{resp_timeouts} timeouts"
+
+    unless resp_failures.zero?
+      msg << "\n#{resp_failures.inspect}\n"
+    end
+
+    assert_equal 0, req_failures , "Req Errors #{req_errors.inspect}"
+    assert_equal 0, resp_failures, msg
+    assert_equal 0, resp_timeouts, msg
+
+    assert_operator 10, :<=, successes  , msg
+    assert_operator 20, :>=, req_refused, msg
+    assert_operator 15, :>=, resp_resets, msg
+
+    # Interleaved asserts
+    if l_reset
+      assert_operator r_success, :<, l_reset  , "Interleaved success and reset"
+    elsif l_failure
+      assert_operator r_success, :<, l_failure, "Interleaved success and refused"
+    end
+
+  ensure
+    if passed?
+      $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n"
+    else
+      $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n#{replies.inspect}\n"
+    end
+  end
+
+  # Send requests 20 per second.  Send 20, then :USR1 server, then send another 20.
+  # All should be responded to, and at least three workers should be used
+  def usr1_all_respond(unix: false, config: '')
+    cli_server "-w #{workers} -t 5:5 -q test/rackup/sleep_pid.ru #{config}", unix: unix
+    replies = []
+    req_interval = 0.05
+    sleep_time = 1
+    mutex = Mutex.new
+    req_queue = Thread::Queue.new
+    req_errors  = Hash.new 0
+    resp_errors = Hash.new 0
+    requests = 40
+
+    req_thread = Thread.new do
+      requests.times.each do |i|
+        sleep req_interval
+        begin
+          req_str = "sleep#{sleep_time}"
+          req_queue << [i, fast_connect(req_str, unix: unix)]
+          if i == 20
+            Process.kill :USR1, @pid
+          end
+        rescue Errno::ECONNREFUSED, Errno::ENOENT # Errno::ENOENT UNIXS0cket
+          mutex.synchronize { replies[i] = :req_refused }
+        rescue => e
+          req_errors[e.class] += 1
+        end
+      end
+    end
+
+    resp_thread = Thread.new do
+      while (skt_info = req_queue.pop)
+        resp_status replies, resp_errors, skt_info, mutex
+        break if req_queue.empty? && req_queue.closed?
+      end
+    end
+
+    req_thread.join
+    req_queue.close
+    resp_thread.join
+
+    resp_bodies = replies.grep String
+
+    resp_info = replies.grep(Symbol).uniq.sort.map { |n| [n, replies.count(n)] }.to_h
+    resp_info.default_proc = proc { |_, _| 0 }
+
+    req_refused   = resp_info[:req_refused]
+    req_failures  = req_errors.values.sum
+    successes     = resp_bodies.length
+    resp_resets   = resp_info[:resp_reset]
+    resp_failures = resp_info[:resp_failure]
     resp_timeouts = resp_info[:resp_timeout]
 
     # get pids from replies, generate uniq array
     t = resp_bodies.map { |body| body[/\d+\z/] }
-    t.uniq!; t.compact!
-    qty_pids = t.length
+    qty_pids = t.uniq.compact.length
 
     msg = "Writes: #{req_refused} refused, #{req_failures} failures\n" \
-          " Reads: #{resp_bodies.length} successes, #{qty_pids} pids, #{resp_resets} resets, #{resp_refused} refused, #{resp_timeouts} timeouts"
+          " Reads: #{successes} successes, #{qty_pids} pids, #{resp_resets} resets, #{resp_failures} failed, #{resp_timeouts} timeouts"
 
-    assert_equal requests, responses, msg
+    unless resp_failures.zero?
+      msg << "\n#{resp_errors.inspect}"
+    end
+
     assert_operator qty_pids, :>, 2, msg
 
-    assert_equal 0, resp_refused , msg
     assert_equal 0, resp_resets  , msg
+    assert_equal 0, resp_failures, msg
     assert_equal 0, resp_timeouts, msg
 
-    msg = "Reads: #{requests} requests, #{resp_bodies.length} successes, #{qty_pids} pids"
+    assert_equal requests, successes, msg
+
+    msg = "Reads: #{requests} requests, #{successes} successes, #{qty_pids} pids"
 
   ensure
-    $debugging_info << "#{full_name}\n    #{msg}\n"
+    $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n"
   end
 
   def worker_respawn(phase = 1, size = workers)
@@ -703,56 +712,21 @@ RUBY
     t.compact!; t
   end
 
-  def resp_status(replies, skt_info, mutex, refused)
+  # used in loop to read several responses, body contains pid info
+  def resp_status(replies, resp_errors, skt_info, mutex)
     i, skt = skt_info
     begin
-      read_body skt, 20
-      mutex.synchronize { replies[i] = :resp_success }
-    rescue Errno::ECONNRESET
-      # connection was accepted but then closed
-      # client would see an empty response
-      mutex.synchronize { replies[i] = :resp_reset }
-    rescue *refused
-      mutex.synchronize { replies[i] = :resp_refused }
-    rescue Timeout::Error
-      mutex.synchronize { replies[i] = :resp_timeout }
-    end
-  end
-
-  # used in loop to create several 'requests'
-  def resp_pid(replies, skt_info, mutex, refused, unix: false)
-    i, skt = skt_info
-    begin
-      body = read_body skt, 20
+      body = read_body skt
       mutex.synchronize { replies[i] = body }
     rescue Errno::ECONNRESET
-      mutex.synchronize { replies[i] = :resp_reset }
-    rescue *refused
-      mutex.synchronize { replies[i] = :resp_refused }
-    rescue Timeout::Error
-      mutex.synchronize { replies[i] = :resp_timeout }
-    end
-  end
-
-  # used in loop to create several 'requests'
-  def thread_run_step(replies, delay, sleep_time, step, mutex, refused, unix: false)
-    begin
-      sleep delay
-      s = connect "sleep#{sleep_time}-#{step}", unix: unix
-      body = read_body(s, 20)
-      if body[/\ASlept /]
-        mutex.synchronize { replies[step] = :success }
-      else
-        mutex.synchronize { replies[step] = :failure }
-      end
-    rescue Errno::ECONNRESET
       # connection was accepted but then closed
       # client would see an empty response
-      mutex.synchronize { replies[step] = :reset }
-    rescue *refused
-      mutex.synchronize { replies[step] = :refused }
+      mutex.synchronize { replies[i] = :resp_reset }
     rescue Timeout::Error
-      mutex.synchronize { replies[step] = :read_timeout }
+      mutex.synchronize { replies[i] = :resp_timeout }
+    rescue => e
+      resp_errors[e.class] += 1
+      mutex.synchronize { replies[i] = :resp_failure }
     end
   end
 end if ::Process.respond_to?(:fork)
