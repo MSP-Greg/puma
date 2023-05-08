@@ -361,19 +361,21 @@ class TestIntegration < Minitest::Test
     end
   end
 
-  def cli_pumactl(argv, unix: false)
-    arg =
-      if unix
-        %W[-C unix://#{@control_path} -T #{TOKEN} #{argv}]
+  def cli_pumactl(argv, unix: false, no_control_url: false)
+    base =
+      if no_control_url
+        []
+      elsif unix
+        %W[-C unix://#{@control_path} -T #{TOKEN}]
       else
-        %W[-C tcp://#{HOST}:#{@control_tcp_port} -T #{TOKEN} #{argv}]
+        %W[-C tcp://#{HOST}:#{@control_tcp_port} -T #{TOKEN}]
       end
+    arg = base + argv.split
     r, w = IO.pipe
     # Puma::ControlCLI may call exit
     begin
       Puma::ControlCLI.new(arg, w, w).run
     rescue Exception => e
-      STDOUT.syswrite "\n--------------------------------------------------- #{e.class}\n"
     end
     w.close
     @ios_to_close << r

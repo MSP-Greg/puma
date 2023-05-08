@@ -158,11 +158,9 @@ class TestIntegrationSingle_P < TestIntegration
   def test_write_to_log
     skip_unless_signal_exist? :TERM
 
-    suppress_output = '> /dev/null 2>&1'
-
     cli_server '-C test/config/t1_conf.rb test/rackup/hello.ru'
 
-    system "curl http://localhost:#{@tcp_port}/ #{suppress_output}"
+    read_response fast_connect
 
     stop_server
 
@@ -179,9 +177,9 @@ class TestIntegrationSingle_P < TestIntegration
 
     cli_server '-C test/config/t2_conf.rb test/rackup/hello.ru'
 
-    system "curl http://localhost:#{@tcp_port}/ > /dev/null 2>&1"
+    read_response fast_connect
 
-    out=`#{BASE} bin/pumactl -F test/config/t2_conf.rb status`
+    out = cli_pumactl('-F test/config/t2_conf.rb status', no_control_url: true).read
 
     stop_server
 
@@ -197,7 +195,7 @@ class TestIntegrationSingle_P < TestIntegration
   def test_application_logs_are_flushed_on_write
     cli_server "#{set_pumactl_args} test/rackup/write_to_stdout.ru"
 
-    read_body connect
+    read_body fast_connect
 
     cli_pumactl 'stop'
 
