@@ -1,6 +1,8 @@
 require_relative "helper"
 require_relative "helpers/integration"
 
+# git clean -fdx -- test/**/vendor/bundle/**
+
 class TestWorkerGemIndependence < TestIntegration
 
   PUMA_TTO = true # use Timeout.timeout on each test
@@ -94,7 +96,6 @@ class TestWorkerGemIndependence < TestIntegration
 
     Dir.chdir(current_release_symlink) do
       with_unbundled_env do
-        silent_and_checked_system_command("bundle config --local path vendor/bundle")
         silent_and_checked_system_command("bundle install")
         cli_server "--prune-bundler -w 1 #{server_opts}"
       end
@@ -109,7 +110,6 @@ class TestWorkerGemIndependence < TestIntegration
     set_release_symlink File.expand_path(new_app_dir, __dir__)
     Dir.chdir(current_release_symlink) do
       with_unbundled_env do
-        silent_and_checked_system_command("bundle config --local path vendor/bundle")
         silent_and_checked_system_command("bundle install")
       end
     end
