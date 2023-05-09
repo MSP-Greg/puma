@@ -67,7 +67,7 @@ class TestIntegration < Minitest::Test
       File.unlink(@bind_path) rescue nil
     end
 
-    STDOUT.syswrite("\n-----------------------------------err_out\n#{err_out}\n") unless err_out.empty?
+    STDOUT.syswrite("\n-----------------------------------err_out\n#{err_out}\n") unless err_out.strip.empty?
   end
 
   private
@@ -375,7 +375,7 @@ class TestIntegration < Minitest::Test
     # Puma::ControlCLI may call exit
     begin
       Puma::ControlCLI.new(arg, w, w).run
-    rescue Exception => e
+    rescue Exception
     end
     w.close
     @ios_to_close << r

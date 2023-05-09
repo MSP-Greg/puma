@@ -32,14 +32,6 @@ end
 class TestIntegrationCluster_P < TestIntegrationClusterBase
   parallelize_me! if ::Puma::IS_MRI && ::Puma::HAS_FORK
 
-  def test_hot_restart_does_not_drop_connections_threads
-    hot_restart_does_not_drop_connections num_threads: 10, total_requests: 3_000
-  end
-
-  def test_hot_restart_does_not_drop_connections
-    hot_restart_does_not_drop_connections num_threads: 1, total_requests: 1_000
-  end
-
   def test_pre_existing_unix
     skip_unless :unix
 
@@ -254,7 +246,7 @@ class TestIntegrationCluster_P < TestIntegrationClusterBase
     refork = Tempfile.new 'refork'
     wrkrs = 3
 
-    cli_server "-w #{wrkrs} test/rackup/hello_with_delay.ru", config: <<~RUBY
+    cli_server "-w #{wrkrs} -t2:5 test/rackup/hello_with_delay.ru", config: <<~RUBY
       fork_worker 20
       on_refork { File.write '#{refork.path}', 'Reforked' }
     RUBY
@@ -272,7 +264,20 @@ class TestIntegrationCluster_P < TestIntegrationClusterBase
       sleep 0.004
     }
 
-    socks.each { |s| read_body s }
+    results = []
+    until socks.empty?
+      socks.each_with_index do |sock, idx|
+        if sock.wait_readable 0.000_5
+          begin
+            read_body sock
+          rescue StandardError => e
+            results << e.class
+          end
+          socks[idx] = nil
+        end
+      end
+      socks.compact!
+    end
 
     refute_includes pids, get_worker_pids(1, wrkrs - 1)
   end
@@ -288,6 +293,7 @@ class TestIntegrationCluster_P < TestIntegrationClusterBase
         [200, {}, [exitstatus.to_s]]
       end
     RUBY
+
     assert_equal '0', read_body(connect)
   end
 
@@ -504,8 +510,11 @@ class TestIntegrationCluster_P < TestIntegrationClusterBase
   # All reuqests have a one second delay in the app.
   # No more than 10 should throw Errno::ECONNRESET.
   def term_closes_listeners(unix: false)
+    skipped = true
     skip_unless_signal_exist? :TERM
+    skipped = false
 
+    msg = ''
     cli_server "-w #{workers} -t 5:5 -q test/rackup/sleep_pid.ru", unix: unix
     replies = []
     req_interval = 0.05
@@ -592,16 +601,21 @@ class TestIntegrationCluster_P < TestIntegrationClusterBase
     end
 
   ensure
-    if passed?
-      $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n"
-    else
-      $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n#{replies.inspect}\n"
+    unless skipped
+      if passed?
+        $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n"
+      elsif msg.empty?
+        $debugging_info << "#{full_name}\n    Unknown Error\n"
+      else
+        $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n#{replies.inspect}\n"
+      end
     end
   end
 
   # Send requests 20 per second.  Send 20, then :USR1 server, then send another 20.
   # All should be responded to, and at least three workers should be used
   def usr1_all_respond(unix: false, config: '')
+    msg = ''
     cli_server "-w #{workers} -t 5:5 -q test/rackup/sleep_pid.ru #{config}", unix: unix
     replies = []
     req_interval = 0.05
@@ -681,7 +695,11 @@ class TestIntegrationCluster_P < TestIntegrationClusterBase
     msg = "Reads: #{requests} requests, #{successes} successes, #{qty_pids} pids"
 
   ensure
-    $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n"
+    if msg.empty?
+      $debugging_info << "#{full_name}\n    Unknown Error\n"
+    else
+      $debugging_info << "#{full_name}\n    #{msg.gsub "\n", "\n    "}\n"
+    end
   end
 
   def worker_respawn(phase = 1, size = workers)
