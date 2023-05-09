@@ -1,11 +1,10 @@
 require_relative "helper"
 require_relative "helpers/integration"
+require "open3"
 
 # git clean -fdx -- test/**/vendor/bundle/**
 
 class TestWorkerGemIndependence < TestIntegration
-
-  PUMA_TTO = true # use Timeout.timeout on each test
 
   def setup
     skip_unless :fork
@@ -32,7 +31,7 @@ class TestWorkerGemIndependence < TestIntegration
 
   def test_changing_json_version_during_phased_restart_after_querying_stats_from_status_server
     @control_tcp_port = UniquePort.call
-    server_opts = "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN}"
+    server_opts = set_pumactl_args
     before_restart = ->() do
       cli_pumactl "stats"
     end
@@ -47,7 +46,7 @@ class TestWorkerGemIndependence < TestIntegration
 
   def test_changing_json_version_during_phased_restart_after_querying_gc_stats_from_status_server
     @control_tcp_port = UniquePort.call
-    server_opts = "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN}"
+    server_opts = set_pumactl_args
     before_restart = ->() do
       cli_pumactl "gc-stats"
     end
@@ -62,7 +61,7 @@ class TestWorkerGemIndependence < TestIntegration
 
   def test_changing_json_version_during_phased_restart_after_querying_thread_backtraces_from_status_server
     @control_tcp_port = UniquePort.call
-    server_opts = "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN}"
+    server_opts = set_pumactl_args
     before_restart = ->() do
       cli_pumactl "thread-backtraces"
     end
@@ -96,7 +95,7 @@ class TestWorkerGemIndependence < TestIntegration
 
     Dir.chdir(current_release_symlink) do
       with_unbundled_env do
-        silent_and_checked_system_command("bundle install")
+        open3_bundle_install
         cli_server "--prune-bundler -w 1 #{server_opts}"
       end
     end
@@ -110,7 +109,7 @@ class TestWorkerGemIndependence < TestIntegration
     set_release_symlink File.expand_path(new_app_dir, __dir__)
     Dir.chdir(current_release_symlink) do
       with_unbundled_env do
-        silent_and_checked_system_command("bundle install")
+        open3_bundle_install
       end
     end
     start_phased_restart
@@ -141,6 +140,40 @@ class TestWorkerGemIndependence < TestIntegration
       Bundler.with_clean_env { yield }
     else
       Bundler.with_unbundled_env { yield }
+    end
+  end
+
+  # Bundler may timeout even though it's install all needed gems
+  #
+  def open3_bundle_install
+    stdout, stderr, pid = nil, nil, nil
+    status = nil
+    begin
+      Timeout::timeout(10) {
+        stdout, stderr, pid = spawn_cmd 'bundle install'
+        _, status = Process.wait2 pid
+      }
+      unless status.success?
+        Process.kill('KILL', pid) rescue nil
+      end
+    rescue Timeout::Error
+      raise_timeout = true
+      out = ''
+      if defined?(stdout) && IO === stdout && (out = stdout.read.strip) && !out.empty?
+        raise_timeout = !out.include?('Bundle complete! ')
+      end
+      if raise_timeout
+        if defined?(stderr) && IO === stderr && (err = stderr.read.strip) && !err.empty?
+          STDOUT.syswrite "\nbundle install stderr:\n#{err}\n"
+        end
+        unless out.empty?
+          STDOUT.syswrite "\nbundle install stdout:\n#{out}\n"
+        end
+      end
+      if pid && status.nil? # bundle install timed out
+        Process.kill('KILL', pid) rescue nil
+      end
+      raise Timeout::Error if raise_timeout
     end
   end
 end
