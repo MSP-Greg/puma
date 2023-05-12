@@ -155,10 +155,14 @@ class TestIntegration < Minitest::Test
     end
     t1
   rescue => e
-    if @server_err.wait_readable 1
-      STDOUT.syswrite "\n------------------ Server Error log:\n#{@server_err.read}\n"
+    unless no_error
+      if @server_err.wait_readable 1
+        if (err = @server_err&.read&.strip || '') && !err.empty?
+          STDOUT.syswrite "\n------------------ Server Error log:\n#{err}\n"
+        end
+      end
+      raise e.message
     end
-    raise e.message unless no_error
   end
 
   # Returns true if and when server log includes str.
