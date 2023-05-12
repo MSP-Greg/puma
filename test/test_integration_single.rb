@@ -156,40 +156,55 @@ class TestIntegrationSingle_P < TestIntegration
   end
 
   def test_write_to_log
+    fn = tmp_path '.puma_log'
     skip_unless_signal_exist? :TERM
 
-    cli_server '-C test/config/t1_conf.rb test/rackup/hello.ru'
+    cli_server 'test/rackup/hello.ru', config: <<~CONFIG
+      log_requests
+      stdout_redirect "#{fn}"
+      pidfile "t1-pid"
+    CONFIG
 
     read_response fast_connect
 
     stop_server
 
-    log = File.read('t1-stdout')
+    # macos intermittently raises 'Errno::ENOENT: No such file'
+    sleep 1 unless File.exist? fn
+    log = File.read fn
 
     assert_includes log, '"GET / HTTP/1.1"'
   ensure
-    File.unlink 't1-stdout' if File.file? 't1-stdout'
-    File.unlink 't1-pid'    if File.file? 't1-pid'
+    File.unlink fn if File.file? fn
+    File.unlink 't1-pid' if File.file? 't1-pid'
   end
 
   def test_puma_started_log_writing
+    fn = tmp_path '.puma_log'
     skip_unless_signal_exist? :TERM
 
-    cli_server '-C test/config/t2_conf.rb test/rackup/hello.ru'
+    cli_server 'test/rackup/hello.ru', config: <<~CONFIG
+      log_requests
+      stdout_redirect "#{fn}"
+      pidfile "t2-pid"
+    CONFIG
 
     read_response fast_connect
 
-    out = cli_pumactl('-F test/config/t2_conf.rb status', no_control_url: true).read
+    out = cli_pumactl('-p t2-pid status', no_control_url: true).read
 
     stop_server
 
-    log = File.read('t2-stdout')
+    # macos intermittently raises 'Errno::ENOENT: No such file'
+    sleep 1 unless File.exist? fn
+    log = File.read fn
 
     assert_includes log, '"GET / HTTP/1.1"'
-    assert(!File.file?("t2-pid"))
-    assert_equal("Puma is started\n", out)
+    assert !File.file?("t2-pid")
+    assert_equal "Puma is started\n", out
   ensure
-    File.unlink 't2-stdout' if File.file? 't2-stdout'
+    File.unlink fn if File.file? fn
+    File.unlink 't2-pid' if File.file? 't2-pid'
   end
 
   def test_application_logs_are_flushed_on_write
