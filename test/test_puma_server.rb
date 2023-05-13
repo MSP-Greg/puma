@@ -1608,6 +1608,8 @@ class TestPumaServer_S < TestPumaServerBase
     connections = Array.new(num_connections) { send_http req }
     @server.stop
     wait.close
+    # give server threads time to run
+    4.times { Thread.pass; sleep 0.000_5 }
 
     until connections.empty?
       connections.each_with_index do |skt, idx|
@@ -1662,7 +1664,8 @@ class TestPumaServer_S < TestPumaServerBase
     connections = Array.new(num_connections) { send_http (req * 2) }
     @server.stop
     wait.close
-
+    # give server threads time to run
+    4.times { Thread.pass; sleep 0.000_5 }
     sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
 
     until connections.empty?
