@@ -25,7 +25,6 @@ class TestIntegrationPumactl_P < TestIntegrationPumactlBase
 
   def test_stop_tcp
     skip_if :jruby, :truffleruby # Undiagnose thread race. TODO fix
-    @control_tcp_port = UniquePort.call
     cli_server "-q test/rackup/sleep.ru #{set_pumactl_args} -S #{@state_path}"
 
     cli_pumactl "stop"
