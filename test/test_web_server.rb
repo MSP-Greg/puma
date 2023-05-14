@@ -64,9 +64,7 @@ class WebServerTest < Minitest::Test
   end
 
   def test_bad_path
-    socket = do_test("GET : HTTP/1.1\r\n\r\n", 3)
-    assert_match "HTTP/1.1 400 Bad Request\r\n\r\n", socket.read
-    socket.close
+    assert_match "HTTP/1.1 400 Bad Request\r\n\r\n", do_test("GET : HTTP/1.1\r\n\r\n", 3)
   end
 
   def test_header_is_too_long
