@@ -179,7 +179,6 @@ class TestIntegrationCluster_P < TestIntegrationClusterBase
   def test_worker_check_interval
     # iso8601 2022-12-14T00:05:49Z
     re_8601 = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/
-    @control_tcp_port = UniquePort.call
     worker_check_interval = 1
 
     cli_server "-w1 -t1:1 #{set_pumactl_args} test/rackup/hello.ru", config: "worker_check_interval #{worker_check_interval}"
@@ -264,19 +263,19 @@ class TestIntegrationCluster_P < TestIntegrationClusterBase
       sleep 0.004
     }
 
-    results = []
-    until socks.empty?
+    results = Array.new 100
+    until socks.compact.empty?
       socks.each_with_index do |sock, idx|
+        next if sock.nil?
         if sock.wait_readable 0.000_5
           begin
-            read_body sock
+            results[idx] = read_body sock
           rescue StandardError => e
-            results << e.class
+            results[idx] = e.class
           end
           socks[idx] = nil
         end
       end
-      socks.compact!
     end
 
     refute_includes pids, get_worker_pids(1, wrkrs - 1)
@@ -356,7 +355,6 @@ class TestIntegrationCluster_P < TestIntegrationClusterBase
   end
 
   def test_nio4r_gem_not_required_in_master_process_when_using_control_server
-    @control_tcp_port = UniquePort.call
     cli_server "-w #{workers} #{set_pumactl_args} -C test/config/prune_bundler_print_nio_defined.rb test/rackup/hello.ru"
 
     @server.wait_readable 3
