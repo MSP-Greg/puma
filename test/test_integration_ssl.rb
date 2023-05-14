@@ -15,17 +15,18 @@ class TestIntegrationSSL < TestIntegration
   require "net/http"
   require "openssl"
 
+  def setup
+    @tcp_port = UniquePort.call
+    @control_tcp_port = UniquePort.call
+  end
+
   def teardown
     @server.close if @server && !@server.closed?
     @server = nil
   end
 
-  def control_tcp_port
-    @control_tcp_port ||= UniquePort.call
-  end
-
   def with_server(config)
-    cli_server '', config: config, config_bind: true
+    cli_server set_pumactl_args, config: config, config_bind: true
 
     http = Net::HTTP.new HOST, @tcp_port
     http.use_ssl = true
@@ -34,11 +35,7 @@ class TestIntegrationSSL < TestIntegration
     yield http
 
     # stop server
-    sock = TCPSocket.new HOST, control_tcp_port
-    @ios_to_close << sock
-    sock.syswrite "GET /stop?token=#{TOKEN} HTTP/1.1\r\n\r\n"
-    sock.wait_readable 3
-    sock.read_nonblock 1_024
+    cli_pumactl 'stop'
     assert wait_for_server_to_include('Goodbye!')
   end
 
@@ -48,7 +45,7 @@ class TestIntegrationSSL < TestIntegration
         keystore =  '#{File.expand_path '../examples/puma/keystore.jks', __dir__}'
         keystore_pass = 'jruby_puma'
 
-        ssl_bind '#{HOST}', '#{bind_port}', {
+        ssl_bind '#{HOST}', '#{@tcp_port}', {
           keystore: keystore,
           keystore_pass:  keystore_pass,
           verify_mode: 'none'
@@ -57,14 +54,12 @@ class TestIntegrationSSL < TestIntegration
         key  = '#{File.expand_path '../examples/puma/puma_keypair.pem', __dir__}'
         cert = '#{File.expand_path '../examples/puma/cert_puma.pem', __dir__}'
 
-        ssl_bind '#{HOST}', '#{bind_port}', {
+        ssl_bind '#{HOST}', '#{@tcp_port}', {
           cert: cert,
           key:  key,
           verify_mode: 'none'
         }
       end
-
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
@@ -129,13 +124,11 @@ class TestIntegrationSSL < TestIntegration
       key_path  = '#{File.expand_path '../examples/puma/puma_keypair.pem', __dir__}'
       cert_path = '#{File.expand_path '../examples/puma/cert_puma.pem', __dir__}'
 
-      ssl_bind '#{HOST}', '#{bind_port}', {
+      ssl_bind '#{HOST}', '#{@tcp_port}', {
         cert_pem: File.read(cert_path),
         key_pem:  File.read(key_path),
         verify_mode: 'none'
       }
-
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
@@ -157,9 +150,7 @@ class TestIntegrationSSL < TestIntegration
 
     config = <<~RUBY
       require 'localhost'
-      ssl_bind '#{HOST}', '#{bind_port}'
-
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      ssl_bind '#{HOST}', '#{@tcp_port}'
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
@@ -185,14 +176,12 @@ class TestIntegrationSSL < TestIntegration
       key_command = ::Puma::IS_WINDOWS ? 'echo hello world' :
         '#{File.expand_path '../examples/puma/key_password_command.sh', __dir__}'
 
-      ssl_bind '#{HOST}', '#{bind_port}', {
+      ssl_bind '#{HOST}', '#{@tcp_port}', {
         cert: cert_path,
         key: key_path,
         verify_mode: 'none',
         key_password_command: key_command
       }
-
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
@@ -218,14 +207,12 @@ class TestIntegrationSSL < TestIntegration
       key_command = ::Puma::IS_WINDOWS ? 'echo hello world' :
         '#{File.expand_path '../examples/puma/key_password_command.sh', __dir__}'
 
-      ssl_bind '#{HOST}', '#{bind_port}', {
+      ssl_bind '#{HOST}', '#{@tcp_port}', {
         cert_pem: File.read(cert_path),
         key_pem: File.read(key_path),
         verify_mode: 'none',
         key_password_command: key_command
       }
-
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
