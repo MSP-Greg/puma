@@ -97,8 +97,8 @@ class TestIntegration < Minitest::Test
         @bind_path ||= tmp_path '.bind'
         cmd << " -b unix://#{@bind_path}"
       else
-        #@tcp_port = UniquePort.call
-        cmd << " -b tcp://#{HOST}:0"
+        @tcp_port = UniquePort.call
+        cmd << " -b tcp://#{HOST}:#{@tcp_port}"
       end
     end
     cmd << " #{argv}" if argv
@@ -150,8 +150,8 @@ class TestIntegration < Minitest::Test
   def wait_for_server_to_boot(no_error: false, log: false)
     host_re = Regexp.escape HOST
     t1 = wait_for_server_to_include 'Ctrl-C', log: log
-    if (t2 = @log_out[/Listening on (http|ssl):\/\/(#{host_re}|\[::1\]):(\d{4,5})($|\?)/, 3])
-      @tcp_port = t2
+    if (bind = @log_out[/Listening on (http|ssl):\/\/(#{host_re}|\[::1\]):(\d{4,5})($|\?)/, 3])
+      @tcp_port ||= bind
     end
     t1
   rescue => e
@@ -358,10 +358,10 @@ class TestIntegration < Minitest::Test
   def set_pumactl_args(unix: false)
     if unix
       @control_path = tmp_path('.cntl_sock')
-      "--control-url unix://#{@control_path} --control-token #{TOKEN}"
+      "--control-url=unix://#{@control_path} --control-token=#{TOKEN}"
     else
       @control_tcp_port = UniquePort.call
-      "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN}"
+      "--control-url=tcp://#{HOST}:#{@control_tcp_port} --control-token=#{TOKEN}"
     end
   end
 
