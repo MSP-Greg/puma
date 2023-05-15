@@ -1596,8 +1596,8 @@ class TestPumaServer_S < TestPumaServerBase
   def test_drain_on_shutdown_http10(drain = true)
     req = "GET / HTTP/1.0\r\n\r\n"
     good_response = "HTTP/1.0 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
-    results = []
     num_connections = 10
+
     wait = Queue.new
 
     server_run(drain_on_shutdown: drain, min_threads: 2, max_threads: 2) do
@@ -1611,26 +1611,14 @@ class TestPumaServer_S < TestPumaServerBase
     # give server threads time to run
     4.times { Thread.pass; sleep 0.000_5 }
 
-    until connections.empty?
-      connections.each_with_index do |skt, idx|
-        if skt.wait_readable 0.000_5
-          begin
-            results << skt.read_response.inspect
-          rescue StandardError => e
-            results << e.class.to_s
-          end
-          connections[idx] = nil
-        end
-      end
-      connections.compact!
-    end
+    results = read_response_array connections, num_connections
 
     results_count = {}
     results.uniq.sort.each { |e| results_count[e] = results.count(e) }
 
-    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join "\n"
+    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join("\n").gsub("\r\n", "\\r\\n")
 
-    good    = results_count[good_response.inspect] || 0
+    good    = results_count[good_response] || 0
     dropped = num_connections - good
 
     msg = "#{results_msg}\nGood req (#{good}) and Dropped req (#{dropped}) should total #{num_connections}"
@@ -1668,34 +1656,17 @@ class TestPumaServer_S < TestPumaServerBase
     4.times { Thread.pass; sleep 0.000_5 }
     sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
 
-    until connections.empty?
-      connections.each_with_index do |skt, idx|
-        if skt.wait_readable 0.000_5
-          begin
-            body = skt.read_response.inspect.dup
-            if body == good_response.inspect # received only 1st response
-              skt.wait_readable 0.005
-              body << skt.read_response.inspect
-            end
-            results << body
-          rescue StandardError => e
-            results << e.class.to_s
-          end
-          connections[idx] = nil
-        end
-      end
-      connections.compact!
-    end
+    results = read_response_array connections, num_connections, read_again: true
 
     results_count = {}
     results.uniq.sort.each { |e| results_count[e] = results.count(e) }
 
-    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join "\n"
+    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join("\n").gsub("\r\n", "\\r\\n")
 
-    good        = results_count[good_response.inspect] || 0
-    good_good   = results_count[(good_response * 2).inspect] || 0
-    good_closed = results_count[(good_response + closed_response).inspect] || 0
-    closed      = results_count[closed_response.inspect] || 0
+    good        = results_count[good_response] || 0
+    good_good   = results_count[(good_response * 2)] || 0
+    good_closed = results_count[(good_response + closed_response)] || 0
+    closed      = results_count[closed_response] || 0
     dropped     = num_connections - good - good_good - good_closed - closed
 
     if drain
