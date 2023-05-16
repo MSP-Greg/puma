@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "helper"
 require_relative "helpers/puma_socket"
 
@@ -20,6 +22,8 @@ class TestPumaServerHijack < Minitest::Test
   parallelize_me!
 
   include PumaTest::PumaSocket
+
+  STD_REQ_11 = "GET / HTTP/1.1\r\n\r\n"
 
   def setup
     @host = "127.0.0.1"
@@ -65,18 +69,18 @@ class TestPumaServerHijack < Minitest::Test
       io = env['rack.hijack'].call
       io.syswrite 'Server listening'
       io.wait_readable 2
-      io.syswrite io.sysread(256)
+      io.syswrite io.sysread(1_024)
       body = ::Rack::BodyProxy.new([]) { @body_closed = true }
       [200, {}, body]
     end
 
-    sock = send_http "GET / HTTP/1.1\r\n\r\n"
+    sock = send_http STD_REQ_11
 
     sock.wait_readable 2
-    assert_equal "Server listening", sock.sysread(256)
+    assert_equal "Server listening", sock.sysread(1_024)
 
     sock.syswrite "this should echo"
-    assert_equal "this should echo", sock.sysread(256)
+    assert_equal "this should echo", sock.sysread(1_024)
 
     sleep 0.005 # intermittent failure, may need to increase in CI
     assert @body_closed, "Reponse body must be closed"
@@ -94,7 +98,7 @@ class TestPumaServerHijack < Minitest::Test
       # below for TruffleRuby error with io.sysread
       # Read Errno::EAGAIN: Resource temporarily unavailable
       io.wait_readable 0.1
-      io.syswrite io.sysread(256)
+      io.syswrite io.sysread(1_024)
       io.close
     }
 
@@ -102,13 +106,14 @@ class TestPumaServerHijack < Minitest::Test
       [101, headers, body]
     end
 
-    sock = send_http "GET / HTTP/1.1\r\n\r\n"
+    sock = send_http STD_REQ_11
+    sock.wait_readable 0.5
     resp = sock.sysread 1_024
     echo_msg = "This should echo..."
     sock << echo_msg
 
     assert_includes resp, 'Connection: Upgrade'
-    assert_equal echo_msg, sock.sysread(256)
+    assert_equal echo_msg, sock.sysread(1_024)
   end
 
   def test_101_header
@@ -121,7 +126,7 @@ class TestPumaServerHijack < Minitest::Test
         # below for TruffleRuby error with io.sysread
         # Read Errno::EAGAIN: Resource temporarily unavailable
         io.wait_readable 0.1
-        io.syswrite io.sysread(256)
+        io.syswrite io.sysread(1_024)
         io.close
       }
     }
@@ -130,13 +135,14 @@ class TestPumaServerHijack < Minitest::Test
       [101, headers, []]
     end
 
-    sock = send_http "GET / HTTP/1.1\r\n\r\n"
+    sock = send_http STD_REQ_11
+    sock.wait_readable 0.5
     resp = sock.sysread 1_024
     echo_msg = "This should echo..."
     sock << echo_msg
 
     assert_includes resp, 'Connection: Upgrade'
-    assert_equal echo_msg, sock.sysread(256)
+    assert_equal echo_msg, sock.sysread(1_024)
   end
 
   def test_http_10_header_with_content_length
@@ -192,14 +198,20 @@ class TestPumaServerHijack < Minitest::Test
       end
     end
 
-    sock1 = send_http "GET / HTTP/1.1\r\n\r\n"
-    sleep (Puma::IS_WINDOWS || !Puma::IS_MRI ? 0.3 : 0.1)
+    sock1 = send_http STD_REQ_11
+    # response will often cause retries, can't repo locally
+    sleep (Puma::IS_MRI ? 0.1 : 0.3)
+    Thread.pass
+    sock1.wait_readable 0.5
     resp1 = sock1.sysread 1_024
 
     sleep 0.01 # time for close block to be called ?
 
-    sock2 = send_http "GET / HTTP/1.1\r\n\r\n"
-    sleep (Puma::IS_WINDOWS || !Puma::IS_MRI ? 0.3 : 0.1)
+    sock2 = send_http STD_REQ_11
+    # response will often cause retries, can't repo locally
+    sleep (Puma::IS_MRI ? 0.1 : 0.3)
+    Thread.pass
+    sock2.wait_readable 0.5
     resp2 = sock2.sysread 1_024
 
     assert_operator resp1, :end_with?, 'hijacked'
