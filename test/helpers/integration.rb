@@ -189,6 +189,7 @@ class TestIntegration < Minitest::Test
           STDOUT.syswrite "\n#{@log_out}\n"
           raise "Waited too long for server log to include '#{str}'"
         else
+          sleep 0.01 # io.wait_readable may immediately return !true
           wait_readable_timeouts += 1
         end
       end
@@ -227,6 +228,7 @@ class TestIntegration < Minitest::Test
           STDOUT.syswrite "\n#{log_out}\n"
           raise "Waited too long for server log to match '#{re.inspect}'"
         else
+          sleep 0.01 # io.wait_readable may immediately return !true
           wait_readable_timeouts += 1
         end
       end
