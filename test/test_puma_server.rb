@@ -14,7 +14,9 @@ class WithoutBacktraceError < StandardError
   def message; "no backtrace error"; end
 end
 
-class TestPumaServerBase < Minitest::Test
+class TestPumaServer < Minitest::Test
+  parallelize_me!
+
   include PumaTest::PumaSocket
 
   STATUS_CODES = ::Puma::HTTP_STATUS_CODES
@@ -56,10 +58,6 @@ class TestPumaServerBase < Minitest::Test
     end
     conn
   end
-end
-
-class TestPumaServer_P < TestPumaServerBase
-  parallelize_me!
 
   def test_normalize_host_header_missing
     server_run do |env|
@@ -1290,6 +1288,35 @@ class TestPumaServer_P < TestPumaServerBase
     sock.close
   end
 
+  def stub_accept_nonblock(error)
+    @port = (@server.add_tcp_listener @host, 0).addr[1]
+    io = @server.binder.ios.last
+
+    accept_old = io.method(:accept_nonblock)
+    io.define_singleton_method :accept_nonblock do
+      accept_old.call.close
+      raise error
+    end
+
+    @server.run
+    @skt = new_connection
+    sleep 0.03
+  end
+
+  # System-resource errors such as EMFILE should not be silently swallowed by accept loop.
+  def test_accept_emfile
+    stub_accept_nonblock Errno::EMFILE.new('accept(2)')
+    refute_empty @log_writer.stderr.string, "Expected EMFILE error was not logged"
+  end
+
+  # Retryable errors such as ECONNABORTED should be silently swallowed by accept loop.
+  def test_accept_econnaborted
+    # Match Ruby #accept_nonblock implementation, ECONNABORTED error is extended by IO::WaitReadable.
+    error = Errno::ECONNABORTED.new('accept(2) would block').tap {|e| e.extend IO::WaitReadable}
+    stub_accept_nonblock(error)
+    assert_empty @log_writer.stderr.string
+  end
+
   # see      https://github.com/puma/puma/issues/2390
   # fixed by https://github.com/puma/puma/pull/2279
   #
@@ -1363,6 +1390,116 @@ class TestPumaServer_P < TestPumaServerBase
     selector = @server.instance_variable_get(:@reactor).instance_variable_get(:@selector)
 
     assert_equal selector.backend, backend
+  end
+
+  def test_drain_on_shutdown_http10(drain = true)
+    req = "GET / HTTP/1.0\r\n\r\n"
+    good_response = "HTTP/1.0 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
+    num_connections = 10
+
+    wait = Queue.new
+
+    server_run(drain_on_shutdown: drain, min_threads: 2, max_threads: 2) do
+      wait.pop
+      [200, {}, ["DONE"]]
+    end
+
+    # Send one connection
+    wait << true
+    send_http_read_response req
+
+    connections = Array.new(num_connections) { send_http req }
+    @server.stop
+    wait.close
+
+    # give server threads time to run
+    num_connections.times { Thread.pass; sleep 0.000_5 }
+
+    results = read_response_array connections, num_connections
+
+    results_count = {}
+    results.uniq.sort.each { |e| results_count[e] = results.count(e) }
+
+    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join("\n").gsub("\r\n", "\\r\\n")
+
+    good    = results_count[good_response] || 0
+    dropped = num_connections - good
+
+    msg = "#{results_msg}\nGood req (#{good}) and Dropped req (#{dropped}) should total #{num_connections}"
+    assert_equal num_connections, (good + dropped), msg
+
+    if drain
+      assert_equal 0, dropped, "There should be no dropped requests, there were #{dropped}\n#{results_msg}"
+    else
+      refute_equal 0, dropped, "There should be at least 1 dropped request, there were #{dropped}\n#{results_msg}"
+    end
+  end
+
+  def test_not_drain_on_shutdown_http10
+    test_drain_on_shutdown_http10 false
+  end
+
+  # send two requests with each client/socket
+  def test_drain_on_shutdown_http11(drain = true)
+    req = "GET / HTTP/1.1\r\n\r\n"
+    good_response   = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
+    closed_response = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nDONE"
+    results = []
+    num_connections = 10
+    wait = Queue.new
+
+    server_run(drain_on_shutdown: drain, min_threads: 2, max_threads: 2) do
+      wait.pop
+      [200, {}, ["DONE"]]
+    end
+
+    # Send one connection
+    wait << true
+    send_http_read_response req
+
+    connections = Array.new(num_connections) { send_http (req * 2) }
+    @server.stop
+    wait.close
+
+    # give server threads time to run, two requests per connection
+    (2 * num_connections).times { Thread.pass; sleep 0.000_5 }
+    sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
+
+    results = read_response_array connections, num_connections, read_again: true
+
+    results_count = {}
+    results.uniq.sort.each { |e| results_count[e] = results.count(e) }
+
+    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join("\n").gsub("\r\n", "\\r\\n")
+
+    good        = results_count[good_response] || 0
+    good_good   = results_count[(good_response * 2)] || 0
+    good_closed = results_count[(good_response + closed_response)] || 0
+    closed      = results_count[closed_response] || 0
+    dropped     = num_connections - good - good_good - good_closed - closed
+
+    if drain
+      msg = "#{results_msg}\n#{good} good + #{good_good} good_good " \
+        "+ #{good_closed} good_closed + #{closed} closed should equal #{num_connections}"
+      assert_equal num_connections, (good + good_good + good_closed + closed), msg
+
+      msg = "#{results_msg}\nThere should be 8 or more good_good responses, there were #{good_good}"
+      assert_operator 8, :<=, good_good, msg
+
+      msg = "#{results_msg}\nNo requests should have been dropped"
+      assert_equal 0, dropped, msg
+    else
+      msg = "#{results_msg}\n#{good} good + #{good_good} good_good " \
+        "+ #{good_closed} good_closed + #{closed} closed + #{dropped} dropped should equal #{num_connections}"
+      assert_equal num_connections, (good + good_good + good_closed + closed + dropped), msg
+
+      msg = "#{results_msg}\nSome requests should have been dropped"
+      refute_equal 0, dropped, msg
+    end
+  end
+
+  def test_not_drain_on_shutdown_http11
+    test_drain_on_shutdown_http11 false
   end
 
   def test_remote_address_header
@@ -1589,146 +1726,5 @@ class TestPumaServer_P < TestPumaServerBase
     pid = spawn(env, cmd, opts)
     [out_w, err_w].each(&:close)
     [out_r, err_r, pid]
-  end
-end
-
-class TestPumaServer_S < TestPumaServerBase
-  def test_drain_on_shutdown_http10(drain = true)
-    req = "GET / HTTP/1.0\r\n\r\n"
-    good_response = "HTTP/1.0 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
-    num_connections = 10
-
-    wait = Queue.new
-
-    server_run(drain_on_shutdown: drain, min_threads: 2, max_threads: 2) do
-      wait.pop
-      [200, {}, ["DONE"]]
-    end
-
-    # Send one connection
-    wait << true
-    send_http_read_response req
-
-    connections = Array.new(num_connections) { send_http req }
-    @server.stop
-    wait.close
-
-    # give server threads time to run
-    num_connections.times { Thread.pass; sleep 0.000_5 }
-
-    results = read_response_array connections, num_connections
-
-    results_count = {}
-    results.uniq.sort.each { |e| results_count[e] = results.count(e) }
-
-    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join("\n").gsub("\r\n", "\\r\\n")
-
-    good    = results_count[good_response] || 0
-    dropped = num_connections - good
-
-    msg = "#{results_msg}\nGood req (#{good}) and Dropped req (#{dropped}) should total #{num_connections}"
-    assert_equal num_connections, (good + dropped), msg
-
-    if drain
-      assert_equal 0, dropped, "There should be no dropped requests, there were #{dropped}\n#{results_msg}"
-    else
-      refute_equal 0, dropped, "There should be at least 1 dropped request, there were #{dropped}\n#{results_msg}"
-    end
-  end
-
-  def test_not_drain_on_shutdown_http10
-    test_drain_on_shutdown_http10 false
-  end
-
-  # send two requests with each client/socket
-  def test_drain_on_shutdown_http11(drain = true)
-    req = "GET / HTTP/1.1\r\n\r\n"
-    good_response   = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
-    closed_response = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nDONE"
-    results = []
-    num_connections = 10
-    wait = Queue.new
-
-    server_run(drain_on_shutdown: drain, min_threads: 2, max_threads: 2) do
-      wait.pop
-      [200, {}, ["DONE"]]
-    end
-
-    # Send one connection
-    wait << true
-    send_http_read_response req
-
-    connections = Array.new(num_connections) { send_http (req * 2) }
-    @server.stop
-    wait.close
-
-    # give server threads time to run, two requests per connection
-    (2 * num_connections).times { Thread.pass; sleep 0.000_5 }
-    sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
-
-    results = read_response_array connections, num_connections, read_again: true
-
-    results_count = {}
-    results.uniq.sort.each { |e| results_count[e] = results.count(e) }
-
-    results_msg = results_count.map { |k,v| format '  %2d  %s', v, k }.join("\n").gsub("\r\n", "\\r\\n")
-
-    good        = results_count[good_response] || 0
-    good_good   = results_count[(good_response * 2)] || 0
-    good_closed = results_count[(good_response + closed_response)] || 0
-    closed      = results_count[closed_response] || 0
-    dropped     = num_connections - good - good_good - good_closed - closed
-
-    if drain
-      msg = "#{results_msg}\n#{good} good + #{good_good} good_good " \
-        "+ #{good_closed} good_closed + #{closed} closed should equal #{num_connections}"
-      assert_equal num_connections, (good + good_good + good_closed + closed), msg
-
-      msg = "#{results_msg}\nThere should be 8 or more good_good responses, there were #{good_good}"
-      assert_operator 8, :<=, good_good, msg
-
-      msg = "#{results_msg}\nNo requests should have been dropped"
-      assert_equal 0, dropped, msg
-    else
-      msg = "#{results_msg}\n#{good} good + #{good_good} good_good " \
-        "+ #{good_closed} good_closed + #{closed} closed + #{dropped} dropped should equal #{num_connections}"
-      assert_equal num_connections, (good + good_good + good_closed + closed + dropped), msg
-
-      msg = "#{results_msg}\nSome requests should have been dropped"
-      refute_equal 0, dropped, msg
-    end
-  end
-
-  def test_not_drain_on_shutdown_http11
-    test_drain_on_shutdown_http11 false
-  end
-
-  def stub_accept_nonblock(error)
-    @port = (@server.add_tcp_listener @host, 0).addr[1]
-    io = @server.binder.ios.last
-
-    accept_old = io.method(:accept_nonblock)
-    io.define_singleton_method :accept_nonblock do
-      accept_old.call.close
-      raise error
-    end
-
-    @server.run
-    @skt = new_connection
-    sleep 0.03
-  end
-
-  # System-resource errors such as EMFILE should not be silently swallowed by accept loop.
-  def test_accept_emfile
-    stub_accept_nonblock Errno::EMFILE.new('accept(2)')
-    refute_empty @log_writer.stderr.string, "Expected EMFILE error was not logged"
-  end
-
-  # Retryable errors such as ECONNABORTED should be silently swallowed by accept loop.
-  def test_accept_econnaborted
-    # Match Ruby #accept_nonblock implementation, ECONNABORTED error is extended by IO::WaitReadable.
-    error = Errno::ECONNABORTED.new('accept(2) would block').tap {|e| e.extend IO::WaitReadable}
-    stub_accept_nonblock(error)
-    assert_empty @log_writer.stderr.string
   end
 end
