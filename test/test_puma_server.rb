@@ -1404,9 +1404,9 @@ class TestPumaServer < Minitest::Test
       [200, {}, ["DONE"]]
     end
 
-    # Send one connection
-    wait << true
-    send_http_read_response req
+    # Send two requests
+    connections = Array.new(2) { wait << true; send_http req }
+    connections.each { |skt| skt.read_response }
 
     connections = Array.new(num_connections) { send_http req }
     @server.stop
@@ -1453,9 +1453,9 @@ class TestPumaServer < Minitest::Test
       [200, {}, ["DONE"]]
     end
 
-    # Send one connection
-    wait << true
-    send_http_read_response req
+    # Send two requests
+    connections = Array.new(2) { wait << true; send_http req }
+    connections.each { |skt| skt.read_response }
 
     connections = Array.new(num_connections) { send_http (req * 2) }
     @server.stop
