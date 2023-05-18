@@ -1,13 +1,10 @@
-# frozen_string_literal: true
-
 require_relative "helper"
 require_relative "helpers/integration"
 require_relative "helpers/puma_socket"
 
-class TestIntegrationPumactl < TestIntegration
+class TestIntegrationPumactlBase < TestIntegration
   include TmpPath
   include PumaTest::PumaSocket
-  parallelize_me! if ::Puma::IS_MRI
 
   def workers ; 2 ; end
 
@@ -17,11 +14,14 @@ class TestIntegrationPumactl < TestIntegration
   end
 
   def teardown
-    return if skipped?
     refute @control_path && File.exist?(@control_path), "Control path must be removed after stop"
   ensure
     [@state_path, @control_path].each { |p| File.unlink(p) rescue nil }
   end
+end
+
+class TestIntegrationPumactl_P < TestIntegrationPumactlBase
+  parallelize_me! if ::Puma::IS_MRI
 
   def test_stop_tcp
     skip_if :jruby, :truffleruby # Undiagnose thread race. TODO fix
@@ -54,41 +54,6 @@ class TestIntegrationPumactl < TestIntegration
     _, status = Process.wait2(@pid)
     assert_equal 0, status
     @server = nil
-  end
-
-  def test_phased_restart_cluster
-    skip_unless :fork
-    cli_server "-q -w #{workers} -t1:4 test/rackup/sleep.ru #{set_pumactl_args unix: true} -S #{@state_path}", unix: true
-
-    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-
-    send_http_read_response "GET /sleep1 HTTP/1.0\r\n\r\n"
-
-    # Get the PIDs of the phase 0 workers.
-    phase0_worker_pids = get_worker_pids 0
-
-    assert File.exist? @bind_path
-
-    # Phased restart
-    cli_pumactl 'phased-restart', unix: true
-
-    # Get the PIDs of the phase 1 workers.
-    phase1_worker_pids = get_worker_pids 1
-
-    msg = "phase 0 pids #{phase0_worker_pids.inspect}  phase 1 pids #{phase1_worker_pids.inspect}"
-
-    assert_equal workers, phase0_worker_pids.length, msg
-    assert_equal workers, phase1_worker_pids.length, msg
-    assert_empty phase0_worker_pids & phase1_worker_pids, "#{msg}\nBoth workers should be replaced with new"
-    assert File.exist?(@bind_path), "Bind path must exist after phased restart"
-  ensure
-    if @pid
-      cli_pumactl 'stop', unix: true
-      _, status = Process.wait2(@pid)
-      assert_equal 0, status
-      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - start, :<, (DARWIN ? 8 : 7)
-      @server = nil
-    end
   end
 
   def test_refork_cluster
@@ -161,5 +126,45 @@ class TestIntegrationPumactl < TestIntegration
     # windows bad URI(is not URI?)
     assert_match(/No pid '\d+' found|bad URI\(is not URI\?\)/, sout.readlines.join(""))
     assert_equal(1, e.status)
+  end
+end
+
+class TestIntegrationPumactl_S < TestIntegrationPumactlBase
+
+  # 2023-Apr This test intermittently freezes when run parallel
+
+  def test_phased_restart_cluster
+    skip_unless :fork
+    cli_server "-q -w #{workers} -t1:4 test/rackup/sleep.ru #{set_pumactl_args unix: true} -S #{@state_path}", unix: true
+
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+    send_http_read_response "GET /sleep1 HTTP/1.0\r\n\r\n"
+
+    # Get the PIDs of the phase 0 workers.
+    phase0_worker_pids = get_worker_pids 0
+
+    assert File.exist? @bind_path
+
+    # Phased restart
+    cli_pumactl 'phased-restart', unix: true
+
+    # Get the PIDs of the phase 1 workers.
+    phase1_worker_pids = get_worker_pids 1
+
+    msg = "phase 0 pids #{phase0_worker_pids.inspect}  phase 1 pids #{phase1_worker_pids.inspect}"
+
+    assert_equal workers, phase0_worker_pids.length, msg
+    assert_equal workers, phase1_worker_pids.length, msg
+    assert_empty phase0_worker_pids & phase1_worker_pids, "#{msg}\nBoth workers should be replaced with new"
+    assert File.exist?(@bind_path), "Bind path must exist after phased restart"
+  ensure
+    if @pid
+      cli_pumactl 'stop', unix: true
+      _, status = Process.wait2(@pid)
+      assert_equal 0, status
+      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - start, :<, (DARWIN ? 8 : 7)
+      @server = nil
+    end
   end
 end
