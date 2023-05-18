@@ -5,7 +5,9 @@ require_relative "helpers/integration"
 
 require "time"
 
-class TestIntegrationClusterBase < TestIntegration
+class TestIntegrationCluster < TestIntegration
+  parallelize_me! if ::Puma::IS_MRI && ::Puma::HAS_FORK
+
   def workers ; 2 ; end
 
   def setup
@@ -17,9 +19,7 @@ class TestIntegrationClusterBase < TestIntegration
     return if skipped?
     super
   end
-end
 
-class TestIntegrationCluster_S < TestIntegrationClusterBase
   def test_hot_restart_does_not_drop_connections_threads
     hot_restart_does_not_drop_connections num_threads: 10, total_requests: 3_000
   end
@@ -27,10 +27,6 @@ class TestIntegrationCluster_S < TestIntegrationClusterBase
   def test_hot_restart_does_not_drop_connections
     hot_restart_does_not_drop_connections num_threads: 1, total_requests: 1_000
   end
-end
-
-class TestIntegrationCluster_P < TestIntegrationClusterBase
-  parallelize_me! if ::Puma::IS_MRI && ::Puma::HAS_FORK
 
   def test_pre_existing_unix
     skip_unless :unix
