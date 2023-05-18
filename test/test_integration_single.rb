@@ -1,7 +1,11 @@
+# frozen_string_literal: true
+
 require_relative "helper"
 require_relative "helpers/integration"
 
-class TestIntegrationSingle_S < TestIntegration
+class TestIntegrationSingle < TestIntegration
+  parallelize_me! if ::Puma::IS_MRI
+
   def workers ; 0 ; end
 
   def test_hot_restart_does_not_drop_connections_threads
@@ -16,12 +20,6 @@ class TestIntegrationSingle_S < TestIntegration
       hot_restart_does_not_drop_connections
     end
   end
-end
-
-class TestIntegrationSingle_P < TestIntegration
-  parallelize_me! if ::Puma::IS_MRI
-
-  def workers ; 0 ; end
 
   def test_usr2_restart
     skip_unless_signal_exist? :USR2
