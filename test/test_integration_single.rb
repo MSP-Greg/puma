@@ -214,10 +214,12 @@ class TestIntegrationSingle < TestIntegration
 
     read_body fast_connect
 
+    # below should be written before 'stop' command is issued
+    assert wait_for_server_to_include("hello\n")
+
     cli_pumactl 'stop'
 
-    assert wait_for_server_to_include("hello\n")
-    assert_includes @server.read, 'Goodbye!'
+    assert wait_for_server_to_include("Goodbye")
 
     @server.close unless @server.closed?
     @server = nil
