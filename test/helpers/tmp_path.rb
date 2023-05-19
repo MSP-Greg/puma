@@ -23,7 +23,7 @@ module TmpPath
       end
     end
 
-  def tmp_path(extension=nil, unix: false )
+  def tmp_path(extension = nil, unix: false)
     tmp = unix ? PUMA_TMPDIR : nil
     path = Tempfile.create(['', extension], tmp) { |f| f.path }
     tmp_paths << path
