@@ -94,7 +94,7 @@ class TestIntegration < Minitest::Test
 
     unless config_bind
       if unix
-        @bind_path ||= tmp_path '.bind'
+        @bind_path ||= tmp_path '.bind', unix: true
         cmd << " -b unix://#{@bind_path}"
       else
         @tcp_port = UniquePort.call

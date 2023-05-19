@@ -16,7 +16,7 @@ class TestPumaUnixSocket < Minitest::Test
   end
 
   def server_unix(type)
-    @bind_path = type == :unix ? tmp_path('.sock') : "@TestPumaUnixSocket"
+    @bind_path = type == :unix ? tmp_path('.sock', unix: true) : "@TestPumaUnixSocket"
     @server = Puma::Server.new App, nil, {min_threads: 1}
     @server.add_unix_listener @bind_path
     @server.run
