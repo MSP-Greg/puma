@@ -48,18 +48,18 @@ module TestPuma
       headers
     end
 
-    def send_http_read_resp_body(req, port: nil, path: nil, ctx: nil, len: nil)
-      skt = send_http req, port: port, path: path, ctx: ctx
+    def send_http_read_resp_body(req, host: nil, port: nil, path: nil, ctx: nil, len: nil)
+      skt = send_http req, host: host, port: port, path: path, ctx: ctx
       skt.read_body len: len
     end
 
-    def send_http_read_response(req, port: nil, path: nil, ctx: nil, len: nil)
-      skt = send_http req, port: port, path: path, ctx: ctx
+    def send_http_read_response(req, host: nil, port: nil, path: nil, ctx: nil, len: nil)
+      skt = send_http req, host: host, port: port, path: path, ctx: ctx
       skt.read_response len: len
     end
 
-    def send_http(req, port: nil, path: nil, ctx: nil)
-      skt = new_connection port: port, path: path, ctx: ctx
+    def send_http(req, host: nil, port: nil, path: nil, ctx: nil)
+      skt = new_connection host: host, port: port, path: path, ctx: ctx
       skt.syswrite req
       skt
     end
@@ -144,10 +144,10 @@ module TestPuma
       ctx
     end
 
-    def new_connection(port: nil, path: nil, ctx: nil)
+    def new_connection(host: nil, port: nil, path: nil, ctx: nil)
       port  ||= @port || @tcp_port
       path  ||= @bind_path
-      @host ||= HOST
+      @host ||= host || HOST
       skt =
         if path && !port && !ctx
           UNIXSocket.new path.sub(/\A@/, "\0") # sub sis for abstract
