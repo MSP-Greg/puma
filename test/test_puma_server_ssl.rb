@@ -279,6 +279,8 @@ end if ::Puma::HAS_SSL
 class TestPumaServerSSLClient < Minitest::Test
   parallelize_me! unless ::Puma.jruby?
 
+  include TestPuma::PumaSocket
+
   CERT_PATH = File.expand_path "../examples/puma/client-certs", __dir__
 
   # Context can be shared, may help with JRuby
@@ -306,23 +308,16 @@ class TestPumaServerSSLClient < Minitest::Test
     host_addrs = server.binder.ios.map { |io| io.to_io.addr[2] }
     server.run
 
-    http = Net::HTTP.new host, server.connected_ports[0]
-    http.use_ssl = true
-    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-
-    yield http
+    ctx = OpenSSL::SSL::SSLContext.new
+    ctx.verify_mode = OpenSSL::SSL::VERIFY_NONE
+    yield ctx
 
     client_error = false
     begin
-      http.start do
-        req = Net::HTTP::Get.new "/", {}
-        http.request(req)
-      end
+      send_http GET_11, host: host, port: server.connected_ports[0], ctx: ctx
     rescue OpenSSL::SSL::SSLError, EOFError, Errno::ECONNABORTED, Errno::ECONNRESET, IOError => e
       # Errno::ECONNRESET TruffleRuby, IOError macOS JRuby
       client_error = e
-      # closes socket if open, may not close on error
-      http.send :do_finish
     end
 
     sleep 0.1
@@ -338,7 +333,7 @@ class TestPumaServerSSLClient < Minitest::Test
 
   def test_verify_fail_if_no_client_cert
     error = Puma.jruby? ? /Empty client certificate chain/ : 'peer did not return a certificate'
-    assert_ssl_client_error_match(error) do |http|
+    assert_ssl_client_error_match(error) do |client_ctx|
       # nothing
     end
   end
@@ -346,34 +341,35 @@ class TestPumaServerSSLClient < Minitest::Test
   def test_verify_fail_if_client_unknown_ca
     error = Puma.jruby? ? /No trusted certificate found/ : /self[- ]signed certificate in certificate chain/
     cert_subject = Puma.jruby? ? '/DC=net/DC=puma/CN=localhost' : '/DC=net/DC=puma/CN=CAU'
-    assert_ssl_client_error_match(error, subject: cert_subject) do |http|
+
+    assert_ssl_client_error_match(error, subject: cert_subject) do |client_ctx|
       key = "#{CERT_PATH}/client_unknown.key"
       crt = "#{CERT_PATH}/client_unknown.crt"
-      http.key = OpenSSL::PKey::RSA.new File.read(key)
-      http.cert = OpenSSL::X509::Certificate.new File.read(crt)
-      http.ca_file = "#{CERT_PATH}/unknown_ca.crt"
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/unknown_ca.crt"
     end
   end
 
   def test_verify_fail_if_client_expired_cert
     error = Puma.jruby? ? /NotAfter:/ : 'certificate has expired'
-    assert_ssl_client_error_match(error, subject: '/DC=net/DC=puma/CN=localhost') do |http|
+    assert_ssl_client_error_match(error, subject: '/DC=net/DC=puma/CN=localhost') do |client_ctx|
       key = "#{CERT_PATH}/client_expired.key"
       crt = "#{CERT_PATH}/client_expired.crt"
-      http.key = OpenSSL::PKey::RSA.new File.read(key)
-      http.cert = OpenSSL::X509::Certificate.new File.read(crt)
-      http.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
     end
   end
 
   def test_verify_client_cert
-    assert_ssl_client_error_match(false) do |http|
+    assert_ssl_client_error_match(false) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
-      http.key = OpenSSL::PKey::RSA.new File.read(key)
-      http.cert = OpenSSL::X509::Certificate.new File.read(crt)
-      http.ca_file = "#{CERT_PATH}/ca.crt"
-      http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
     end
   end
 
@@ -387,13 +383,13 @@ class TestPumaServerSSLClient < Minitest::Test
     ctx.truststore_pass = 'jruby_puma'
     ctx.verify_mode = Puma::MiniSSL::VERIFY_PEER
 
-    assert_ssl_client_error_match(false, context: ctx) do |http|
+    assert_ssl_client_error_match(false, context: ctx) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
-      http.key = OpenSSL::PKey::RSA.new File.read(key)
-      http.cert = OpenSSL::X509::Certificate.new File.read(crt)
-      http.ca_file = "#{CERT_PATH}/ca.crt"
-      http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
     end
   end if Puma.jruby?
 
@@ -407,13 +403,13 @@ class TestPumaServerSSLClient < Minitest::Test
     ctx.truststore_pass = 'jruby_puma'
     ctx.verify_mode = Puma::MiniSSL::VERIFY_PEER
 
-    assert_ssl_client_error_match(true, context: ctx) do |http|
+    assert_ssl_client_error_match(true, context: ctx) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
-      http.key = OpenSSL::PKey::RSA.new File.read(key)
-      http.cert = OpenSSL::X509::Certificate.new File.read(crt)
-      http.ca_file = "#{CERT_PATH}/ca.crt"
-      http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
     end
   end if Puma.jruby?
 
@@ -426,13 +422,13 @@ class TestPumaServerSSLClient < Minitest::Test
     # NOTE: a little hard to test - we're at least asserting that setting :default does not raise errors
     ctx.verify_mode = Puma::MiniSSL::VERIFY_NONE
 
-    assert_ssl_client_error_match(false, context: ctx) do |http|
+    assert_ssl_client_error_match(false, context: ctx) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
-      http.key = OpenSSL::PKey::RSA.new File.read(key)
-      http.cert = OpenSSL::X509::Certificate.new File.read(crt)
-      http.ca_file = "#{CERT_PATH}/ca.crt"
-      http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
     end
   end if Puma.jruby?
 
@@ -441,16 +437,16 @@ class TestPumaServerSSLClient < Minitest::Test
     ctx.cipher_suites = [ 'TLS_RSA_WITH_AES_128_GCM_SHA256' ]
     ctx.protocols = 'TLSv1.2'
 
-    assert_ssl_client_error_match(false, context: ctx) do |http|
+    assert_ssl_client_error_match(false, context: ctx) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
-      http.key = OpenSSL::PKey::RSA.new File.read(key)
-      http.cert = OpenSSL::X509::Certificate.new File.read(crt)
-      http.ca_file = "#{CERT_PATH}/ca.crt"
-      http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
 
-      http.ssl_version = :TLSv1_2
-      http.ciphers = [ 'TLS_RSA_WITH_AES_128_GCM_SHA256' ]
+      client_ctx.ssl_version = :TLSv1_2
+      client_ctx.ciphers = [ 'TLS_RSA_WITH_AES_128_GCM_SHA256' ]
     end
   end if Puma.jruby?
 
@@ -459,16 +455,16 @@ class TestPumaServerSSLClient < Minitest::Test
     ctx.cipher_suites = [ 'TLS_RSA_WITH_AES_128_GCM_SHA256' ]
     ctx.protocols = 'TLSv1.2'
 
-    assert_ssl_client_error_match(/no cipher suites in common/, context: ctx) do |http|
+    assert_ssl_client_error_match(/no cipher suites in common/, context: ctx) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
-      http.key = OpenSSL::PKey::RSA.new File.read(key)
-      http.cert = OpenSSL::X509::Certificate.new File.read(crt)
-      http.ca_file = "#{CERT_PATH}/ca.crt"
-      http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
 
-      http.ssl_version = :TLSv1_2
-      http.ciphers = [ 'TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384' ]
+      client_ctx.ssl_version = :TLSv1_2
+      client_ctx.ciphers = [ 'TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384' ]
     end
   end if Puma.jruby?
 
@@ -481,13 +477,13 @@ class TestPumaServerSSLClient < Minitest::Test
     ctx.truststore_type = 'jks'
     ctx.verify_mode = Puma::MiniSSL::VERIFY_PEER
 
-    assert_ssl_client_error_match(false, context: ctx) do |http|
+    assert_ssl_client_error_match(false, context: ctx) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
-      http.key = OpenSSL::PKey::RSA.new File.read(key)
-      http.cert = OpenSSL::X509::Certificate.new File.read(crt)
-      http.ca_file = "#{CERT_PATH}/ca.crt"
-      http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
     end
   end if Puma.jruby?
 
