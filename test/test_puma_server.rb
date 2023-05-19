@@ -17,7 +17,7 @@ end
 class TestPumaServer < Minitest::Test
   parallelize_me!
 
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   STATUS_CODES = ::Puma::HTTP_STATUS_CODES
 

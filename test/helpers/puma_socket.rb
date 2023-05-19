@@ -1,10 +1,13 @@
 # frozen_string_literal: true
 
-module PumaTest
+module TestPuma
 
   # Note: no setup or teardown, make sure to initialize @ios = []
   #
   module PumaSocket
+    GET_10 = "GET / HTTP/1.0\r\n\r\n"
+    GET_11 = "GET / HTTP/1.1\r\n\r\n"
+
     HOST = '127.0.0.1'
     RESP_READ_LEN = 65_536
     RESP_READ_TIMEOUT = 10
@@ -45,18 +48,18 @@ module PumaTest
       headers
     end
 
-    def send_http_read_resp_body(req, port: nil, path: nil, len: nil)
-      skt = send_http req, port: port, path: path
+    def send_http_read_resp_body(req, port: nil, path: nil, ctx: nil, len: nil)
+      skt = send_http req, port: port, path: path, ctx: ctx
       skt.read_body len: len
     end
 
-    def send_http_read_response(req, port: nil, path: nil, len: nil)
-      skt = send_http req, port: port, path: path
+    def send_http_read_response(req, port: nil, path: nil, ctx: nil, len: nil)
+      skt = send_http req, port: port, path: path, ctx: ctx
       skt.read_response len: len
     end
 
-    def send_http(req, port: nil, path: nil)
-      skt = new_connection port: port, path: path
+    def send_http(req, port: nil, path: nil, ctx: nil)
+      skt = new_connection port: port, path: path, ctx: ctx
       skt.syswrite req
       skt
     end
@@ -74,6 +77,7 @@ module PumaTest
       response = +''
       t_st = Process.clock_gettime Process::CLOCK_MONOTONIC
       read_len = len || RESP_READ_LEN
+
       if self.to_io.wait_readable timeout
         loop do
           begin
@@ -127,27 +131,44 @@ module PumaTest
           end
         end
       else
-        raise Timeout::Error, 'Client Read Timeout'
+        raise Timeout::Error, "Client 'wait_readable' Timeout"
       end
     end
 
     REQ_WRITE = -> (str) { self.syswrite str }
 
-    def new_connection(port: nil, path: nil)
+    def new_ctx(&blk)
+      ctx = OpenSSL::SSL::SSLContext.new
+      ctx.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      yield ctx if blk
+      ctx
+    end
+
+    def new_connection(port: nil, path: nil, ctx: nil)
       port  ||= @port || @tcp_port
       path  ||= @bind_path
       @host ||= HOST
-      skt = if path && !port
-        UNIXSocket.new path.sub(/\A@/, "\0")
-      elsif port && !path
-        TCPSocket.new @host, port
-      else
-        raise 'port or path must be set!'
-      end
+      skt =
+        if path && !port && !ctx
+          UNIXSocket.new path.sub(/\A@/, "\0") # sub sis for abstract
+        elsif port && !path
+          tcp = TCPSocket.new @host, port
+          if ctx
+            ::OpenSSL::SSL::SSLSocket.new(tcp, ctx)
+          else
+            tcp
+          end
+        else
+          raise 'port or path must be set!'
+        end
       skt.define_singleton_method :read_response, READ_RESPONSE
       skt.define_singleton_method :read_body, READ_BODY
       skt.define_singleton_method :<<, REQ_WRITE
       @ios_to_close << skt
+      if ctx
+        @ios_to_close << tcp
+        skt.connect
+      end
       skt
     end
 

@@ -42,7 +42,7 @@ module TestRackUp
   end
 
   class TestPathHandler < Minitest::Test
-    include PumaTest::PumaSocket
+    include TestPuma::PumaSocket
 
     def app
       Proc.new {|env| @input = env; [200, {}, ["hello world"]]}

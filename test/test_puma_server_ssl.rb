@@ -3,6 +3,7 @@
 # helper is required first since it loads Puma, which needs to be
 # loaded so HAS_SSL is defined
 require_relative "helper"
+require_relative "helpers/puma_socket"
 
 if ::Puma::HAS_SSL && ENV['PUMA_TEST_DEBUG']
   require "puma/minissl"
@@ -25,6 +26,9 @@ end
 
 class TestPumaServerSSL < Minitest::Test
   parallelize_me!
+
+  include TestPuma::PumaSocket
+
   def setup
     @app = nil
     @http = nil
@@ -82,20 +86,15 @@ class TestPumaServerSSL < Minitest::Test
 
   def test_request_wont_block_thread
     start_server
+
     # Open a connection and give enough data to trigger a read, then wait
-    ctx = OpenSSL::SSL::SSLContext.new
-    ctx.verify_mode = OpenSSL::SSL::VERIFY_NONE
-    port = @server.connected_ports[0]
-    socket = OpenSSL::SSL::SSLSocket.new TCPSocket.new(@host, port), ctx
-    socket.connect
-    socket.write "HEAD"
+    send_http "HEAD", ctx: new_ctx
+
     sleep 0.1
 
     # Capture the amount of threads being used after connecting and being idle
     thread_pool = @server.instance_variable_get(:@thread_pool)
     busy_threads = thread_pool.spawned - thread_pool.waiting
-
-    socket.close
 
     # The thread pool should be empty since the request would block on read
     # and our request should have been moved to the reactor.
@@ -110,13 +109,7 @@ class TestPumaServerSSL < Minitest::Test
 
     start_server
 
-    body = ''
-    @http.start do
-      req = Net::HTTP::Get.new "/"
-      @http.request(req) do |rep|
-        body = rep.body
-      end
-    end
+    body = send_http_read_resp_body GET_11, ctx: new_ctx
 
     assert_equal giant.bytesize, body.bytesize
   end

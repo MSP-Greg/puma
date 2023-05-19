@@ -4,7 +4,7 @@ require_relative "helpers/puma_socket"
 class TestOutOfBandServer < Minitest::Test
   parallelize_me!
 
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   WAIT_TIME = ::Puma::IS_JRUBY ? 2 : 1
 

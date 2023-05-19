@@ -3,7 +3,7 @@ require_relative "helpers/puma_socket"
 
 class TestPersistent < Minitest::Test
   parallelize_me!
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   VALID_REQUEST  = "GET / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\n\r\n"
   CLOSE_REQUEST  = "GET / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n"

@@ -20,7 +20,7 @@ end
 class WebServerTest < Minitest::Test
   parallelize_me!
 
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   VALID_REQUEST = "GET / HTTP/1.1\r\nHost: www.zedshaw.com\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n"
 

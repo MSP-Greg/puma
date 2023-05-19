@@ -4,7 +4,7 @@ require_relative "helpers/puma_socket"
 
 class TestIntegrationPumactlBase < TestIntegration
   include TmpPath
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   def workers ; 2 ; end
 

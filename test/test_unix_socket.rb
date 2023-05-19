@@ -6,7 +6,7 @@ require_relative "helpers/puma_socket"
 
 class TestPumaUnixSocket < Minitest::Test
   include TmpPath
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   App = lambda { |env| [200, {}, ["Works"]] }
 

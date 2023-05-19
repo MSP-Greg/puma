@@ -15,7 +15,7 @@ class TestRequestInvalid < Minitest::Test
   # running parallel seems to take longer...
   # parallelize_me! unless JRUBY_HEAD
 
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   GET_PREFIX = "GET / HTTP/1.1\r\nConnection: close\r\n"
   CHUNKED = "1\r\nH\r\n4\r\nello\r\n5\r\nWorld\r\n0\r\n\r\n"

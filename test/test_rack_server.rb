@@ -22,7 +22,7 @@ require "nio"
 class TestRackServer < Minitest::Test
   parallelize_me!
 
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   HOST = '127.0.0.1'
 

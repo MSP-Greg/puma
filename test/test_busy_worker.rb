@@ -6,7 +6,7 @@ require_relative "helpers/puma_socket"
 class TestBusyWorker < Minitest::Test
   parallelize_me! if ::Puma::IS_MRI
 
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   def setup
     skip_unless :mri # This feature only makes sense on MRI

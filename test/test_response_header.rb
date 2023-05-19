@@ -8,7 +8,7 @@ require "nio"
 class TestResponseHeader < Minitest::Test
   parallelize_me!
 
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   def setup
     @host = "127.0.0.1"

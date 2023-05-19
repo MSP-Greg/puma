@@ -10,7 +10,7 @@ require "psych"
 class TestCLI < Minitest::Test
   include SSLHelper if ::Puma::HAS_SSL
   include TmpPath
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   def setup
     @environment = 'production'

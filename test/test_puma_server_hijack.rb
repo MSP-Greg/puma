@@ -21,7 +21,7 @@ require "rack/body_proxy"
 class TestPumaServerHijack < Minitest::Test
   parallelize_me!
 
-  include PumaTest::PumaSocket
+  include TestPuma::PumaSocket
 
   STD_REQ_11 = "GET / HTTP/1.1\r\n\r\n"
 
