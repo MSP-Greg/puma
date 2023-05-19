@@ -39,7 +39,7 @@ class TestPumaServerSSL < Minitest::Test
   end
 
   # yields ctx to block, use for ctx setup & configuration
-  def start_server
+  def start_server(&blk)
     @host = "127.0.0.1"
 
     app = @app || lambda { |env| [200, {}, [env['rack.url_scheme']]] }
@@ -56,7 +56,7 @@ class TestPumaServerSSL < Minitest::Test
 
     ctx.verify_mode = Puma::MiniSSL::VERIFY_NONE
 
-    yield ctx if block_given?
+    yield ctx if blk
 
     @log_writer = SSLLogWriterHelper.new STDOUT, STDERR
     @server = Puma::Server.new app, nil, {log_writer: @log_writer}
@@ -126,14 +126,14 @@ class TestPumaServerSSL < Minitest::Test
     start_server
 
     ctx = new_ctx { |c|
-      if c.respond_to? :max_version
+      if c.respond_to? :max_version=
         c.max_version = :SSL3
       else
         c.ssl_version = :SSLv3
       end
     }
     assert_raises(OpenSSL::SSL::SSLError) do
-      send_http GET_11, ctx: ctx
+      send_http_read_response GET_11, ctx: ctx
     end
 
     unless Puma.jruby?
@@ -147,14 +147,14 @@ class TestPumaServerSSL < Minitest::Test
     start_server { |ctx| ctx.no_tlsv1 = true }
 
     ctx = new_ctx { |c|
-      if c.respond_to? :max_version
+      if c.respond_to? :max_version=
         c.max_version = :TLS1
       else
         c.ssl_version = :TLSv1
       end
     }
     assert_raises(OpenSSL::SSL::SSLError) do
-      send_http GET_11, ctx: ctx
+      send_http_read_response GET_11, ctx: ctx
     end
 
     unless Puma.jruby?
@@ -167,18 +167,19 @@ class TestPumaServerSSL < Minitest::Test
     start_server { |ctx| ctx.no_tlsv1_1 = true }
 
     ctx = new_ctx { |c|
-      if c.respond_to? :max_version
+      if c.respond_to? :max_version=
         c.max_version = :TLS1_1
       else
         c.ssl_version = :TLSv1_1
       end
     }
     assert_raises(OpenSSL::SSL::SSLError) do
-      send_http GET_11, ctx: ctx
+      send_http_read_response GET_11, ctx: ctx
     end
 
     unless Puma.jruby?
       msg = /wrong version number|(unknown|unsupported) protocol|no protocols available|version too low|unknown SSL method/
+STDOUT.syswrite "\n#{@log_writer.error.message}\n" if @log_writer.error
       assert_match(msg, @log_writer.error.message) if @log_writer.error
     end
   end
@@ -314,7 +315,7 @@ class TestPumaServerSSLClient < Minitest::Test
 
     client_error = false
     begin
-      send_http GET_11, host: host, port: server.connected_ports[0], ctx: ctx
+      send_http_read_response GET_11, host: host, port: server.connected_ports[0], ctx: ctx
     rescue OpenSSL::SSL::SSLError, EOFError, Errno::ECONNABORTED, Errno::ECONNRESET, IOError => e
       # Errno::ECONNRESET TruffleRuby, IOError macOS JRuby
       client_error = e
