@@ -31,12 +31,10 @@ class TestPumaServerSSL < Minitest::Test
 
   def setup
     @app = nil
-    @http = nil
     @server = nil
   end
 
   def teardown
-    @http.finish if @http&.started?
     @server&.stop true
   end
 
@@ -64,22 +62,12 @@ class TestPumaServerSSL < Minitest::Test
     @server = Puma::Server.new app, nil, {log_writer: @log_writer}
     @port = (@server.add_ssl_listener @host, 0, ctx).addr[1]
     @server.run
-
-    @http = Net::HTTP.new @host, @port
-    @http.use_ssl = true
-    @http.verify_mode = OpenSSL::SSL::VERIFY_NONE
   end
 
   def test_url_scheme_for_https
     start_server
-    body = nil
-    @http.start do
-      req = Net::HTTP::Get.new "/", {}
 
-      @http.request(req) do |rep|
-        body = rep.body
-      end
-    end
+    body = send_http_read_resp_body GET_11, ctx: new_ctx
 
     assert_equal "https", body
   end
@@ -88,13 +76,17 @@ class TestPumaServerSSL < Minitest::Test
     start_server
 
     # Open a connection and give enough data to trigger a read, then wait
-    send_http "HEAD", ctx: new_ctx
+    skt = send_http "HEAD", ctx: new_ctx
 
     sleep 0.1
 
     # Capture the amount of threads being used after connecting and being idle
     thread_pool = @server.instance_variable_get(:@thread_pool)
     busy_threads = thread_pool.spawned - thread_pool.waiting
+
+    tcp = skt.to_io
+    skt.close
+    tcp.close
 
     # The thread pool should be empty since the request would block on read
     # and our request should have been moved to the reactor.
@@ -116,16 +108,15 @@ class TestPumaServerSSL < Minitest::Test
 
   def test_form_submit
     start_server
-    body = nil
-    @http.start do
-      req = Net::HTTP::Post.new '/'
-      req.set_form_data('a' => '1', 'b' => '2')
 
-      @http.request(req) do |rep|
-        body = rep.body
-      end
+    req = <<~REQUEST
+      POST / HTTP/1.1\r
+      content-length: 7\r
+      content-type: application/x-www-form-urlencoded\r\n\r
+      a=1&b=2
+    REQUEST
 
-    end
+    body = send_http_read_resp_body req, ctx: new_ctx
 
     assert_equal "https", body
   end
@@ -133,12 +124,18 @@ class TestPumaServerSSL < Minitest::Test
   def test_ssl_v3_rejection
     skip("SSLv3 protocol is unavailable") if Puma::MiniSSL::OPENSSL_NO_SSL3
     start_server
-    @http.ssl_version= :SSLv3
-    assert_raises(OpenSSL::SSL::SSLError) do
-      @http.start do
-        Net::HTTP::Get.new '/'
+
+    ctx = new_ctx { |c|
+      if c.respond_to? :max_version
+        c.max_version = :SSL3
+      else
+        c.ssl_version = :SSLv3
       end
+    }
+    assert_raises(OpenSSL::SSL::SSLError) do
+      send_http GET_11, ctx: ctx
     end
+
     unless Puma.jruby?
       msg = /wrong version number|no protocols available|version too low|unknown SSL method/
       assert_match(msg, @log_writer.error.message) if @log_writer.error
@@ -149,16 +146,17 @@ class TestPumaServerSSL < Minitest::Test
     skip("TLSv1 protocol is unavailable") if Puma::MiniSSL::OPENSSL_NO_TLS1
     start_server { |ctx| ctx.no_tlsv1 = true }
 
-    if OpenSSL::SSL::SSLContext.private_instance_methods(false).include?(:set_minmax_proto_version)
-      @http.max_version = :TLS1
-    else
-      @http.ssl_version = :TLSv1
-    end
-    assert_raises(OpenSSL::SSL::SSLError) do
-      @http.start do
-        Net::HTTP::Get.new '/'
+    ctx = new_ctx { |c|
+      if c.respond_to? :max_version
+        c.max_version = :TLS1
+      else
+        c.ssl_version = :TLSv1
       end
+    }
+    assert_raises(OpenSSL::SSL::SSLError) do
+      send_http GET_11, ctx: ctx
     end
+
     unless Puma.jruby?
       msg = /wrong version number|(unknown|unsupported) protocol|no protocols available|version too low|unknown SSL method/
       assert_match(msg, @log_writer.error.message) if @log_writer.error
@@ -168,16 +166,17 @@ class TestPumaServerSSL < Minitest::Test
   def test_tls_v1_1_rejection
     start_server { |ctx| ctx.no_tlsv1_1 = true }
 
-    if OpenSSL::SSL::SSLContext.private_instance_methods(false).include?(:set_minmax_proto_version)
-      @http.max_version = :TLS1_1
-    else
-      @http.ssl_version = :TLSv1_1
-    end
-    assert_raises(OpenSSL::SSL::SSLError) do
-      @http.start do
-        Net::HTTP::Get.new '/'
+    ctx = new_ctx { |c|
+      if c.respond_to? :max_version
+        c.max_version = :TLS1_1
+      else
+        c.ssl_version = :TLSv1_1
       end
+    }
+    assert_raises(OpenSSL::SSL::SSLError) do
+      send_http GET_11, ctx: ctx
     end
+
     unless Puma.jruby?
       msg = /wrong version number|(unknown|unsupported) protocol|no protocols available|version too low|unknown SSL method/
       assert_match(msg, @log_writer.error.message) if @log_writer.error
@@ -189,16 +188,8 @@ class TestPumaServerSSL < Minitest::Test
 
     start_server
 
-    @http.min_version = :TLS1_3
-
-    body = nil
-    @http.start do
-      req = Net::HTTP::Get.new '/'
-      @http.request(req) do |rep|
-        assert_equal 'OK', rep.message
-        body = rep.body
-      end
-    end
+    body = send_http_read_resp_body GET_11,
+      ctx: new_ctx { |c| c.min_version = :TLS1_3 }
 
     assert_equal "https", body
   end
@@ -222,11 +213,9 @@ class TestPumaServerSSL < Minitest::Test
       end
     end
 
+    body_https = nil
     ssl = Thread.new do
-      @http.start do
-        req_https = Net::HTTP::Get.new "/", {}
-        @http.request(req_https) { |rep_https| body_https = rep_https.body }
-      end
+      body_https = send_http_read_resp_body GET_11, ctx: new_ctx
     end
 
     tcp.join
@@ -505,38 +494,35 @@ class TestPumaServerSSLClient < Minitest::Test
 end if ::Puma::HAS_SSL
 
 class TestPumaServerSSLWithCertPemAndKeyPem < Minitest::Test
-  CERT_PATH = File.expand_path "../examples/puma/client-certs", __dir__
+  include TestPuma::PumaSocket
 
   def test_server_ssl_with_cert_pem_and_key_pem
     host = "localhost"
-    port = 0
+    cert_path = File.expand_path "../examples/puma/client-certs", __dir__
+
     ctx = Puma::MiniSSL::Context.new
-    ctx.cert_pem = File.read "#{CERT_PATH}/server.crt"
-    ctx.key_pem  = File.read "#{CERT_PATH}/server.key"
+    ctx.cert_pem = File.read "#{cert_path}/server.crt"
+    ctx.key_pem  = File.read "#{cert_path}/server.key"
 
     app = lambda { |env| [200, {}, [env['rack.url_scheme']]] }
     log_writer = SSLLogWriterHelper.new STDOUT, STDERR
     server = Puma::Server.new app, nil, {log_writer: log_writer}
-    server.add_ssl_listener host, port, ctx
+    server.add_ssl_listener host, 0, ctx
+    @port = server.connected_ports[0]
     server.run
 
-    http = Net::HTTP.new host, server.connected_ports[0]
-    http.use_ssl = true
-    http.ca_file = "#{CERT_PATH}/ca.crt"
-
     client_error = nil
+    body = ''
     begin
-      http.start do
-        req = Net::HTTP::Get.new "/", {}
-        http.request(req)
-      end
+      body = send_http_read_resp_body GET_11, host: host, ctx: new_ctx { |c|
+        c.ca_file = "#{cert_path}/ca.crt"
+      }
     rescue OpenSSL::SSL::SSLError, EOFError, Errno::ECONNRESET => e
       # Errno::ECONNRESET TruffleRuby
       client_error = e
-      # closes socket if open, may not close on error
-      http.send :do_finish
     end
 
+    assert_equal 'https', body
     assert_nil client_error
   ensure
     server&.stop true
