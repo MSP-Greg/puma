@@ -154,7 +154,7 @@ module TestPuma
         elsif port && !path
           tcp = TCPSocket.new @host, port
           if ctx
-            ::OpenSSL::SSL::SSLSocket.new(tcp, ctx)
+            ::OpenSSL::SSL::SSLSocket.new tcp, ctx
           else
             tcp
           end
