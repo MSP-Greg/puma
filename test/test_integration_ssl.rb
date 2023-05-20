@@ -63,11 +63,11 @@ class TestIntegrationSSL < TestIntegration
     assert_equal 'https', body
   end
 
-  def test_ssl_run_with_curl_client
+  def test_verify_client_cert_roundtrip
     cert_path = File.expand_path '../examples/puma/client-certs', __dir__
 
     config = <<~RUBY
-      if ::Puma.jruby?
+      if ::Puma::IS_JRUBY
         ssl_bind '#{HOST}', '#{@tcp_port}', {
           keystore: '#{File.expand_path '../examples/puma/keystore.jks', __dir__}',
           keystore_pass: 'jruby_puma',
@@ -84,38 +84,29 @@ class TestIntegrationSSL < TestIntegration
       threads 1, 5
 
       app do |env|
-        [200, {}, [env['rack.url_scheme']]]
+        [200, {}, [env['puma.peercert'].to_s]]
       end
     RUBY
 
-    cli_server set_pumactl_args, config: config, config_bind: true, log: true
+    cli_server set_pumactl_args, config: config, config_bind: true
 
-    ca   = "#{cert_path}/ca.crt"
-    cert = "#{cert_path}/client.crt"
-    key  = "#{cert_path}/client.key"
-#=begin
-
-#    body = send_http_read_response GET_11, host: HOST,
-    skt = send_http GET_11, host: HOST,
+    body = send_http_read_resp_body GET_11, host: HOST,
       ctx: new_ctx { |c|
+        ca   = "#{cert_path}/ca.crt"
+        cert = "#{cert_path}/client.crt"
+        key  = "#{cert_path}/client.key"
         c.ca_file = ca
-        c.cert = OpenSSL::X509::Certificate.new File.read(cert)
-        c.key  = OpenSSL::PKey::RSA.new File.read(key)
+        c.cert = ::OpenSSL::X509::Certificate.new File.read(cert)
+        c.key  = ::OpenSSL::PKey::RSA.new File.read(key)
         if c.respond_to? :max_version=
           c.max_version = :TLS1_2
         else
           c.ssl_version = :TLSv1_2
         end
-        c.verify_mode = OpenSSL::SSL::VERIFY_PEER
+        c.verify_mode = ::OpenSSL::SSL::VERIFY_PEER
       }
-    body = skt.read_response
-#=end
-#body = curl_and_get_response "https://localhost:#{@tcp_port}",
-#                                   args: "--cacert #{ca} --cert #{cert} --key #{key} --tlsv1.2 --tls-max 1.2"
 
-#STDOUT.syswrite "\n---------------------\n#{@server.read}\n"
-
-    assert_equal 'https', body
+    assert_equal File.read("#{cert_path}/client.crt"), body
   end
 
   def test_ssl_run_with_pem
