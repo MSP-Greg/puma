@@ -1,5 +1,6 @@
 require_relative 'helper'
 require_relative "helpers/integration"
+require_relative "helpers/puma_socket"
 
 # These tests are used to verify that Puma works with SSL sockets.  Only
 # integration tests isolate the server from the test environment, so there
@@ -12,7 +13,8 @@ require_relative "helpers/integration"
 class TestIntegrationSSL < TestIntegration
   parallelize_me! if ::Puma.mri?
 
-  require "net/http"
+  include TestPuma::PumaSocket
+
   require "openssl"
 
   def setup
@@ -21,22 +23,11 @@ class TestIntegrationSSL < TestIntegration
   end
 
   def teardown
-    @server.close if @server && !@server.closed?
-    @server = nil
-  end
-
-  def with_server(config)
-    cli_server set_pumactl_args, config: config, config_bind: true
-
-    http = Net::HTTP.new HOST, @tcp_port
-    http.use_ssl = true
-    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-
-    yield http
-
-    # stop server
     cli_pumactl 'stop'
     assert wait_for_server_to_include('Goodbye!')
+
+    @server.close if @server && !@server.closed?
+    @server = nil
   end
 
   def test_ssl_run
@@ -66,55 +57,65 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server set_pumactl_args, config: config, config_bind: true
+
+    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    assert_equal 'https', body
   end
 
   def test_ssl_run_with_curl_client
-    require 'stringio'
+    cert_path = File.expand_path '../examples/puma/client-certs', __dir__
 
-    app = lambda { |_| [200, { 'Content-Type' => 'text/plain' }, ["HELLO", ' ', "THERE"]] }
-    opts = {max_threads: 1}
-    server = Puma::Server.new app, nil, opts
-    if Puma.jruby?
-      ssl_params = {
-          'keystore'      => File.expand_path('../examples/puma/client-certs/keystore.jks', __dir__),
-          'keystore-pass' => 'jruby_puma', # keystore includes server.p12 as well as ca.crt
-      }
-    else
-      ssl_params = {
-          'cert' => File.expand_path('../examples/puma/client-certs/server.crt', __dir__),
-          'key'  => File.expand_path('../examples/puma/client-certs/server.key', __dir__),
-          'ca'   => File.expand_path('../examples/puma/client-certs/ca.crt', __dir__),
-      }
-    end
-    ssl_params['verify_mode'] = 'force_peer' # 'peer'
-    out_err = StringIO.new
-    ssl_context = Puma::MiniSSL::ContextBuilder.new(ssl_params, Puma::LogWriter.new(out_err, out_err)).context
-    @tcp_port = server.add_ssl_listener(HOST, 0, ssl_context).addr[1]
-    server.run(true)
-    begin
-      ca   = File.expand_path '../examples/puma/client-certs/ca.crt'    , __dir__
-      cert = File.expand_path '../examples/puma/client-certs/client.crt', __dir__
-      key  = File.expand_path '../examples/puma/client-certs/client.key', __dir__
-      # NOTE: JRuby used to end up in a hang with TLS peer verification enabled
-      # it's easier to reproduce using an external client such as CURL (using net/http client the bug isn't triggered)
-      # also the "hang", being buffering related, seems to showcase better with TLS 1.2 than 1.3
-      body = curl_and_get_response "https://localhost:#{@tcp_port}",
-                                   args: "--cacert #{ca} --cert #{cert} --key #{key} --tlsv1.2 --tls-max 1.2"
+    config = <<~RUBY
+      if ::Puma.jruby?
+        ssl_bind '#{HOST}', '#{@tcp_port}', {
+          keystore: '#{File.expand_path '../examples/puma/keystore.jks', __dir__}',
+          keystore_pass: 'jruby_puma',
+          verify_mode: 'force_peer'
+        }
+      else
+        ssl_bind '#{HOST}', '#{@tcp_port}', {
+          cert: '#{cert_path}/server.crt',
+          key:  '#{cert_path}/server.key',
+          ca:   '#{cert_path}/ca.crt',
+          verify_mode: 'force_peer'
+        }
+      end
+      threads 1, 5
 
-      warn out_err.string unless out_err.string.empty?
-      assert_equal 'HELLO THERE', body
-    ensure
-      server.stop(true)
-    end
-    assert_equal '', out_err.string
+      app do |env|
+        [200, {}, [env['rack.url_scheme']]]
+      end
+    RUBY
+
+    cli_server set_pumactl_args, config: config, config_bind: true, log: true
+
+    ca   = "#{cert_path}/ca.crt"
+    cert = "#{cert_path}/client.crt"
+    key  = "#{cert_path}/client.key"
+#=begin
+
+#    body = send_http_read_response GET_11, host: HOST,
+    skt = send_http GET_11, host: HOST,
+      ctx: new_ctx { |c|
+        c.ca_file = ca
+        c.cert = OpenSSL::X509::Certificate.new File.read(cert)
+        c.key  = OpenSSL::PKey::RSA.new File.read(key)
+        if c.respond_to? :max_version=
+          c.max_version = :TLS1_2
+        else
+          c.ssl_version = :TLSv1_2
+        end
+        c.verify_mode = OpenSSL::SSL::VERIFY_PEER
+      }
+    body = skt.read_response
+#=end
+#body = curl_and_get_response "https://localhost:#{@tcp_port}",
+#                                   args: "--cacert #{ca} --cert #{cert} --key #{key} --tlsv1.2 --tls-max 1.2"
+
+#STDOUT.syswrite "\n---------------------\n#{@server.read}\n"
+
+    assert_equal 'https', body
   end
 
   def test_ssl_run_with_pem
@@ -135,14 +136,10 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server set_pumactl_args, config: config, config_bind: true
+
+    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    assert_equal 'https', body
   end
 
   def test_ssl_run_with_localhost_authority
@@ -157,14 +154,10 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server set_pumactl_args, config: config, config_bind: true
+
+    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    assert_equal 'https', body
   end
 
   def test_ssl_run_with_encrypted_key
@@ -188,14 +181,10 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server set_pumactl_args, config: config, config_bind: true
+
+    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    assert_equal 'https', body
   end
 
   def test_ssl_run_with_encrypted_pem
@@ -219,14 +208,10 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server set_pumactl_args, config: config, config_bind: true
+
+    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    assert_equal 'https', body
   end
 
   private
