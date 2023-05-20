@@ -17,6 +17,8 @@ class TestIntegrationSSL < TestIntegration
 
   require "openssl"
 
+  CERT_PATH = File.expand_path '../examples/puma', __dir__
+
   def setup
     @tcp_port = UniquePort.call
     @control_tcp_port = UniquePort.call
@@ -33,17 +35,14 @@ class TestIntegrationSSL < TestIntegration
   def test_ssl_run
     config = <<~RUBY
       if ::Puma.jruby?
-        keystore =  '#{File.expand_path '../examples/puma/keystore.jks', __dir__}'
-        keystore_pass = 'jruby_puma'
-
         ssl_bind '#{HOST}', '#{@tcp_port}', {
-          keystore: keystore,
-          keystore_pass:  keystore_pass,
+          keystore: '#{CERT_PATH}/keystore.jks',
+          keystore_pass:  'jruby_puma',
           verify_mode: 'none'
         }
       else
-        key  = '#{File.expand_path '../examples/puma/puma_keypair.pem', __dir__}'
-        cert = '#{File.expand_path '../examples/puma/cert_puma.pem', __dir__}'
+        key  = '#{CERT_PATH}/puma_keypair.pem'
+        cert = '#{CERT_PATH}/cert_puma.pem'
 
         ssl_bind '#{HOST}', '#{@tcp_port}', {
           cert: cert,
@@ -113,12 +112,12 @@ class TestIntegrationSSL < TestIntegration
     skip_if :jruby
 
     config = <<~RUBY
-      key_path  = '#{File.expand_path '../examples/puma/puma_keypair.pem', __dir__}'
-      cert_path = '#{File.expand_path '../examples/puma/cert_puma.pem', __dir__}'
+      key  = '#{CERT_PATH}/puma_keypair.pem'
+      cert = '#{CERT_PATH}/cert_puma.pem'
 
       ssl_bind '#{HOST}', '#{@tcp_port}', {
-        cert_pem: File.read(cert_path),
-        key_pem:  File.read(key_path),
+        cert_pem: File.read(cert),
+        key_pem:  File.read(key),
         verify_mode: 'none'
       }
 
@@ -182,10 +181,10 @@ class TestIntegrationSSL < TestIntegration
     skip_if :jruby
 
     config = <<~RUBY
-      key_path  = '#{File.expand_path '../examples/puma/encrypted_puma_keypair.pem', __dir__}'
-      cert_path = '#{File.expand_path '../examples/puma/cert_puma.pem', __dir__}'
+      key_path  = '#{CERT_PATH}/encrypted_puma_keypair.pem'
+      cert_path = '#{CERT_PATH}/cert_puma.pem'
       key_command = ::Puma::IS_WINDOWS ? 'echo hello world' :
-        '#{File.expand_path '../examples/puma/key_password_command.sh', __dir__}'
+        '#{CERT_PATH}/key_password_command.sh'
 
       ssl_bind '#{HOST}', '#{@tcp_port}', {
         cert_pem: File.read(cert_path),
@@ -204,32 +203,4 @@ class TestIntegrationSSL < TestIntegration
     body = send_http_read_resp_body GET_11, ctx: new_ctx
     assert_equal 'https', body
   end
-
-  private
-
-  def curl_and_get_response(url, method: :get, args: nil)
-    cmd = "curl -s -v --show-error #{args} -X #{method.to_s.upcase} -k #{url}"
-
-    begin
-      io_out, io_err, pid = spawn_cmd cmd
-    rescue Errno::ENOENT
-      flunk "curl not available, make sure curl binary is installed and available on $PATH"
-    end
-
-    _, status = Process.wait2 pid
-    out = io_out.read
-    err = io_err.read
-    if status.success?
-      http_status = err.match(/< HTTP\/1.1 (.*?)/)[1] || '0' # < HTTP/1.1 200 OK\r\n
-      if http_status.strip[0].to_i > 2
-        warn out
-        flunk "#{cmd.inspect} unexpected response: #{http_status}\n#{err}\n"
-      end
-      return out
-    else
-      warn out
-      flunk "#{cmd.inspect} process failed: #{status}\n#{err}\n"
-    end
-  end
-
 end if ::Puma::HAS_SSL
