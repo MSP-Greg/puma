@@ -365,11 +365,11 @@ class TestPumaServerSSLClient < Minitest::Test
 
   def test_verify_client_cert
     assert_ssl_client_error_match(false) do |client_ctx|
-      key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
-      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
-      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      key = "#{CERT_PATH}/client.key"
       client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
+      client_ctx.cert = OpenSSL::X509::Certificate.new File.read(crt)
+      client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
       client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
     end
   end
