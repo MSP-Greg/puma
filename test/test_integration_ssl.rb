@@ -69,7 +69,7 @@ class TestIntegrationSSL < TestIntegration
     config = <<~RUBY
       if ::Puma::IS_JRUBY
         ssl_bind '#{HOST}', '#{@tcp_port}', {
-          keystore: '#{File.expand_path '../examples/puma/keystore.jks', __dir__}',
+          keystore: '#{cert_path}/keystore.jks',
           keystore_pass: 'jruby_puma',
           verify_mode: 'force_peer'
         }
