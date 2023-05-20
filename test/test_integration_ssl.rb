@@ -25,6 +25,7 @@ class TestIntegrationSSL < TestIntegration
   end
 
   def teardown
+    return if skipped?
     cli_pumactl 'stop'
     assert wait_for_server_to_include('Goodbye!')
 
