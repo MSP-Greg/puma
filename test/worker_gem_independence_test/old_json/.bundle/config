@@ -1,4 +1,5 @@
 ---
 BUNDLE_PATH: "vendor/bundle"
+BUNDLE_CACHE_PATH: "../../../vendor/bundle/cache"
 BUNDLE_RETRY: "6"
 BUNDLE_JOBS: "4"
