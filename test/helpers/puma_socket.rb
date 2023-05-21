@@ -48,18 +48,18 @@ module TestPuma
       headers
     end
 
-    def send_http_read_resp_body(req, host: nil, port: nil, path: nil, ctx: nil, len: nil)
-      skt = send_http req, host: host, port: port, path: path, ctx: ctx
+    def send_http_read_resp_body(req, host: nil, port: nil, path: nil, ctx: nil, session: nil, len: nil)
+      skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
       skt.read_body len: len
     end
 
-    def send_http_read_response(req, host: nil, port: nil, path: nil, ctx: nil, len: nil)
-      skt = send_http req, host: host, port: port, path: path, ctx: ctx
+    def send_http_read_response(req, host: nil, port: nil, path: nil, ctx: nil, session: nil, len: nil)
+      skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
       skt.read_response len: len
     end
 
-    def send_http(req, host: nil, port: nil, path: nil, ctx: nil)
-      skt = new_connection host: host, port: port, path: path, ctx: ctx
+    def send_http(req, host: nil, port: nil, path: nil, ctx: nil, session: nil)
+      skt = new_connection host: host, port: port, path: path, ctx: ctx, session: session
       skt.syswrite req
       skt
     end
@@ -144,7 +144,7 @@ module TestPuma
       ctx
     end
 
-    def new_connection(host: nil, port: nil, path: nil, ctx: nil)
+    def new_connection(host: nil, port: nil, path: nil, ctx: nil, session: nil)
       port  ||= @port || @tcp_port
       path  ||= @bind_path
       @host ||= host || HOST
@@ -167,6 +167,7 @@ module TestPuma
       @ios_to_close << skt
       if ctx
         @ios_to_close << tcp
+        skt.session = session if session
         skt.connect
       end
       skt
