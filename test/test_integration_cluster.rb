@@ -274,6 +274,8 @@ class TestIntegrationCluster < TestIntegration
       end
     end
 
+    assert_equal ['Hello World'], results.uniq
+
     refute_includes pids, get_worker_pids(1, wrkrs - 1)
   end
 
