@@ -2,6 +2,7 @@
 
 require_relative 'helper'
 require_relative 'helpers/integration'
+require_relative 'helpers/puma_socket'
 
 # These tests are used to verify that Puma works with SSL sockets.  Only
 # integration tests isolate the server from the test environment, so there
@@ -15,6 +16,8 @@ class TestIntegrationSSLSession < TestIntegration
   parallelize_me! if Puma::IS_MRI
 
   require "openssl" unless defined?(::OpenSSL::SSL)
+
+  include TestPuma::PumaSocket
 
   OSSL = ::OpenSSL::SSL
 
@@ -33,15 +36,13 @@ class TestIntegrationSSLSession < TestIntegration
     super
   end
 
-  def control_tcp_port
-    @control_tcp_port ||= UniquePort.call
-  end
-
   def set_reuse(reuse)
-    <<~RUBY
-      key  = '#{File.expand_path '../examples/puma/client-certs/server.key', __dir__}'
-      cert = '#{File.expand_path '../examples/puma/client-certs/server.crt', __dir__}'
-      ca   = '#{File.expand_path '../examples/puma/client-certs/ca.crt', __dir__}'
+    path = File.expand_path '../examples/puma/client-certs', __dir__
+    
+    <<~CONFIG
+      key  = '#{path}/server.key'
+      cert = '#{path}/server.crt'
+      ca   = '#{path}/ca.crt'
 
       ssl_bind '#{HOST}', 0, {
         cert: cert,
@@ -51,16 +52,14 @@ class TestIntegrationSSLSession < TestIntegration
         reuse: #{reuse}
       }
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
-
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
       end
-    RUBY
+    CONFIG
   end
 
   def with_server(config)
-    cli_server '', config: config, config_bind: true
+    cli_server set_pumactl_args, config: config, config_bind: true
     yield
   ensure
     cli_pumactl 'stop'
@@ -120,7 +119,7 @@ class TestIntegrationSSLSession < TestIntegration
     assert reused, 'TLSv1.3 session was not reused'
   end
 
-  def client_skt(tls_vers = nil, session_pems = [])
+  def client_ctx(tls_vers = nil, session_pems = [], queue = nil)
     ctx = OSSL::SSLContext.new
     ctx.verify_mode = OSSL::VERIFY_NONE
     ctx.session_cache_mode = OSSL::SSLContext::SESSION_CACHE_CLIENT
@@ -132,33 +131,30 @@ class TestIntegrationSSLSession < TestIntegration
         ctx.ssl_version = tls_vers.to_s.sub('TLS', 'TLSv').to_sym
       end
     end
-    ctx.session_new_cb = ->(ary) { session_pems << ary.last.to_pem }
-
-    skt = OSSL::SSLSocket.new TCPSocket.new(HOST, @tcp_port), ctx
-    skt.sync_close = true
-    skt
+    ctx.session_new_cb = ->(ary) {
+      session_pems << ary.last.to_pem
+      queue << true if queue
+    }
+    ctx
   end
 
   def ssl_client(tls_vers: nil)
+    queue = Thread::Queue.new
     session_pems = []
-    skt = client_skt tls_vers, session_pems
-    skt.connect
 
-    skt.syswrite GET
-    skt.to_io.wait_readable 2
-    assert_equal RESP, skt.sysread(1_024)
-    skt.sysclose
+    ctx = client_ctx tls_vers, session_pems, queue
+    skt = send_http GET, ctx: ctx
+   
+    assert_equal RESP, skt.read_response
+    queue.pop
 
-    skt = client_skt tls_vers, session_pems
-    skt.session = OSSL::Session.new(session_pems[0])
-    skt.connect
-
-    skt.syswrite GET
-    skt.to_io.wait_readable 2
-    assert_equal RESP, skt.sysread(1_024)
+    ctx = client_ctx tls_vers
+    skt = send_http GET, ctx: ctx, session: OSSL::Session.new(session_pems[0])
+    assert_equal RESP, skt.read_response
 
     skt.session_reused?
   ensure
-    skt&.sysclose unless skt&.closed?
+    queue.close
+    queue = nil
   end
 end if Puma::HAS_SSL && Puma::IS_MRI
