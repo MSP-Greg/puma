@@ -18,20 +18,21 @@ module TmpPath
         dir_temp = File.absolute_path("#{__dir__}/../../tmp")
         Dir.mkdir dir_temp unless Dir.exist? dir_temp
         './tmp'
+      elsif ENV['RUNNER_TEMP']
+        ENV['RUNNER_TEMP']
       else
         nil
       end
     end
 
   def tmp_path(extension = nil, unix: false)
-    tmp = unix ? PUMA_TMPDIR : nil
-    path = Tempfile.create(['', extension], tmp) { |f| f.path }
+    path = Tempfile.create(['', extension], PUMA_TMPDIR) { |f| f.path }
     tmp_paths << path
     path
   end
 
   def tmp_path_write(basename, data, mode: File::BINARY)
-    fio = Tempfile.create basename, mode: mode
+    fio = Tempfile.create basename, PUMA_TMPDIR, mode: mode
     path = fio.path
     fio.write data
     fio.flush
