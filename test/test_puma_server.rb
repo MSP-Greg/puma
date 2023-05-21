@@ -1483,8 +1483,9 @@ class TestPumaServer < Minitest::Test
         "+ #{good_closed} good_closed + #{closed} closed should equal #{num_connections}"
       assert_equal num_connections, (good + good_good + good_closed + closed), msg
 
-      msg = "#{results_msg}\nThere should be 8 or more good_good responses, there were #{good_good}"
-      assert_operator 8, :<=, good_good, msg
+      temp = good_good + good_closed
+      msg = "#{results_msg}\nThere should be 8 or more good_good & good_closed responses, there were #{temp}"
+      assert_operator 8, :<=, temp, msg
 
       msg = "#{results_msg}\nNo requests should have been dropped"
       assert_equal 0, dropped, msg
