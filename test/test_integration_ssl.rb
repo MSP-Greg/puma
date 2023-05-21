@@ -129,7 +129,12 @@ class TestIntegrationSSL < TestIntegration
 
     cli_server set_pumactl_args, config: config, config_bind: true
 
-    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    skt = send_http GET_11, ctx: new_ctx
+    body = skt.read_body
+
+    svr_pem = File.read "#{CERT_PATH}/cert_puma.pem"
+
+    assert_equal svr_pem, skt.peer_cert.to_pem
     assert_equal 'https', body
   end
 
