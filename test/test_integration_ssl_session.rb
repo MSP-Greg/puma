@@ -29,6 +29,8 @@ class TestIntegrationSSLSession < TestIntegration
 
   CERT_PATH = File.expand_path "../examples/puma/client-certs", __dir__
 
+  SKT_MUTEX = Thread::Mutex.new
+
   def teardown
     return if skipped?
     @server.close unless @server.is_a?(IO) && @server.closed?
@@ -38,7 +40,7 @@ class TestIntegrationSSLSession < TestIntegration
 
   def set_reuse(reuse)
     path = File.expand_path '../examples/puma/client-certs', __dir__
-    
+
     <<~CONFIG
       key  = '#{path}/server.key'
       cert = '#{path}/server.crt'
@@ -143,8 +145,11 @@ class TestIntegrationSSLSession < TestIntegration
     session_pems = []
 
     ctx = client_ctx tls_vers, session_pems, queue
-    skt = send_http GET, ctx: ctx
-   
+    skt = nil
+    SKT_MUTEX.synchronize {
+      skt = send_http GET, ctx: ctx
+    }
+
     assert_equal RESP, skt.read_response
     queue.pop
 
