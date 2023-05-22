@@ -2,7 +2,6 @@
 
 require_relative "helper"
 require_relative "helpers/ssl" if ::Puma::HAS_SSL
-require_relative "helpers/tmp_path"
 
 require "puma/binder"
 require "puma/events"
@@ -10,7 +9,6 @@ require "puma/configuration"
 
 class TestBinderBase < Minitest::Test
   include SSLHelper if ::Puma::HAS_SSL
-  include TmpPath
 
   def setup
     @log_writer = Puma::LogWriter.strings
@@ -177,8 +175,9 @@ class TestBinderParallel < TestBinderBase
   def test_pre_existing_unix
     skip_unless :unix
 
-    unix_path = tmp_path('.sock')
+    unix_path = tmp_unix '.sock'
     File.open(unix_path, mode: 'wb') { |f| f.puts 'pre existing' }
+
     @binder.parse ["unix://#{unix_path}"], @log_writer
 
     assert_match %r!unix://#{unix_path}!, @log_writer.stdout.string
@@ -187,12 +186,7 @@ class TestBinderParallel < TestBinderBase
 
     @binder.close_listeners
 
-    assert File.exist?(unix_path)
-
-  ensure
-    if UNIX_SKT_EXIST
-      File.unlink unix_path if File.exist? unix_path
-    end
+    assert File.exist? unix_path
   end
 
   def test_binder_tcp_defaults_to_low_latency_off
@@ -364,7 +358,7 @@ class TestBinderParallel < TestBinderBase
   def test_listeners_file_unlink_if_unix_listener
     skip_unless :unix
 
-    unix_path = tmp_path('.sock')
+    unix_path = tmp_unix '.sock'
     @binder.parse ["unix://#{unix_path}"], @log_writer
     assert File.socket?(unix_path)
 
@@ -405,11 +399,9 @@ class TestBinderParallel < TestBinderBase
     skip_if :jruby # Failing with what I think is a JRuby bug
     skip_unless :unix
 
-    state_path = tmp_path('.state')
-    sock = Addrinfo.unix(state_path).listen
-    assert_activates_sockets(path: state_path, sock: sock)
-  ensure
-    File.unlink(state_path) rescue nil # JRuby race?
+    unix_path = tmp_unix '.bind'
+    sock = Addrinfo.unix(unix_path).listen
+    assert_activates_sockets(path: unix_path, sock: sock)
   end
 
   def test_rack_multithread_default_configuration
@@ -462,7 +454,7 @@ class TestBinderParallel < TestBinderBase
     skip MSG_UNIX if order.include?(:unix) && !UNIX_SKT_EXIST
     skip_unless :ssl
 
-    unix_path = tmp_path('.sock')
+    unix_path = tmp_unix '.sock'
     prepared_paths = {
         ssl: "ssl://127.0.0.1:#{UniquePort.call}?#{ssl_query}",
         tcp: "tcp://127.0.0.1:#{UniquePort.call}",

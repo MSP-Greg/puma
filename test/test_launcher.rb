@@ -1,11 +1,9 @@
 require_relative "helper"
-require_relative "helpers/tmp_path"
 
 require "puma/configuration"
 require 'puma/log_writer'
 
 class TestLauncher < Minitest::Test
-  include TmpPath
 
   def test_prints_thread_traces
     launcher.thread_status do |name, _backtrace|
@@ -14,7 +12,7 @@ class TestLauncher < Minitest::Test
   end
 
   def test_pid_file
-    pid_path = tmp_path('.pid')
+    pid_path = tmp_path '.pid'
 
     conf = Puma::Configuration.new do |c|
       c.pidfile pid_path
@@ -23,12 +21,10 @@ class TestLauncher < Minitest::Test
     launcher(conf).write_state
 
     assert_equal File.read(pid_path).strip.to_i, Process.pid
-  ensure
-    File.unlink pid_path
   end
 
   def test_state_permission_0640
-    state_path = tmp_path('.state')
+    state_path = tmp_path '.state'
     state_permission = 0640
 
     conf = Puma::Configuration.new do |c|
@@ -39,12 +35,10 @@ class TestLauncher < Minitest::Test
     launcher(conf).write_state
 
     assert File.stat(state_path).mode.to_s(8)[-4..-1], state_permission
-  ensure
-    File.unlink state_path
   end
 
   def test_state_permission_nil
-    state_path = tmp_path('.state')
+    state_path = tmp_path '.state'
 
     conf = Puma::Configuration.new do |c|
       c.state_path state_path
@@ -54,12 +48,10 @@ class TestLauncher < Minitest::Test
     launcher(conf).write_state
 
     assert File.exist?(state_path)
-  ensure
-    File.unlink state_path
   end
 
   def test_no_state_permission
-    state_path = tmp_path('.state')
+    state_path = tmp_path '.state'
 
     conf = Puma::Configuration.new do |c|
       c.state_path state_path
@@ -68,8 +60,6 @@ class TestLauncher < Minitest::Test
     launcher(conf).write_state
 
     assert File.exist?(state_path)
-  ensure
-    File.unlink state_path
   end
 
   def test_puma_stats

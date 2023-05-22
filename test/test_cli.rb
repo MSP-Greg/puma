@@ -1,6 +1,5 @@
 require_relative "helper"
 require_relative "helpers/ssl" if ::Puma::HAS_SSL
-require_relative "helpers/tmp_path"
 require_relative "helpers/puma_socket"
 
 require "puma/cli"
@@ -9,7 +8,6 @@ require "psych"
 
 class TestCLI < Minitest::Test
   include SSLHelper if ::Puma::HAS_SSL
-  include TmpPath
   include TestPuma::PumaSocket
 
   def setup

@@ -35,14 +35,16 @@ module TestPuma
         end
       end
 
-    def tmp_unix(extension = nil)
-      path = Tempfile.create(['', extension], PUMA_TMP_UNIX) { |f| f.path }
+    def tmp_path(extension = nil)
+      ext = extension ? ['', extension] : ''
+      path = Tempfile.create(ext, PUMA_TMP_DIR) { |f| f.path }
       tmp_paths << path
       path
     end
 
-    def tmp_path(extension = nil)
-      path = Tempfile.create(['', extension], PUMA_TMP_DIR) { |f| f.path }
+    def tmp_unix(extension = nil)
+      ext = extension ? ['', extension] : ''
+      path = Tempfile.create(ext, PUMA_TMP_UNIX) { |f| f.path }
       tmp_paths << path
       path
     end
@@ -60,7 +62,7 @@ module TestPuma
     end
 
     def tmp_file_io(basename, data = nil, mode: File::BINARY)
-      fio = Tempfile.create basename, ENV['RUNNER_TEMP'], mode: mode
+      fio = Tempfile.create basename, PUMA_TMP_DIR, mode: mode
       if data
         fio.write data
         fio.flush

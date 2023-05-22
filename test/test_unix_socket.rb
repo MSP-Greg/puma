@@ -1,11 +1,9 @@
 # frozen_string_literal: true
 
 require_relative "helper"
-require_relative "helpers/tmp_path"
 require_relative "helpers/puma_socket"
 
 class TestPumaUnixSocket < Minitest::Test
-  include TmpPath
   include TestPuma::PumaSocket
 
   App = lambda { |env| [200, {}, ["Works"]] }
