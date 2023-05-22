@@ -2,7 +2,6 @@ require_relative "helper"
 require_relative "helpers/puma_socket"
 
 require "puma/events"
-require "net/http"
 require "nio"
 
 class TestResponseHeader < Minitest::Test
@@ -11,8 +10,6 @@ class TestResponseHeader < Minitest::Test
   include TestPuma::PumaSocket
 
   def setup
-    @host = "127.0.0.1"
-
     @app = ->(env) { [200, {}, [env['rack.url_scheme']]] }
 
     @log_writer = Puma::LogWriter.strings
@@ -25,15 +22,16 @@ class TestResponseHeader < Minitest::Test
 
   def server_run(app: @app, early_hints: false)
     @server.app = app
-    @port = (@server.add_tcp_listener @host, 0).addr[1]
+    @port = (@server.add_tcp_listener HOST, 0).addr[1]
     @server.instance_variable_set(:@early_hints, true) if early_hints
     @server.run
+    sleep 0.1 until @server.running == 1
   end
 
   # The header keys must be Strings
   def test_integer_key
     server_run app: ->(env) { [200, { 1 => 'Boo'}, []] }
-    resp = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response GET_10
 
     assert_match(/HTTP\/1.1 500 Internal Server Error/, resp)
   end
@@ -41,7 +39,7 @@ class TestResponseHeader < Minitest::Test
   # The header must respond to each
   def test_nil_header
     server_run app: ->(env) { [200, nil, []] }
-    resp = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response GET_10
 
     assert_match(/HTTP\/1.1 500 Internal Server Error/, resp)
   end
@@ -49,7 +47,7 @@ class TestResponseHeader < Minitest::Test
   # The values of the header must be Strings
   def test_integer_value
     server_run app: ->(env) { [200, {'Content-Length' => 500}, []] }
-    resp = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response GET_10
 
     assert_match(/HTTP\/1.0 200 OK\r\nContent-Length: 500\r\n\r\n/, resp)
   end
@@ -67,12 +65,12 @@ class TestResponseHeader < Minitest::Test
     end
 
     server_run(app: app, early_hints: opts[:early_hints])
-    resp = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response GET_10
 
     if opts[:early_hints]
       refute_includes resp, "HTTP/1.1 103 Early Hints"
     end
-    refute_match("#{name}: #{value}", resp)
+    refute_includes resp, "#{name}: #{value}"
   end
 
   # The header must not contain a Status key.
@@ -83,9 +81,11 @@ class TestResponseHeader < Minitest::Test
   # The header key can contain the word status.
   def test_key_containing_status
     server_run app: ->(env) { [200, {'Teapot-Status' => 'Boiling'}, []] }
-    resp = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response GET_10
 
-    assert_match(/HTTP\/1.0 200 OK\r\nTeapot-Status: Boiling\r\nContent-Length: 0\r\n\r\n/, resp)
+    expected = "HTTP/1.0 200 OK\r\nTeapot-Status: Boiling\r\nContent-Length: 0\r\n\r\n"
+
+    assert_equal expected, resp
   end
 
   # Special headers starting “rack.” are for communicating with the server, and must not be sent back to the client.
@@ -96,9 +96,11 @@ class TestResponseHeader < Minitest::Test
   # The header key can still start with the word rack
   def test_racket_key
     server_run app: ->(env) { [200, {'Racket' => 'Bouncy'}, []] }
-    resp = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response GET_10
 
-    assert_match(/HTTP\/1.0 200 OK\r\nRacket: Bouncy\r\nContent-Length: 0\r\n\r\n/, resp)
+    expected = "HTTP/1.0 200 OK\r\nRacket: Bouncy\r\nContent-Length: 0\r\n\r\n"
+
+    assert_equal expected, resp
   end
 
   # testing header key must conform rfc token specification
@@ -130,14 +132,14 @@ class TestResponseHeader < Minitest::Test
 
   def test_illegal_character_in_value_when_newline
     server_run app: ->(env) { [200, {'X-header' => "First\000 line\nSecond Lin\037e"}, ["Hello"]] }
-    resp = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response GET_10
 
-    refute_match("X-header: First\000 line\r\nX-header: Second Lin\037e\r\n", resp)
+    refute_includes resp, "header"
   end
 
   def test_header_value_array
     server_run app: ->(env) { [200, {'set-cookie' => ['z=1', 'a=2']}, ['Hello']] }
-    resp = send_http_read_response "GET / HTTP/1.1\r\n\r\n"
+    resp = send_http_read_response GET_11
 
     expected = "HTTP/1.1 200 OK\r\nset-cookie: z=1\r\nset-cookie: a=2\r\nContent-Length: 5\r\n\r\nHello"
     assert_equal expected, resp
