@@ -150,7 +150,7 @@ module TestPuma
       @host ||= host || HOST
       skt =
         if path && !port && !ctx
-          UNIXSocket.new path.sub(/\A@/, "\0") # sub sis for abstract
+          UNIXSocket.new path.sub(/\A@/, "\0") # sub is for abstract
         elsif port && !path
           tcp = TCPSocket.new @host, port
           if ctx

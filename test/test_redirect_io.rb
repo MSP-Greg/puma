@@ -12,8 +12,8 @@ class TestRedirectIO < TestIntegration
     skip_unless_signal_exist? :HUP
     super
 
-    @out_file_path = Tempfile.create('puma-out', PUMA_TMPDIR).path
-    @err_file_path = Tempfile.create('puma-err', PUMA_TMPDIR).path
+    @out_file_path = tmp_path_str 'puma-out'
+    @err_file_path = tmp_path_str 'puma-err'
 
     @cli_args = ['--redirect-stdout', @out_file_path,
       '--redirect-stderr', @err_file_path,

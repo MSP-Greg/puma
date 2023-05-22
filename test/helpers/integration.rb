@@ -3,10 +3,8 @@
 require "puma/control_cli"
 require "json"
 require "io/wait" unless Puma::HAS_NATIVE_IO_WAIT
-require_relative 'tmp_path'
 
 class TestIntegration < Minitest::Test
-  include TmpPath
   DARWIN = RUBY_PLATFORM.include? 'darwin'
   HOST  = "127.0.0.1"
   TOKEN = "xxyyzz"
@@ -94,7 +92,7 @@ class TestIntegration < Minitest::Test
 
     unless config_bind
       if unix
-        @bind_path ||= tmp_path '.bind', unix: true
+        @bind_path ||= tmp_unix '.bind'
         cmd << " -b unix://#{@bind_path}"
       else
         @tcp_port = UniquePort.call
@@ -359,7 +357,7 @@ class TestIntegration < Minitest::Test
 
   def set_pumactl_args(unix: false)
     if unix
-      @control_path = tmp_path('.cntl_sock')
+      @control_path = tmp_unix '.cntl_sock'
       "--control-url=unix://#{@control_path} --control-token=#{TOKEN}"
     else
       @control_tcp_port = UniquePort.call

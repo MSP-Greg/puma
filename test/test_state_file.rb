@@ -1,13 +1,11 @@
 require_relative "helper"
-require_relative "helpers/tmp_path"
 
 require 'puma/state_file'
 
 class TestStateFile < Minitest::Test
-  include TmpPath
 
   def test_load_empty_value_as_nil
-    state_path = tmp_path_write ['', '.state'], <<~STATE
+    state_path = tmp_path_str ['', '.state'], <<~STATE
       ---
       pid: 123456
       control_url:
@@ -16,7 +14,7 @@ class TestStateFile < Minitest::Test
     STATE
 
     sf = Puma::StateFile.new
-    sf.load(state_path)
+    sf.load state_path
     assert_equal 123456, sf.pid
     assert_equal '/path/to/app', sf.running_from
     assert_nil sf.control_url
