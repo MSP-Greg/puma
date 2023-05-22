@@ -64,7 +64,7 @@ class TestPumaServer < Minitest::Test
       [200, {}, [env["SERVER_NAME"], "\n", env["SERVER_PORT"]]]
     end
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
     assert_equal "localhost\n80", data.split("\r\n").last
   end
 
@@ -198,7 +198,7 @@ class TestPumaServer < Minitest::Test
       [200, {}, [giant]]
     end
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\n\r\n"
+    body = send_http_read_resp_body GET_10
 
     assert_equal giant.bytesize, body.bytesize
   end
@@ -371,7 +371,7 @@ class TestPumaServer < Minitest::Test
   def test_doesnt_print_backtrace_in_production
     server_run(environment: :production) { raise "don't leak me bro" }
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
 
     refute_match(/don't leak me bro/, data)
     assert_match(/HTTP\/1.0 500 Internal Server Error/, data)
@@ -394,7 +394,7 @@ class TestPumaServer < Minitest::Test
       sleep 5
     end
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
 
     assert_match(/HTTP\/1.0 500 Internal Server Error/, data)
     assert_match(/Content-Type: application\/json/, data)
@@ -420,7 +420,7 @@ class TestPumaServer < Minitest::Test
       [[0,1], {}, app_body]
     end
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
 
     assert_includes data, 'HTTP/1.0 500 Internal Server Error'
     assert_includes data, "Puma caught this error: undefined method `to_i' for"
@@ -435,7 +435,7 @@ class TestPumaServer < Minitest::Test
       raise NoMethodError, "Oh no an error"
     end
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
 
     # Internal Server Error
     assert_includes data, "HTTP/1.0 500 #{STATUS_CODES[500]}"
@@ -447,9 +447,8 @@ class TestPumaServer < Minitest::Test
       raise WithoutBacktraceError.new
     end
 
-    data = send_http_and_sysread "GET / HTTP/1.1\r\n\r\n"
-    # Internal Server Error
-    assert_includes data, "HTTP/1.1 500 #{STATUS_CODES[500]}"
+    data = send_http_read_response GET_11
+    assert_includes data, 'HTTP/1.1 500 Internal Server Error'
 
     assert_includes data, 'Puma caught this error: no backtrace error (WithoutBacktraceError)'
     assert_includes data, '<no backtrace available>'
@@ -461,7 +460,7 @@ class TestPumaServer < Minitest::Test
       sleep 5
     end
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
 
     assert_match(/HTTP\/1.0 503 Service Unavailable/, data)
     assert_match(/Puma caught this error.+Puma::ThreadPool::ForceShutdown/, data)
@@ -471,7 +470,7 @@ class TestPumaServer < Minitest::Test
     re = lambda { |err| [302, {'Content-Type' => 'text', 'Location' => 'foo.html'}, ['302 found']] }
     server_run(lowlevel_error_handler: re) { raise "don't leak me bro" }
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
 
     assert_match(/HTTP\/1.0 302 Found/, data)
   end
@@ -484,7 +483,7 @@ class TestPumaServer < Minitest::Test
 
     server_run(lowlevel_error_handler: re) { raise "don't leak me bro" }
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
 
     assert_match(/HTTP\/1.0 302 Found/, data)
   end
@@ -497,7 +496,7 @@ class TestPumaServer < Minitest::Test
 
     server_run(lowlevel_error_handler: re) { raise "don't leak me bro" }
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
 
     assert_match(/HTTP\/1.0 302 Found/, data)
   end
@@ -505,7 +504,7 @@ class TestPumaServer < Minitest::Test
   def test_custom_http_codes_10
     server_run { [449, {}, [""]] }
 
-    data = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
+    data = send_http_read_response GET_10
 
     assert_equal "HTTP/1.0 449 CUSTOM\r\nContent-Length: 0\r\n\r\n", data
   end
@@ -1080,7 +1079,7 @@ class TestPumaServer < Minitest::Test
     server_run(**options) { [200, {}, ["Hello"]] }
     s = send_http nil
     sleep 0.1
-    s.syswrite "GET / HTTP/1.0\r\n\r\n"
+    s.syswrite GET_10
     assert_equal 'Hello', s.readlines.last
   end
 
@@ -1113,13 +1112,13 @@ class TestPumaServer < Minitest::Test
       [200, {}, [env["REMOTE_ADDR"]]]
     end
 
-    remote_addr = send_proxy_v1_http("GET / HTTP/1.0\r\n\r\n", "1.2.3.4").read.split("\r\n").last
+    remote_addr = send_proxy_v1_http(GET_10, "1.2.3.4").read.split("\r\n").last
     assert_equal '1.2.3.4', remote_addr
 
-    remote_addr = send_proxy_v1_http("GET / HTTP/1.0\r\n\r\n", "fd00::1").read.split("\r\n").last
+    remote_addr = send_proxy_v1_http(GET_10, "fd00::1").read.split("\r\n").last
     assert_equal 'fd00::1', remote_addr
 
-    remote_addr = send_proxy_v1_http("GET / HTTP/1.0\r\n\r\n", "fd00::1", true).read.split("\r\n").last
+    remote_addr = send_proxy_v1_http(GET_10, "fd00::1", true).read.split("\r\n").last
     assert_equal 'fd00::1', remote_addr
   end
 
@@ -1249,7 +1248,7 @@ class TestPumaServer < Minitest::Test
   def test_http11_connection_header_queue
     server_run { [200, {}, [""]] }
 
-    headers = send_http_read_response("GET / HTTP/1.1\r\n\r\n")
+    headers = send_http_read_response(GET_11)
       .split("\r\n\r\n").first.split "\r\n"
 
     assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], headers
@@ -1266,21 +1265,21 @@ class TestPumaServer < Minitest::Test
     sock = send_http "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n"
     assert_equal ["HTTP/1.0 200 OK", "Connection: Keep-Alive", "Content-Length: 0"], header(sock)
 
-    sock << "GET / HTTP/1.0\r\n\r\n"
+    sock << GET_10
     assert_equal ["HTTP/1.0 200 OK", "Content-Length: 0"], header(sock)
     sock.close
   end
 
   def test_http11_connection_header_no_queue
     server_run(queue_requests: false) { [200, {}, [""]] }
-    sock = send_http "GET / HTTP/1.1\r\n\r\n"
+    sock = send_http GET_11
     assert_equal ["HTTP/1.1 200 OK", "Connection: close", "Content-Length: 0"], header(sock)
     sock.close
   end
 
   def test_http10_connection_header_no_queue
     server_run(queue_requests: false) { [200, {}, [""]] }
-    sock = send_http "GET / HTTP/1.0\r\n\r\n"
+    sock = send_http GET_10
     assert_equal ["HTTP/1.0 200 OK", "Content-Length: 0"], header(sock)
     sock.close
   end
@@ -1326,7 +1325,7 @@ class TestPumaServer < Minitest::Test
     server_run(lowlevel_error_handler: handler) { [200, {}, ['Hello World']] }
 
     # valid req & read, close
-    sock = send_http "GET / HTTP/1.0\r\n\r\n"
+    sock = send_http GET_10
     sleep 0.05  # macOS TruffleRuby may not get the body without
     resp = sock.sysread 256
     sock.close
@@ -1335,7 +1334,7 @@ class TestPumaServer < Minitest::Test
     assert_empty @log_writer.stdout.string
 
     # valid req, close
-    send_http("GET / HTTP/1.0\r\n\r\n").close
+    send_http(GET_10).close
     sleep 0.5
     assert_empty @log_writer.stdout.string
 
@@ -1390,7 +1389,7 @@ class TestPumaServer < Minitest::Test
   end
 
   def test_drain_on_shutdown_http10(drain = true)
-    req = "GET / HTTP/1.0\r\n\r\n"
+    req = GET_10
     good_response = "HTTP/1.0 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
     num_connections = 10
 
@@ -1438,7 +1437,7 @@ class TestPumaServer < Minitest::Test
 
   # send two requests with each client/socket
   def test_drain_on_shutdown_http11(drain = true)
-    req = "GET / HTTP/1.1\r\n\r\n"
+    req = GET_11
     good_response   = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nDONE"
     closed_response = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nDONE"
     results = []
@@ -1509,7 +1508,7 @@ class TestPumaServer < Minitest::Test
 
     # TODO: it would be great to test a connection from a non-localhost IP, but we can't really do that. For
     # now, at least test that it doesn't return garbage.
-    remote_addr = send_http_read_resp_body "GET / HTTP/1.1\r\n\r\n"
+    remote_addr = send_http_read_resp_body GET_11
     assert_equal @host, remote_addr
   end
 
@@ -1585,25 +1584,22 @@ class TestPumaServer < Minitest::Test
   def test_empty_body_array_content_length_0
     server_run { |env| [404, {'Content-Length' => '0'}, []] }
 
-    resp = send_http_and_sysread "GET / HTTP/1.1\r\n\r\n"
-    # Not Found
-    assert_equal "HTTP/1.1 404 #{STATUS_CODES[404]}\r\nContent-Length: 0\r\n\r\n", resp
+    resp = send_http_read_response GET_11
+    assert_equal "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n", resp
   end
 
   def test_empty_body_array_no_content_length
     server_run { |env| [404, {}, []] }
 
-    resp = send_http_and_sysread "GET / HTTP/1.1\r\n\r\n"
-    # Not Found
-    assert_equal "HTTP/1.1 404 #{STATUS_CODES[404]}\r\nContent-Length: 0\r\n\r\n", resp
+    resp = send_http_read_response GET_11
+    assert_equal "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n", resp
   end
 
   def test_empty_body_enum
     server_run { |env| [404, {}, [].to_enum] }
 
-    resp = send_http_and_sysread "GET / HTTP/1.1\r\n\r\n"
-    # Not Found
-    assert_equal "HTTP/1.1 404 #{STATUS_CODES[404]}\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n", resp
+    resp = send_http_read_response GET_11
+    assert_equal "HTTP/1.1 404 Not Found\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n", resp
   end
 
   def test_form_data_encoding_windows_bom
