@@ -12,11 +12,8 @@ class TestRedirectIO < TestIntegration
     skip_unless_signal_exist? :HUP
     super
 
-    # Keep the Tempfile instances alive to avoid being GC'd
-    @out_file = Tempfile.new('puma-out')
-    @err_file = Tempfile.new('puma-err')
-    @out_file_path = @out_file.path
-    @err_file_path = @err_file.path
+    @out_file_path = Tempfile.create('puma-out', PUMA_TMPDIR).path
+    @err_file_path = Tempfile.create('puma-err', PUMA_TMPDIR).path
 
     @cli_args = ['--redirect-stdout', @out_file_path,
       '--redirect-stderr', @err_file_path,
@@ -26,7 +23,6 @@ class TestRedirectIO < TestIntegration
   end
 
   def teardown
-    return if skipped?
     super
 
     paths = (skipped? ? [@out_file_path, @err_file_path] :
