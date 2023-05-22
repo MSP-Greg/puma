@@ -238,12 +238,13 @@ class TestIntegrationCluster < TestIntegration
 
   # use three workers to keep accepting clients
   def test_fork_worker_on_refork
-    refork = Tempfile.new 'refork'
+    refork = Tempfile.create(['', 'refork'], PUMA_TMPDIR)
+    refork_path = refork.path
     wrkrs = 3
 
     cli_server "-w #{wrkrs} -t2:5 test/rackup/hello_with_delay.ru", config: <<~RUBY
       fork_worker 20
-      on_refork { File.write '#{refork.path}', 'Reforked' }
+      on_refork { File.write '#{refork_path}', 'Reforked' }
     RUBY
 
     pids = get_worker_pids 0, wrkrs
@@ -259,7 +260,7 @@ class TestIntegrationCluster < TestIntegration
       sleep 0.004
     }
 
-    results = Array.new 100
+    results = Array.new socks.length
     until socks.compact.empty?
       socks.each_with_index do |sock, idx|
         next if sock.nil?
@@ -277,6 +278,9 @@ class TestIntegrationCluster < TestIntegration
     assert_equal ['Hello World'], results.uniq
 
     refute_includes pids, get_worker_pids(1, wrkrs - 1)
+  ensure
+    refork&.close unless refork&.closed?
+    File.unlink refork_path if File.exist? refork_path
   end
 
   def test_fork_worker_spawn
