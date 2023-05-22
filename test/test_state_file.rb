@@ -5,7 +5,7 @@ require 'puma/state_file'
 class TestStateFile < Minitest::Test
 
   def test_load_empty_value_as_nil
-    state_path = tmp_path_str ['', '.state'], <<~STATE
+    state_path = tmp_file_path ['', '.state'], <<~STATE
       ---
       pid: 123456
       control_url:

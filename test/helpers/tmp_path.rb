@@ -8,7 +8,7 @@ module TestPuma
 
   module PumaTempFile # Ruby's std lib is Tempfile
 
-    PUMA_TMPDIR =
+    PUMA_TMP_DIR =
       begin
         if (rt = ENV['RUNNER_TEMP']) && Dir.exist?(rt)
           rt
@@ -35,22 +35,20 @@ module TestPuma
         end
       end
 
-
     def tmp_unix(extension = nil)
       path = Tempfile.create(['', extension], PUMA_TMP_UNIX) { |f| f.path }
       tmp_paths << path
       path
     end
 
-    #
     def tmp_path(extension = nil)
-      path = Tempfile.create(['', extension], PUMA_TMPDIR) { |f| f.path }
+      path = Tempfile.create(['', extension], PUMA_TMP_DIR) { |f| f.path }
       tmp_paths << path
       path
     end
 
-    def tmp_path_str(basename, data = nil, mode: File::BINARY)
-      fio = Tempfile.create basename, PUMA_TMPDIR, mode: mode
+    def tmp_file_path(basename, data = nil, mode: File::BINARY)
+      fio = Tempfile.create basename, PUMA_TMP_DIR, mode: mode
       path = fio.path
       if data
         fio.write data
@@ -61,7 +59,7 @@ module TestPuma
       path
     end
 
-    def tmp_path_io(basename, data = nil, mode: File::BINARY)
+    def tmp_file_io(basename, data = nil, mode: File::BINARY)
       fio = Tempfile.create basename, ENV['RUNNER_TEMP'], mode: mode
       if data
         fio.write data

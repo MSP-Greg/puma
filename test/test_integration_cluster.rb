@@ -31,7 +31,7 @@ class TestIntegrationCluster < TestIntegration
   def test_pre_existing_unix
     skip_unless :unix
 
-    @bind_path = tmp_path_write(['', '.bind'], 'pre existing', mode: File::BINARY)
+    @bind_path = tmp_file_path(['', '.bind'], 'pre existing', mode: File::BINARY)
 
     cli_server "-w #{workers} -q test/rackup/sleep_step.ru", unix: :unix
 
@@ -48,7 +48,7 @@ class TestIntegrationCluster < TestIntegration
   def test_pre_existing_unix_stop_after_restart
     skip_unless :unix
 
-    @bind_path = tmp_path_write(['', '.bind'], 'pre existing', mode: File::BINARY)
+    @bind_path = tmp_file_path(['', '.bind'], 'pre existing', mode: File::BINARY)
 
     cli_server "-w #{workers} -t1:5 -q test/rackup/sleep_step.ru", unix: :unix
     connection = connect unix: true
@@ -234,7 +234,7 @@ class TestIntegrationCluster < TestIntegration
 
   # use three workers to keep accepting clients
   def test_fork_worker_on_refork
-    refork = Tempfile.create(['', 'refork'], PUMA_TMPDIR)
+    refork = tmp_file_io ['', 'refork']
     refork_path = refork.path
     wrkrs = 3
 

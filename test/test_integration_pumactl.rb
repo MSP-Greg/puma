@@ -15,8 +15,6 @@ class TestIntegrationPumactlBase < TestIntegration
   def teardown
     refute @control_path && File.exist?(@control_path),
       "Control path must be removed after stop"
-  ensure
-    [@state_path, @control_path].each { |p| File.unlink(p) rescue nil }
   end
 end
 
@@ -58,9 +56,10 @@ class TestIntegrationPumactl_P < TestIntegrationPumactlBase
 
   def test_refork_cluster
     skip_unless :fork
+    skip_unless :unix
     wrkrs = 3
     cli_server "-q -w #{wrkrs} test/rackup/sleep.ru #{set_pumactl_args unix: true}" \
-      "-S #{@state_path}",
+      " -S #{@state_path}",
       config: 'fork_worker 50',
       unix: true
 
@@ -82,7 +81,9 @@ class TestIntegrationPumactl_P < TestIntegrationPumactlBase
 
     assert_equal wrkrs    , phase0_worker_pids.length, msg
     assert_equal wrkrs - 1, phase1_worker_pids.length, msg
-    assert_empty phase0_worker_pids & phase1_worker_pids, "#{msg}\nBoth workers should be replaced with new"
+    assert_empty phase0_worker_pids & phase1_worker_pids,
+      "#{msg}\nBoth workers should be replaced with new"
+
     assert File.exist?(@bind_path), "Bind path must exist after phased refork"
   ensure
     if @pid
@@ -99,7 +100,7 @@ class TestIntegrationPumactl_P < TestIntegrationPumactlBase
     skip_unless :fork
 
     cli_server "-q -C test/config/prune_bundler_with_multiple_workers.rb" \
-      "#{set_pumactl_args unix: true} -S #{@state_path}", unix: true
+      " #{set_pumactl_args unix: true} -S #{@state_path}", unix: true
 
     resp = send_http_read_response "GET / HTTP/1.0\r\n\r\n"
 

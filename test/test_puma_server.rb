@@ -125,7 +125,7 @@ class TestPumaServer < Minitest::Test
   def test_file_body
     random_bytes = SecureRandom.random_bytes(4096 * 32)
 
-    tf = tmp_path_io "test_file_body", random_bytes
+    tf = tmp_file_io "test_file_body", random_bytes
 
     server_run { |env| [200, {}, tf] }
 
@@ -142,7 +142,7 @@ class TestPumaServer < Minitest::Test
   def test_file_to_path
     random_bytes = SecureRandom.random_bytes(4096 * 32)
 
-    path = tmp_path_str "test_file_to_path", random_bytes
+    path = tmp_file_path "test_file_to_path", random_bytes
 
     obj = Object.new
     obj.singleton_class.send(:define_method, :to_path) { path }
@@ -1650,7 +1650,7 @@ class TestPumaServer < Minitest::Test
 
     file_bytesize = file_contents.bytesize
 
-    temp_file_path = tmp_path_str 'win_utf8_', file_contents
+    temp_file_path = tmp_file_path 'win_utf8_', file_contents
 
     server_run do |env|
       req_body = env['rack.input'].read

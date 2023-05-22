@@ -83,7 +83,7 @@ class TestIntegration < Minitest::Test
       config_bind: false, # use bind from config
       env: {})            # pass env setting to Puma process in spawn_cmd
     if config
-      path = tmp_path_write %w(config .rb), config
+      path = tmp_file_path %w(config .rb), config
       config = "-C #{path}"
     end
 
@@ -221,7 +221,8 @@ class TestIntegration < Minitest::Test
           end
         elsif t_end < Process.clock_gettime(Process::CLOCK_MONOTONIC)
           unless wait_readable_timeouts.zero?
-            log_out << "#{wait_readable_timeouts} io.wait_readable timeouts, 2 sec each\n"
+            log_out << "    #{wait_readable_timeouts} io.wait_readable timeouts, 2 sec each\n" \
+              "    #{full_name}\n"
           end
           STDOUT.syswrite "\n#{log_out}\n"
           raise "Waited too long for server log to match '#{re.inspect}'"
@@ -332,7 +333,7 @@ class TestIntegration < Minitest::Test
   end
 
   # gets worker pids from @server output
-  def get_worker_pids(phase = 0, size = workers, log: false)
+  def get_worker_pids(phase = 0, size = workers, log: nil)
     pids = []
     re = /\(PID: (\d+)\) booted in [.0-9]+s, phase: #{phase}/
     while pids.size < size
