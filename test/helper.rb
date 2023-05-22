@@ -341,7 +341,8 @@ Minitest::SummaryReporter.prepend AggregatedResults
 module TestTempFile
   require "tempfile"
   def tempfile_create(basename, data, mode: File::BINARY)
-    fio = Tempfile.create(basename, mode: mode)
+    # ENV['RUNNER_TEMP'] is defined in GitHub Actions, otherwise should be nil
+    fio = Tempfile.create(basename, ENV['RUNNER_TEMP'], mode: mode)
     fio.write data
     fio.flush
     fio.rewind
