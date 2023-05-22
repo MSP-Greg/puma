@@ -29,8 +29,6 @@ class TestIntegrationSSLSession < TestIntegration
 
   CERT_PATH = File.expand_path "../examples/puma/client-certs", __dir__
 
-  SKT_MUTEX = Thread::Mutex.new
-
   def teardown
     return if skipped?
     @server.close unless @server.is_a?(IO) && @server.closed?
@@ -121,7 +119,7 @@ class TestIntegrationSSLSession < TestIntegration
     assert reused, 'TLSv1.3 session was not reused'
   end
 
-  def client_ctx(tls_vers = nil, session_pems = [], queue = nil)
+  def client_ctx(tls_vers = nil)
     ctx = OSSL::SSLContext.new
     ctx.verify_mode = OSSL::VERIFY_NONE
     ctx.session_cache_mode = OSSL::SSLContext::SESSION_CACHE_CLIENT
@@ -133,33 +131,19 @@ class TestIntegrationSSLSession < TestIntegration
         ctx.ssl_version = tls_vers.to_s.sub('TLS', 'TLSv').to_sym
       end
     end
-    ctx.session_new_cb = ->(ary) {
-      session_pems << ary.last.to_pem
-      queue << true if queue
-    }
     ctx
   end
 
   def ssl_client(tls_vers: nil)
-    queue = Thread::Queue.new
-    session_pems = []
+    ctx = client_ctx tls_vers
+    skt1 = send_http GET, ctx: ctx
 
-    ctx = client_ctx tls_vers, session_pems, queue
-    skt = nil
-    SKT_MUTEX.synchronize {
-      skt = send_http GET, ctx: ctx
-    }
-
-    assert_equal RESP, skt.read_response
-    queue.pop
+    assert_equal RESP, skt1.read_response
 
     ctx = client_ctx tls_vers
-    skt = send_http GET, ctx: ctx, session: OSSL::Session.new(session_pems[0])
-    assert_equal RESP, skt.read_response
+    skt2 = send_http GET, ctx: ctx, session: skt1.session
+    assert_equal RESP, skt2.read_response
 
-    skt.session_reused?
-  ensure
-    queue.close
-    queue = nil
+    skt2.session_reused?
   end
 end if Puma::HAS_SSL && Puma::IS_MRI
