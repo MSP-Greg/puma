@@ -154,9 +154,9 @@ class TestIntegrationSingle < TestIntegration
   end
 
   def test_write_to_log
-    fn = tmp_path '.puma_log'
     skip_unless_signal_exist? :TERM
 
+    fn = tmp_path '.puma_log'
     cli_server 'test/rackup/hello.ru', config: <<~CONFIG
       log_requests
       stdout_redirect "#{fn}"
@@ -175,14 +175,13 @@ class TestIntegrationSingle < TestIntegration
 
     assert_includes log, '"GET / HTTP/1.1"'
   ensure
-    File.unlink fn if File.file? fn
     File.unlink 't1-pid' if File.file? 't1-pid'
   end
 
   def test_puma_started_log_writing
-    fn = tmp_path '.puma_log'
     skip_unless_signal_exist? :TERM
 
+    fn = tmp_path '.puma_log'
     cli_server 'test/rackup/hello.ru', config: <<~CONFIG
       log_requests
       stdout_redirect "#{fn}"
@@ -205,7 +204,6 @@ class TestIntegrationSingle < TestIntegration
     assert !File.file?("t2-pid")
     assert_equal "Puma is started\n", out
   ensure
-    File.unlink fn if File.file? fn
     File.unlink 't2-pid' if File.file? 't2-pid'
   end
 
