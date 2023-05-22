@@ -18,8 +18,8 @@ module TmpPath
         dir_temp = File.absolute_path("#{__dir__}/../../tmp")
         Dir.mkdir dir_temp unless Dir.exist? dir_temp
         './tmp'
-      elsif ENV['RUNNER_TEMP']
-        ENV['RUNNER_TEMP']
+      elsif (rt = ENV['RUNNER_TEMP']) && Dir.exist?(rt)
+        rt
       else
         nil
       end
