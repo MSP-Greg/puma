@@ -83,7 +83,7 @@ class TestIntegration < Minitest::Test
       config_bind: false, # use bind from config
       env: {})            # pass env setting to Puma process in spawn_cmd
     if config
-      path = tmp_file_path %w(config .rb), config
+      path = tmp_file_path %w[config .rb], config
       config = "-C #{path}"
     end
 

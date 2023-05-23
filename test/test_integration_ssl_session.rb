@@ -37,17 +37,11 @@ class TestIntegrationSSLSession < TestIntegration
   end
 
   def set_reuse(reuse)
-    path = File.expand_path '../examples/puma/client-certs', __dir__
-
     <<~CONFIG
-      key  = '#{path}/server.key'
-      cert = '#{path}/server.crt'
-      ca   = '#{path}/ca.crt'
-
       ssl_bind '#{HOST}', 0, {
-        cert: cert,
-        key:  key,
-        ca: ca,
+        cert: '#{CERT_PATH}/server.crt',
+        key:  '#{CERT_PATH}/server.key',
+        ca:   '#{CERT_PATH}/ca.key',
         verify_mode: 'none',
         reuse: #{reuse}
       }
