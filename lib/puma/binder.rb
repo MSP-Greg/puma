@@ -300,7 +300,13 @@ module Puma
     end
 
     def localhost_authority
-      @localhost_authority ||= Localhost::Authority.fetch if defined?(Localhost::Authority) && !Puma::IS_JRUBY
+      root =
+        if ENV.key?('CI') && ENV.key?('RUNNER_TEMP') && Dir.exist?(root1 = ENV['RUNNER_TEMP'])
+          root1
+        else
+          File.absolute_path '../../local_host_auth', __dir__
+        end
+      @localhost_authority ||= Localhost::Authority.fetch(root: root) if defined?(Localhost::Authority) && !Puma::IS_JRUBY
     end
 
     def localhost_authority_context
