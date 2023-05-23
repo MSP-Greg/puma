@@ -231,7 +231,5 @@ class TestPersistent < Minitest::Test
     assert_equal expected, @client.read_response
 
     assert_equal expected, c2.read_response
-  ensure
-    c2.close
   end
 end
