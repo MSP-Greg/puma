@@ -247,17 +247,15 @@ class TestIntegrationCluster < TestIntegration
 
     socks = []
 
-    # generates about 250 requests locally
+    # generates about 250 requests on Ubuntu, less on macOS
     until refork.read == 'Reforked'
       socks << fast_connect
       sleep 0.02
     end
 
-STDOUT.syswrite "\n\n------------------------------------------ #{socks.length}\n"
-
     100.times {
       socks << fast_connect
-      sleep 0.004
+      sleep 0.002
     }
 
     results = Array.new socks.length
