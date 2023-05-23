@@ -28,20 +28,21 @@ class TestPumaServer < Minitest::Test
 
     @log_writer = Puma::LogWriter.strings
     @events = Puma::Events.new
-    @server = Puma::Server.new @app, @events, {log_writer: @log_writer}
   end
 
   def teardown
     @server.stop true
   end
 
-  def server_run(**options, &block)
+  def server_run(run: true, **options, &block)
     options[:log_writer]  ||= @log_writer
     options[:min_threads] ||= 1
     @server = Puma::Server.new block || @app, @events, options
     @port = (@server.add_tcp_listener @host, 0).addr[1]
-    @server.run
-    sleep 0.1 until @server.running == options[:min_threads]
+    if run
+      @server.run
+      sleep 0.1 until @server.running == options[:min_threads]
+    end
   end
 
   def send_proxy_v1_http(req, remote_ip, multisend = false)
@@ -204,6 +205,7 @@ class TestPumaServer < Minitest::Test
   end
 
   def test_respect_x_forwarded_proto
+    server_run run: false
     env = {}
     env['HOST'] = "example.com"
     env['HTTP_X_FORWARDED_PROTO'] = "https,http"
@@ -212,6 +214,7 @@ class TestPumaServer < Minitest::Test
   end
 
   def test_respect_x_forwarded_ssl_on
+    server_run run: false
     env = {}
     env['HOST'] = 'example.com'
     env['HTTP_X_FORWARDED_SSL'] = 'on'
@@ -220,6 +223,7 @@ class TestPumaServer < Minitest::Test
   end
 
   def test_respect_x_forwarded_scheme
+    server_run run: false
     env = {}
     env['HOST'] = 'example.com'
     env['HTTP_X_FORWARDED_SCHEME'] = 'https'
@@ -562,6 +566,7 @@ class TestPumaServer < Minitest::Test
 
   # https://github.com/puma/puma/issues/2574
   def test_no_timeout_after_data_received
+    server_run run: false
     @server.instance_variable_set(:@first_data_timeout, 1)
     server_run
 
@@ -1301,12 +1306,14 @@ class TestPumaServer < Minitest::Test
 
   # System-resource errors such as EMFILE should not be silently swallowed by accept loop.
   def test_accept_emfile
+    server_run run: false
     stub_accept_nonblock Errno::EMFILE.new('accept(2)')
     refute_empty @log_writer.stderr.string, "Expected EMFILE error was not logged"
   end
 
   # Retryable errors such as ECONNABORTED should be silently swallowed by accept loop.
   def test_accept_econnaborted
+    server_run run: false
     # Match Ruby #accept_nonblock implementation, ECONNABORTED error is extended by IO::WaitReadable.
     error = Errno::ECONNABORTED.new('accept(2) would block').tap {|e| e.extend IO::WaitReadable}
     stub_accept_nonblock(error)
@@ -1357,6 +1364,7 @@ class TestPumaServer < Minitest::Test
   end
 
   def test_run_stop_thread_safety
+    server_run run: false
     100.times do
       thread = @server.run
       @server.stop
@@ -1365,6 +1373,7 @@ class TestPumaServer < Minitest::Test
   end
 
   def test_command_ignored_before_run
+    server_run run: false
     done = Queue.new
     @server.events.register(:state) do |state|
       done << @server.instance_variable_get(:@status) if state == :done
