@@ -17,12 +17,10 @@ class TestPumaLocalhostAuthority < Minitest::Test
 
   include TestPuma::PumaSocket
 
-  LHA_PATH = Localhost::Authority.path
-
   def setup
     @server = nil
     @host = "localhost"
-    @lha_base = File.join Localhost::Authority.path, @host
+    start_server
   end
 
   def teardown
@@ -37,23 +35,17 @@ class TestPumaLocalhostAuthority < Minitest::Test
     @server = Puma::Server.new app, nil, {log_writer: @log_writer}
     @server.add_ssl_listener @host, 0, nil
     @tcp_port = @server.connected_ports[0]
+    @ctx = @server.binder.ios[0].instance_variable_get :@ctx
     @server.run
   end
 
   def test_files_generated
-    # Initiate server to create localhost authority
-    unless File.exist? "#{@lha_base}.key"
-      start_server
-    end
-    assert File.exist?("#{@lha_base}.key")
-    assert File.exist?("#{@lha_base}.crt")
+    assert File.exist?(@ctx.cert)
+    assert File.exist?(@ctx.key)
   end
 
   def test_self_signed
-    start_server
-
-    local_authority_crt =
-      ::OpenSSL::X509::Certificate.new File.read("#{@lha_base}.crt")
+    local_authority_crt = ::OpenSSL::X509::Certificate.new File.read(@ctx.cert)
 
     skt = send_http GET_11, ctx: new_ctx
 
