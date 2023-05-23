@@ -554,10 +554,11 @@ class TestPumaServer < Minitest::Test
 
     sock << "Hello" unless sock.wait_readable(1.50)
 
-    data = sock.read_response
+    resp = sock.read_response
 
     # Request Timeout
-    assert_equal "HTTP/1.1 408 #{STATUS_CODES[408]}\r\n", data
+    assert_operator resp, :start_with?,
+      "HTTP/1.1 408 #{STATUS_CODES[408]}\r\nConnection: close\r\n"
   end
 
   def test_timeout_data_no_queue
