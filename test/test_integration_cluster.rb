@@ -238,7 +238,7 @@ class TestIntegrationCluster < TestIntegration
     refork_path = refork.path
     wrkrs = 3
 
-    cli_server "-w #{wrkrs} -t2:5 test/rackup/hello_with_delay.ru", config: <<~RUBY
+    cli_server "-w #{wrkrs} -t5:5 test/rackup/hello_with_delay.ru", config: <<~RUBY
       fork_worker 20
       on_refork { File.write '#{refork_path}', 'Reforked' }
     RUBY
@@ -246,10 +246,14 @@ class TestIntegrationCluster < TestIntegration
     pids = get_worker_pids 0, wrkrs
 
     socks = []
+
+    # generates about 250 requests locally
     until refork.read == 'Reforked'
       socks << fast_connect
-      sleep 0.004
+      sleep 0.02
     end
+
+STDOUT.syswrite "\n\n------------------------------------------ #{socks.length}\n"
 
     100.times {
       socks << fast_connect
