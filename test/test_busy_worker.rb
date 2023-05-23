@@ -8,13 +8,15 @@ class TestBusyWorker < Minitest::Test
 
   include TestPuma::PumaSocket
 
+  RESPONSE = [200, {}.freeze, ["Hello World"].freeze].freeze
+
   def setup
     skip_unless :mri # This feature only makes sense on MRI
 
     @host = '127.0.0.1'
     @app = -> (env) {
       sleep 0.1
-      [200, {}, ["Hello World"]]
+      RESPONSE
     }
 
     @server = nil
