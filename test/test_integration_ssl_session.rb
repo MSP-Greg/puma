@@ -133,9 +133,11 @@ class TestIntegrationSSLSession < TestIntegration
     skt1 = send_http GET, ctx: ctx
 
     assert_equal RESP, skt1.read_response
+    # don't hold reference to skt1.session
+    shared_session = OSSL::Session.new skt1.session.to_pem
 
     ctx = client_ctx tls_vers
-    skt2 = send_http GET, ctx: ctx, session: skt1.session
+    skt2 = send_http GET, ctx: ctx, session: shared_session
     assert_equal RESP, skt2.read_response
 
     skt2.session_reused?
