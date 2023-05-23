@@ -66,7 +66,7 @@ class TestOutOfBandServer < Minitest::Test
     requests_sent.times do
       @mutex.synchronize do
         # hold a ref to the req socket
-        req_ary << send_http("GET / HTTP/1.0\r\n\r\n")
+        req_ary << send_http(GET_10)
         @oob_finished.wait(@mutex, 1)
       end
     end
@@ -82,22 +82,13 @@ class TestOutOfBandServer < Minitest::Test
   def test_stream
     req_str = "GET / HTTP/1.0\r\n\r\n"
     requests_sent = 100
-    skts = Thread::Queue.new
+    #skts = Thread::Queue.new
+    skts = []
 
     oob_server app_wait: true, max_threads: 2
-    requests_sent.times { skts.push send_http(req_str); sleep 0.0001 }
+    requests_sent.times {skts << send_http(req_str); sleep 0.0001 }
 
-    Array.new(2) do |i|
-      Thread.new do
-        until skts.empty? do
-          skt = skts.pop
-          begin
-            skt.read_response
-          rescue Exception
-          end
-        end
-      end
-    end.each(&:join)
+    results = read_response_array skts, requests_sent
 
     @mutex.synchronize do
       @app_finished.signal
@@ -105,6 +96,7 @@ class TestOutOfBandServer < Minitest::Test
     end
 
     assert_equal requests_sent, @request_count
+    assert_equal ["HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n"], results.uniq
     assert_equal 1, @oob_count
   end
 
@@ -117,11 +109,11 @@ class TestOutOfBandServer < Minitest::Test
     sleep 0.01
 
     @mutex.synchronize do
-      send_http "GET / HTTP/1.0\r\n\r\n"
+      send_http GET_10
       @oob_finished.wait(@mutex) # enter OOB
 
       # Send Req2
-      req2 << "GET / HTTP/1.0\r\n\r\n"
+      req2 << GET_10
       # If Req2 is processed now it raises 'OOB Conflict' in the response.
       sleep 0.01
 
@@ -147,7 +139,7 @@ class TestOutOfBandServer < Minitest::Test
   def test_partial_concurrent
     oob_server max_threads: 2
     @mutex.synchronize do
-      send_http "GET / HTTP/1.0\r\n\r\n"
+      send_http GET_10
       100.times { send_http("GET").close; sleep 0.0001 }
       @oob_finished.wait(@mutex, WAIT_TIME)
     end
@@ -158,7 +150,7 @@ class TestOutOfBandServer < Minitest::Test
   def test_blocks_new_connection
     oob_server oob_wait: true, max_threads: 2
     @mutex.synchronize do
-      send_http("GET / HTTP/1.0\r\n\r\n")
+      send_http GET_10
       @oob_finished.wait(@mutex)
     end
     accepted = false
