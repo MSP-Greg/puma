@@ -6,6 +6,8 @@ require_relative "helpers/integration"
 require "time"
 
 class TestIntegrationCluster < TestIntegration
+  PUMA_TTO = DARWIN
+
   parallelize_me! if ::Puma::IS_MRI && ::Puma::HAS_FORK
 
   def workers ; 2 ; end
