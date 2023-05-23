@@ -49,8 +49,8 @@ module TestPuma
       path
     end
 
-    def tmp_file_path(basename, data = nil, mode: File::BINARY)
-      fio = Tempfile.create basename, PUMA_TMP_DIR, mode: mode
+    def tmp_file_path(basename, data = nil, dir: PUMA_TMP_DIR, mode: File::BINARY)
+      fio = Tempfile.create basename, dir, mode: mode
       path = fio.path
       if data
         fio.write data

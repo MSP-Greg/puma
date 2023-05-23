@@ -10,6 +10,7 @@ class TestIntegrationCluster < TestIntegration
 
   parallelize_me! if ::Puma::IS_MRI && ::Puma::HAS_FORK
 
+  # @note This is called by `TestIntegration#get_worker_pids`
   def workers ; 2 ; end
 
   def setup
@@ -33,7 +34,7 @@ class TestIntegrationCluster < TestIntegration
   def test_pre_existing_unix
     skip_unless :unix
 
-    @bind_path = tmp_file_path(['', '.bind'], 'pre existing', mode: File::BINARY)
+    @bind_path = tmp_file_path(['', '.bind'], 'pre existing', dir: PUMA_TMP_UNIX, mode: File::BINARY)
 
     cli_server "-w #{workers} -q test/rackup/sleep_step.ru", unix: :unix
 
