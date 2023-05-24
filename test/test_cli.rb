@@ -11,6 +11,8 @@ class TestCLI < Minitest::Test
   include TestPuma::PumaSocket
 
   def setup
+    @cli = nil
+    @cli_thread = nil
     @environment = 'production'
 
     @tmp_path = tmp_path('puma-test')
@@ -29,6 +31,12 @@ class TestCLI < Minitest::Test
     @puma_version_pattern = "\\d+.\\d+.\\d+(\\.[a-z\\d]+)?"
   end
 
+  def start_server(cli)
+    @cli = cli
+    @cli_thread = Thread.new { cli.run }
+    wait_booted
+  end
+
   def wait_booted
     @wait.sysread 1
   rescue Errno::EAGAIN
@@ -37,6 +45,11 @@ class TestCLI < Minitest::Test
   end
 
   def teardown
+    if @cli_thread
+      @cli&.launcher.instance_variable_get(:@runner).stop_blocked
+      @cli_thread&.join
+    end
+
     File.unlink @tmp_path if File.exist? @tmp_path
     File.unlink @tmp_path2 if File.exist? @tmp_path2
 
@@ -53,24 +66,14 @@ class TestCLI < Minitest::Test
                          "--control-token", "",
                          "test/rackup/hello.ru"], @log_writer, @events
 
-    t = Thread.new do
-      cli.run
-    end
+    start_server cli
 
-    wait_booted
-
-    s = new_connection port: cntl
-    s << "GET /stats HTTP/1.0\r\n\r\n"
-    body = s.read_body
+    body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", port: cntl
 
     assert_equal Puma.stats_hash, JSON.parse(Puma.stats, symbolize_names: true)
 
     dmt = Puma::Configuration::DEFAULTS[:max_threads]
     assert_match(/\{"started_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z","backlog":0,"running":0,"pool_capacity":#{dmt},"max_threads":#{dmt},"requests_count":0,"versions":\{"puma":"#{@puma_version_pattern}","ruby":\{"engine":"\w+","version":"\d+.\d+.\d+","patchlevel":-?\d+\}\}\}/, body.split(/\r?\n/).last)
-
-  ensure
-    cli.launcher.stop
-    t.join
   end
 
   def test_control_for_ssl
@@ -87,29 +90,14 @@ class TestCLI < Minitest::Test
                          "--control-token", token,
                          "test/rackup/hello.ru"], @log_writer, @events
 
-    t = Thread.new do
-      cli.run
-    end
+    start_server cli
 
-    wait_booted
-
-    body = ""
-    http = Net::HTTP.new control_host, control_port
-    http.use_ssl = true
-    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-    http.start do
-      req = Net::HTTP::Get.new "/stats?token=#{token}", {}
-      body = http.request(req).body
-    end
+    body = send_http_read_resp_body "GET /stats?token=#{token} HTTP/1.1\r\n\r\n",
+      port: control_port, ctx: new_ctx
 
     dmt = Puma::Configuration::DEFAULTS[:max_threads]
     expected_stats = /{"started_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z","backlog":0,"running":0,"pool_capacity":#{dmt},"max_threads":#{dmt}/
     assert_match(expected_stats, body.split(/\r?\n/).last)
-
-  ensure
-    # always called, even if skipped
-    cli&.launcher&.stop
-    t&.join
   end
 
   def test_control_clustered
@@ -127,9 +115,7 @@ class TestCLI < Minitest::Test
     # without this, Minitest.after_run will trigger on this test ?
     $debugging_hold = true
 
-    t = Thread.new { cli.run }
-
-    wait_booted
+    start_server cli
 
     body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", path: @tmp_path
 
@@ -143,8 +129,8 @@ class TestCLI < Minitest::Test
     assert_match(/\{"started_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z","workers":2,"phase":0,"booted_workers":2,"old_workers":0,"worker_status":\[\{"started_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z","pid":\d+,"index":0,"phase":0,"booted":true,"last_checkin":"[^"]+","last_status":\{"backlog":0,"running":2,"pool_capacity":2,"max_threads":2,"requests_count":0\}\},\{"started_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z","pid":\d+,"index":1,"phase":0,"booted":true,"last_checkin":"[^"]+","last_status":\{"backlog":0,"running":2,"pool_capacity":2,"max_threads":2,"requests_count":0\}\}\],"versions":\{"puma":"#{@puma_version_pattern}","ruby":\{"engine":"\w+","version":"\d+.\d+.\d+","patchlevel":-?\d+\}\}\}/, body.split("\r\n").last)
   ensure
     if UNIX_SKT_EXIST && HAS_FORK
-      cli.launcher.stop
-      t.join
+      cli.launcher.instance_variable_get(:@runner).stop_blocked
+      cli = nil
 
       done = nil
       until done
@@ -166,19 +152,12 @@ class TestCLI < Minitest::Test
                          "--control-token", "",
                          "test/rackup/hello.ru"], @log_writer, @events
 
-    t = Thread.new { cli.run }
-
-    wait_booted
+    start_server cli
 
     body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", path: @tmp_path
 
     dmt = Puma::Configuration::DEFAULTS[:max_threads]
     assert_match(/{"started_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z","backlog":0,"running":0,"pool_capacity":#{dmt},"max_threads":#{dmt},"requests_count":0,"versions":\{"puma":"#{@puma_version_pattern}","ruby":\{"engine":"\w+","version":"\d+.\d+.\d+","patchlevel":-?\d+\}\}\}/, body.split(/\r?\n/).last)
-  ensure
-    if UNIX_SKT_EXIST
-      cli.launcher.stop
-      t.join
-    end
   end
 
   def test_control_stop
@@ -190,15 +169,11 @@ class TestCLI < Minitest::Test
                          "--control-token", "",
                          "test/rackup/hello.ru"], @log_writer, @events
 
-    t = Thread.new { cli.run }
-
-    wait_booted
+    start_server cli
 
     body = send_http_read_resp_body "GET /stop HTTP/1.0\r\n\r\n", path: @tmp_path
 
     assert_equal '{ "status": "ok" }', body.split("\r\n").last
-  ensure
-    t.join if UNIX_SKT_EXIST
   end
 
   def test_control_requests_count
@@ -210,11 +185,7 @@ class TestCLI < Minitest::Test
                          "--control-token", "",
                          "test/rackup/hello.ru"], @log_writer, @events
 
-    t = Thread.new do
-      cli.run
-    end
-
-    wait_booted
+    start_server cli
 
     body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", port: cntl
 
@@ -228,9 +199,6 @@ class TestCLI < Minitest::Test
     body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", port: cntl
 
     assert_equal 3, JSON.parse(body.split(/\r?\n/).last)['requests_count']
-  ensure
-    cli.launcher.stop
-    t.join
   end
 
   def test_control_thread_backtraces
@@ -242,16 +210,11 @@ class TestCLI < Minitest::Test
                          "--control-token", "",
                          "test/rackup/hello.ru"], @log_writer, @events
 
-    t = Thread.new { cli.run }
-
-    wait_booted
+    start_server cli
 
     body = send_http_read_resp_body "GET /thread-backtraces HTTP/1.0\r\n\r\n", path: @tmp_path
 
     assert_match %r{Thread: TID-}, body.split("\r\n").last
-  ensure
-    cli.launcher.stop if cli
-    t.join if UNIX_SKT_EXIST
   end
 
   def control_gc_stats(uri, cntl)
@@ -260,11 +223,7 @@ class TestCLI < Minitest::Test
                          "--control-token", "",
                          "test/rackup/hello.ru"], @log_writer, @events
 
-    t = Thread.new do
-      cli.run
-    end
-
-    wait_booted
+    start_server cli
 
     s = yield
     s << "GET /gc-stats HTTP/1.0\r\n\r\n"
@@ -298,10 +257,6 @@ class TestCLI < Minitest::Test
 
     # Hitting the /gc route should increment the count by 1
     assert(gc_count_before < gc_count_after, "make sure a gc has happened")
-
-  ensure
-    cli.launcher.stop if cli
-    t.join
   end
 
   def test_control_gc_stats_tcp
