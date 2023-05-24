@@ -3,7 +3,7 @@
 require_relative "helper"
 require_relative "helpers/integration"
 
-class TestIntegrationSingle < TestIntegration
+class TestIntegrationSingle_1 < TestIntegration
   parallelize_me! if ::Puma::IS_MRI
 
   def workers ; 0 ; end
@@ -153,60 +153,6 @@ class TestIntegrationSingle < TestIntegration
     assert_includes output.join, 'Thread: TID'
   end
 
-  def test_write_to_log
-    skip_unless_signal_exist? :TERM
-
-    fn = tmp_path '.puma_log'
-    cli_server 'test/rackup/hello.ru', config: <<~CONFIG
-      log_requests
-      stdout_redirect "#{fn}"
-      pidfile "t1-pid"
-    CONFIG
-
-    read_response fast_connect
-
-    sleep 0.01 if DARWIN
-
-    stop_server
-
-    # macos intermittently raises 'Errno::ENOENT: No such file'
-    sleep 0.25 unless File.exist? fn
-    log = File.read fn
-
-    assert_includes log, '"GET / HTTP/1.1"'
-  ensure
-    File.unlink 't1-pid' if File.file? 't1-pid'
-  end
-
-  def test_puma_started_log_writing
-    skip_unless_signal_exist? :TERM
-
-    fn = tmp_path '.puma_log'
-    cli_server 'test/rackup/hello.ru', config: <<~CONFIG
-      log_requests
-      stdout_redirect "#{fn}"
-      pidfile "t2-pid"
-    CONFIG
-
-    read_response fast_connect
-
-    out = cli_pumactl('-p t2-pid status', no_control_url: true).read
-
-    sleep 0.01 if DARWIN
-
-    stop_server
-
-    # macos intermittently raises 'Errno::ENOENT: No such file'
-    sleep 0.25 unless File.exist? fn
-    log = File.read fn
-
-    assert_includes log, '"GET / HTTP/1.1"'
-    assert !File.file?("t2-pid")
-    assert_equal "Puma is started\n", out
-  ensure
-    File.unlink 't2-pid' if File.file? 't2-pid'
-  end
-
   def test_application_logs_are_flushed_on_write
     cli_server "#{set_pumactl_args} test/rackup/write_to_stdout.ru"
 
@@ -272,5 +218,65 @@ class TestIntegrationSingle < TestIntegration
     cli_server "#{set_pumactl_args} test/rackup/hello.ru", puma_debug: true
 
     assert wait_for_server_to_include('Loaded Extensions:')
+  end
+end
+
+class TestIntegrationSingle_2 < TestIntegration
+  parallelize_me! unless DARWIN
+
+  def workers ; 0 ; end
+
+  def test_write_to_log
+    skip_unless_signal_exist? :TERM
+
+    fn = tmp_path '.puma_log'
+    cli_server 'test/rackup/hello.ru', config: <<~CONFIG
+      log_requests
+      stdout_redirect "#{fn}"
+      pidfile "t1-pid"
+    CONFIG
+
+    read_response fast_connect
+
+    sleep 0.01 if DARWIN
+
+    stop_server
+
+    # macos intermittently raises 'Errno::ENOENT: No such file'
+    sleep 0.25 unless File.exist? fn
+    log = File.read fn
+
+    assert_includes log, '"GET / HTTP/1.1"'
+  ensure
+    File.unlink 't1-pid' if File.file? 't1-pid'
+  end
+
+  def test_puma_started_log_writing
+    skip_unless_signal_exist? :TERM
+
+    fn = tmp_path '.puma_log'
+    cli_server 'test/rackup/hello.ru', config: <<~CONFIG
+      log_requests
+      stdout_redirect "#{fn}"
+      pidfile "t2-pid"
+    CONFIG
+
+    read_response fast_connect
+
+    out = cli_pumactl('-p t2-pid status', no_control_url: true).read
+
+    sleep 0.01 if DARWIN
+
+    stop_server
+
+    # macos intermittently raises 'Errno::ENOENT: No such file'
+    sleep 0.25 unless File.exist? fn
+    log = File.read fn
+
+    assert_includes log, '"GET / HTTP/1.1"'
+    assert !File.file?("t2-pid")
+    assert_equal "Puma is started\n", out
+  ensure
+    File.unlink 't2-pid' if File.file? 't2-pid'
   end
 end
