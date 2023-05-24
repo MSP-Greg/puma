@@ -14,9 +14,7 @@ class WithoutBacktraceError < StandardError
   def message; "no backtrace error"; end
 end
 
-class TestPumaServer < Minitest::Test
-  parallelize_me!
-
+class TestPumaServer_Base < Minitest::Test
   include TestPuma::PumaSocket
 
   STATUS_CODES = ::Puma::HTTP_STATUS_CODES
@@ -44,6 +42,10 @@ class TestPumaServer < Minitest::Test
       sleep 0.1 until @server.running == options[:min_threads]
     end
   end
+end
+
+class TestPumaServer_P < TestPumaServer_Base
+  parallelize_me!
 
   def send_proxy_v1_http(req, remote_ip, multisend = false)
     addr = IPAddr.new(remote_ip)
@@ -545,24 +547,6 @@ class TestPumaServer < Minitest::Test
     @server.stop(true)
 
     assert_equal [:booting, :running, :stop, :done], states
-  end
-
-  def test_timeout_in_data_phase(**options)
-    server_run(first_data_timeout: 1, **options)
-
-    sock = send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\n"
-
-    sock << "Hello" unless sock.wait_readable(1.50)
-
-    resp = sock.read_response
-
-    # Request Timeout
-    assert_operator resp, :start_with?,
-      "HTTP/1.1 408 #{STATUS_CODES[408]}\r\nConnection: close\r\n"
-  end
-
-  def test_timeout_data_no_queue
-    test_timeout_in_data_phase(queue_requests: false)
   end
 
   # https://github.com/puma/puma/issues/2574
@@ -1727,5 +1711,28 @@ class TestPumaServer < Minitest::Test
     pid = spawn(env, cmd, opts)
     [out_w, err_w].each(&:close)
     [out_r, err_r, pid]
+  end
+end
+
+# These tests intermittently freeze, run serial
+#
+class TestPumaServer_S < TestPumaServer_Base
+
+  def test_timeout_in_data_phase(**options)
+    server_run(first_data_timeout: 1, **options)
+
+    sock = send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 5\r\n\r\n"
+
+    sock << "Hello" unless sock.wait_readable(1.50)
+
+    resp = sock.read_response
+
+    # Request Timeout
+    assert_operator resp, :start_with?,
+      "HTTP/1.1 408 #{STATUS_CODES[408]}\r\nConnection: close\r\n"
+  end
+
+  def test_timeout_data_no_queue
+    test_timeout_in_data_phase(queue_requests: false)
   end
 end
