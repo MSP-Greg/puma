@@ -1637,16 +1637,17 @@ class TestPumaServer_S < TestPumaServer_Base
       [200, {}, ["DONE"]]
     end
 
-    # Send two requests
+    # Send two requests, allow serverto generate response
     connections = Array.new(2) { wait << true; send_http req }
     connections.each { |skt| skt.read_response }
 
     connections = Array.new(num_connections) { send_http req }
+
     @server.stop
     wait.close
 
-    # give server threads time to run
-    num_connections.times { Thread.pass; sleep 0.000_5 }
+    # give server threads time to run, two requests per connection
+    2.times { Thread.pass; sleep 0.000_5 }
 
     results = read_response_array connections, num_connections
 
@@ -1686,16 +1687,18 @@ class TestPumaServer_S < TestPumaServer_Base
       [200, {}, ["DONE"]]
     end
 
-    # Send two requests
+    # Send two requests, allow serverto generate response
     connections = Array.new(2) { wait << true; send_http req }
     connections.each { |skt| skt.read_response }
 
     connections = Array.new(num_connections) { send_http (req * 2) }
+
     @server.stop
     wait.close
 
     # give server threads time to run, two requests per connection
-    (2 * num_connections).times { Thread.pass; sleep 0.000_5 }
+    2.times { Thread.pass; sleep 0.000_5 }
+
     sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
 
     results = read_response_array connections, num_connections, read_again: true
