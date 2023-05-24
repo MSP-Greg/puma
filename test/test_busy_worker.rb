@@ -4,7 +4,8 @@ require_relative "helper"
 require_relative "helpers/puma_socket"
 
 class TestBusyWorker < Minitest::Test
-  parallelize_me! if ::Puma::IS_MRI
+  # below may have intermittent failures
+  #parallelize_me! if ::Puma::IS_MRI
 
   include TestPuma::PumaSocket
 
