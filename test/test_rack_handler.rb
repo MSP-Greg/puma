@@ -22,11 +22,10 @@ module TestRackUp
         on_booted = true
       end
 
+      opts = {events: events, Verbose: true, Silent: true}
       launcher = nil
       thread = Thread.new do
-        Rack::Handler::Puma.run(app, events: events, Verbose: true, Silent: true) do |l|
-          launcher = l
-        end
+        ::Rack::Handler::Puma.run(app, **opts) { |l| launcher = l }
       end
 
       # Wait for launcher to boot
@@ -34,7 +33,7 @@ module TestRackUp
         sleep 0.5 until launcher && launcher.log_writer.stdout.string.include?('Use Ctrl-C to stop')
       end
 
-      launcher.stop
+      launcher.instance_variable_get(:@runner).stop_blocked
       thread.join
 
       assert_equal on_booted, true
@@ -52,22 +51,20 @@ module TestRackUp
       @input = nil
     end
 
-    def in_handler(app, options = {})
-      options[:Port] ||= 0
-      options[:Silent] = true
+    def in_handler(app, opts = {})
+      opts[:Port] ||= 0
+      opts[:Silent] = true
 
-      @launcher = nil
+      launcher = nil
       thread = Thread.new do
-        ::Rack::Handler::Puma.run(app, **options) do |s, p|
-          @launcher = s
-        end
+        ::Rack::Handler::Puma.run(app, **opts) { |l| launcher = l }
       end
 
       time_limit = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10.0
       booted = false
 
       while Process.clock_gettime(Process::CLOCK_MONOTONIC) < time_limit
-        if @launcher && @launcher.log_writer.stdout.string.include?('Use Ctrl-C to stop')
+        if launcher && launcher.log_writer.stdout.string.include?('Use Ctrl-C to stop')
           booted = true
           break
         else
@@ -76,9 +73,9 @@ module TestRackUp
       end
       assert booted, 'Puma did not boot in 10 seconds?'
 
-      yield @launcher
+      yield launcher
     ensure
-      @launcher&.stop
+      launcher.instance_variable_get(:@runner).stop_blocked
       thread&.join
     end
 
