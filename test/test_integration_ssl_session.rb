@@ -13,7 +13,6 @@ require_relative 'helpers/puma_socket'
 # the server process isn't affected by whatever is loaded in the CI process.
 
 class TestIntegrationSSLSession < TestIntegration
-  parallelize_me! if Puma::IS_MRI
 
   require "openssl" unless defined?(::OpenSSL::SSL)
 
