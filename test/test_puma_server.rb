@@ -1011,9 +1011,8 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, hdrs, body]
     }
 
-    body = Net::HTTP.start @host, @port do |http|
-      http.request(Net::HTTP::Get.new '/').body.force_encoding(enc)
-    end
+    body = send_http_read_resp_body(GET_11).force_encoding(enc)
+
     assert_includes body, str
     assert_equal enc, body.encoding
   end
