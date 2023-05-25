@@ -1432,11 +1432,11 @@ class TestPumaServer_P < TestPumaServer_Base
     end
 
     resp_body, times = get_chunk_times
-    assert_equal body_len, resp_body.bytesize
+    assert_equal body_len, resp_body.bytesize, 'body length incorrrect'
     assert_equal str * 3, resp_body
-    assert times[1] - times[0] > 0.4
-    assert times[1] - times[0] < 1
-    assert times[2] - times[1] > 1
+    assert_operator times[1] - times[0], :>, 0.4, '2nd chunk'
+    assert_operator times[1] - times[0], :<, 1.0, '2nd chunk'
+    assert_operator times[2] - times[1], :>, 1.0, '3rd chunk'
   end
 
   # similar to a longer running app passing its output thru an enum body
