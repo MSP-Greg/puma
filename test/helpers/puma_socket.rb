@@ -235,7 +235,7 @@ module TestPuma
 
     def self.chunked_body(hdrs, body)
       body = body.byteslice(0, body.bytesize - 5)   # remove terminating bytes
-      decoded = String.new
+      decoded = String.new  # rubocop: disable Performance/UnfreezeString
       loop do
         size, body = body.split "\r\n", 2
         size = size.to_i 16
