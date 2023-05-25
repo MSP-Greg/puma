@@ -1649,7 +1649,7 @@ class TestPumaServer_S < TestPumaServer_Base
     # give server threads time to run, two requests per connection
     2.times { Thread.pass; sleep 0.000_5 }
 
-    results = read_response_array connections, num_connections
+    results = read_response_array connections
 
     results_count = {}
     results.uniq.sort.each { |e| results_count[e] = results.count(e) }
@@ -1701,7 +1701,7 @@ class TestPumaServer_S < TestPumaServer_Base
 
     sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
 
-    results = read_response_array connections, num_connections, read_again: true
+    results = read_response_array connections, resp_count: 2
 
     results_count = {}
     results.uniq.sort.each { |e| results_count[e] = results.count(e) }
