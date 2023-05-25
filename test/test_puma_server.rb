@@ -273,7 +273,7 @@ class TestPumaServer_P < TestPumaServer_Base
   end
 
   def test_GET_with_empty_body_has_sane_chunking
-    server_run { [200, {}, [""]] }
+    server_run { EMPTY_200 }
 
     data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
@@ -538,7 +538,7 @@ class TestPumaServer_P < TestPumaServer_Base
 
     @events.register(:state) { |s| states << s }
 
-    server_run { [200, {}, [""]] }
+    server_run { EMPTY_200 }
 
     _ = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
@@ -662,7 +662,7 @@ class TestPumaServer_P < TestPumaServer_Base
   end
 
   def test_Expect_100
-    server_run { [200, {}, [""]] }
+    server_run { EMPTY_200 }
 
     skt = send_http "GET / HTTP/1.1\r\nConnection: close\r\nExpect: 100-continue\r\n\r\n"
     data = skt.read_response
@@ -677,7 +677,7 @@ class TestPumaServer_P < TestPumaServer_Base
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       transfer_encoding = env['HTTP_TRANSFER_ENCODING']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: gzip,chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
@@ -694,7 +694,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     header = "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n"
@@ -724,7 +724,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1\r\n"
@@ -744,7 +744,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n"
@@ -764,7 +764,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1\r"
@@ -784,7 +784,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1"
@@ -804,7 +804,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\ne"
@@ -824,7 +824,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     part1 = 'a' * 4200
@@ -850,7 +850,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "PUT /path HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r"
@@ -870,7 +870,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "PUT /path HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello"
@@ -890,7 +890,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: Chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
@@ -906,7 +906,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
@@ -926,7 +926,7 @@ class TestPumaServer_P < TestPumaServer_Base
     server_run { |env|
       req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n"
@@ -969,7 +969,7 @@ class TestPumaServer_P < TestPumaServer_Base
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       remote_addr = env['REMOTE_ADDR']
-      [200, {}, [""]]
+      EMPTY_200
     }
 
     sock = send_http "GET / HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
@@ -1235,22 +1235,22 @@ class TestPumaServer_P < TestPumaServer_Base
     shutdown_requests(**opts, post: true, s2_response: /408/)
   end
 
-  def test_http11_connection_header_queue
-    server_run { [200, {}, [""]] }
+  def test_http11_connection_header_
+    server_run { EMPTY_200 }
 
     headers = send_http_read_response(GET_11)
-      .split("\r\n\r\n").first.split "\r\n"
+      .split(RESP_SPLIT, 2).first.split "\r\n"
 
     assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], headers
 
     headers = send_http_read_response("GET / HTTP/1.1\r\nConnection: close\r\n\r\n")
-      .split("\r\n\r\n").first.split "\r\n"
+      .split(RESP_SPLIT).first.split "\r\n"
 
     assert_equal ["HTTP/1.1 200 OK", "Connection: close", "Content-Length: 0"], headers
   end
 
   def test_http10_connection_header_queue
-    server_run { [200, {}, [""]] }
+    server_run { EMPTY_200 }
 
     sock = send_http "GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n"
     assert_equal ["HTTP/1.0 200 OK", "Connection: Keep-Alive", "Content-Length: 0"], header(sock)
@@ -1261,14 +1261,14 @@ class TestPumaServer_P < TestPumaServer_Base
   end
 
   def test_http11_connection_header_no_queue
-    server_run(queue_requests: false) { [200, {}, [""]] }
+    server_run(queue_requests: false) { EMPTY_200 }
     sock = send_http GET_11
     assert_equal ["HTTP/1.1 200 OK", "Connection: close", "Content-Length: 0"], header(sock)
     sock.close
   end
 
   def test_http10_connection_header_no_queue
-    server_run(queue_requests: false) { [200, {}, [""]] }
+    server_run(queue_requests: false) { EMPTY_200 }
     sock = send_http GET_10
     assert_equal ["HTTP/1.0 200 OK", "Content-Length: 0"], header(sock)
     sock.close
@@ -1514,7 +1514,7 @@ class TestPumaServer_P < TestPumaServer_Base
 
     out_r.wait_readable 3
 
-    form_file_data = req_body.split("\r\n\r\n", 2)[1].sub(/\r\n----\S+\r\n\z/, '')
+    form_file_data = req_body.split(RESP_SPLIT, 2)[1].sub(/\r\n----\S+\r\n\z/, '')
 
     assert_equal file_bytesize, form_file_data.bytesize
     assert_equal out_r.read.bytesize, req_body.bytesize
@@ -1542,7 +1542,7 @@ class TestPumaServer_P < TestPumaServer_Base
 
     out_r.wait_readable 3
 
-    form_file_data = req_body.split("\r\n\r\n", 2)[1].sub(/\r\n----\S+\r\n\z/, '')
+    form_file_data = req_body.split(RESP_SPLIT, 2)[1].sub(/\r\n----\S+\r\n\z/, '')
 
     assert_equal file_bytesize, form_file_data.bytesize
     assert_equal out_r.read.bytesize, req_body.bytesize
