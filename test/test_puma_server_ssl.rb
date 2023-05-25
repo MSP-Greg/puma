@@ -153,9 +153,15 @@ class TestPumaServerSSL < Minitest::Test
         c.ssl_version = :TLSv1
       end
     }
+
+    bad_ssl = nil
     assert_raises(OpenSSL::SSL::SSLError) do
-      send_http_read_response GET_11, ctx: ctx
+      bad_ssl = send_http GET_11, ctx: ctx
     end
+    bad_ssl.sysclose if bad_ssl.respond_to? :close
+
+    # check that an unrestricted request generates a response
+    assert_equal 'https', send_http_read_resp_body(GET_11, ctx: new_ctx)
 
     unless Puma.jruby?
       msg = /wrong version number|(unknown|unsupported) protocol|no protocols available|version too low|unknown SSL method/
@@ -173,13 +179,18 @@ class TestPumaServerSSL < Minitest::Test
         c.ssl_version = :TLSv1_1
       end
     }
+
+    bad_ssl = nil
     assert_raises(OpenSSL::SSL::SSLError) do
-      send_http_read_response GET_11, ctx: ctx
+      bad_ssl = send_http GET_11, ctx: ctx
     end
+    bad_ssl.sysclose if bad_ssl.respond_to? :close
+
+    # check that an unrestricted request generates a response
+    assert_equal 'https', send_http_read_resp_body(GET_11, ctx: new_ctx)
 
     unless Puma.jruby?
       msg = /wrong version number|(unknown|unsupported) protocol|no protocols available|version too low|unknown SSL method/
-STDOUT.syswrite "\n#{@log_writer.error.message}\n" if @log_writer.error
       assert_match(msg, @log_writer.error.message) if @log_writer.error
     end
   end
@@ -201,16 +212,12 @@ STDOUT.syswrite "\n#{@log_writer.error.message}\n" if @log_writer.error
 
     start_server
 
-    body_http = +''
-    skt_tcp = nil
+    body_http = ''
 
     # nothing to read after 6 seconds
     tcp = Thread.new do
-      skt_tcp = TCPSocket.new @host, @server.connected_ports[0]
-      skt_tcp.syswrite "GET / HTTP/1.1\r\n\r\n"
-      begin
-        body_http << skt_tcp.read_nonblock(1_024) while skt_tcp.wait_readable 6
-      rescue EOFError
+      assert_raises(Timeout::Error, EOFError) do
+        body_http = send_http_read_resp_body GET_11, port: @server.connected_ports[0], timeout: 6
       end
     end
 
@@ -231,8 +238,6 @@ STDOUT.syswrite "\n#{@log_writer.error.message}\n" if @log_writer.error
     busy_threads = thread_pool.spawned - thread_pool.waiting
 
     assert busy_threads.zero?, "Our connection is wasn't dropped"
-  ensure
-    skt_tcp.close if skt_tcp.respond_to? :close
   end
 
   unless Puma.jruby?
