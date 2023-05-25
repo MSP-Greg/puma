@@ -53,16 +53,18 @@ module TestPuma
 
     # Sends a request and returns the response body
     #
-    def send_http_read_resp_body(req, host: nil, port: nil, path: nil, ctx: nil, session: nil, len: nil, timeout: nil)
+    def send_http_read_resp_body(req, host: nil, port: nil, path: nil,
+        ctx: nil, session: nil, len: nil, timeout: nil, decode_chunked: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_body timeout, len: len
+      skt.read_body timeout, len: len, decode_chunked: decode_chunked
     end
 
     # Sends a request and returns the response string
     #
-    def send_http_read_response(req, host: nil, port: nil, path: nil, ctx: nil, session: nil, len: nil, timeout: nil)
+    def send_http_read_response(req, host: nil, port: nil, path: nil,
+        ctx: nil, session: nil, len: nil, timeout: nil, decode_chunked: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_response timeout, len: len
+      skt.read_response timeout, len: len, decode_chunked: decode_chunked
     end
 
     # Sends a request and returns the socket
@@ -73,11 +75,11 @@ module TestPuma
       skt
     end
 
-    READ_BODY = -> (timeout = nil, len: nil) {
-      self.read_response(timeout, len: len).split(RESP_SPLIT, 2).last
+    READ_BODY = -> (timeout = nil, len: nil, decode_chunked: nil) {
+      self.read_response(timeout, len: len, decode_chunked: decode_chunked).split(RESP_SPLIT, 2).last
     }
 
-    READ_RESPONSE = -> (timeout = nil, len: nil) do
+    READ_RESPONSE = -> (timeout = nil, len: nil, decode_chunked: nil) do
       timeout ||= RESP_READ_TIMEOUT
       content_length = nil
       chunked = nil
@@ -115,7 +117,12 @@ module TestPuma
                   if content_length
                     body.bytesize == content_length
                   elsif chunked
-                    body.end_with? "0\r\n\r\n"
+                    if body.end_with? "0\r\n\r\n"
+                      if decode_chunked
+                        response = TestPuma::PumaSocket.chunked_body hdrs, body
+                      end
+                      true
+                    end
                   elsif !hdrs.empty? && !body.empty?
                     true
                   else
@@ -226,9 +233,17 @@ module TestPuma
       results
     end
 
-    private
-    def no_body(status)
-
+    def self.chunked_body(hdrs, body)
+      body = body.byteslice(0, body.bytesize - 5)   # remove terminating bytes
+      decoded = String.new
+      loop do
+        size, body = body.split "\r\n", 2
+        size = size.to_i 16
+        decoded << body.byteslice(0, size)
+        body = body.byteslice (size+2)..-1         # remove segment ending "\r\n"
+        break if body.empty?
+      end
+      "#{hdrs}#{RESP_SPLIT}#{decoded}"
     end
   end
 end
