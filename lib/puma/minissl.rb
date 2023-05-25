@@ -5,9 +5,9 @@ begin
 rescue LoadError
 end
 
-require 'open3'
 # need for Puma::MiniSSL::OPENSSL constants used in `HAS_TLS1_3`
-# use require, see https://github.com/puma/puma/pull/2381
+# for cross-platform compatibility, extension files should always be loaded
+# with `require`, not `require_relative`
 require 'puma/puma_http11'
 
 module Puma
@@ -325,6 +325,8 @@ module Puma
         # Executes the command to return the password needed to decrypt the key.
         def key_password
           raise "Key password command not configured" if @key_password_command.nil?
+
+          require 'open3'
 
           stdout_str, stderr_str, status = Open3.capture3(@key_password_command)
 
