@@ -1005,16 +1005,15 @@ class TestPumaServer_P < TestPumaServer_Base
         100.times do |entry|
           yielder << str
         end
-        yielder << "\nHello World\n".encode(enc)
       end
-
       [200, hdrs, body]
     }
 
-    body = send_http_read_resp_body(GET_11).force_encoding(enc)
+    body = send_http_read_resp_body(GET_11, decode_chunked: true).force_encoding(enc)
 
-    assert_includes body, str
+    assert_equal str.bytesize * 100, body.bytesize
     assert_equal enc, body.encoding
+    assert_equal str * 100, body
   end
 
   def test_empty_header_values
