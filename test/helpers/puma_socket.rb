@@ -48,16 +48,24 @@ module TestPuma
       headers
     end
 
-    def send_http_read_resp_body(req, host: nil, port: nil, path: nil, ctx: nil, session: nil, len: nil)
+    # rubocop: disable Metrics/ParameterLists
+
+    # Sends a request and returns the response body
+    #
+    def send_http_read_resp_body(req, host: nil, port: nil, path: nil, ctx: nil, session: nil, len: nil, timeout: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_body len: len
+      skt.read_body timeout, len: len
     end
 
-    def send_http_read_response(req, host: nil, port: nil, path: nil, ctx: nil, session: nil, len: nil)
+    # Sends a request and returns the response string
+    #
+    def send_http_read_response(req, host: nil, port: nil, path: nil, ctx: nil, session: nil, len: nil, timeout: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_response len: len
+      skt.read_response timeout, len: len
     end
 
+    # Sends a request and returns the socket
+    #
     def send_http(req, host: nil, port: nil, path: nil, ctx: nil, session: nil)
       skt = new_connection host: host, port: port, path: path, ctx: ctx, session: session
       skt.syswrite req
@@ -75,7 +83,8 @@ module TestPuma
       status = nil
       no_body = nil
       response = +''
-      t_st = Process.clock_gettime Process::CLOCK_MONOTONIC
+      time_end = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+
       read_len = len || RESP_READ_LEN
 
       if self.to_io.wait_readable timeout
@@ -125,7 +134,7 @@ module TestPuma
                 return response
               end
             end
-            if timeout < Process.clock_gettime(Process::CLOCK_MONOTONIC) - t_st
+            if time_end < Process.clock_gettime(Process::CLOCK_MONOTONIC)
               raise Timeout::Error, 'Client Read Timeout'
             end
           end
