@@ -326,13 +326,12 @@ module Puma
         def key_password
           raise "Key password command not configured" if @key_password_command.nil?
 
-          require 'open3'
-
-          stdout_str, stderr_str, status = Open3.capture3(@key_password_command)
-
-          return stdout_str.chomp if status.success?
-
-          raise "Key password failed with code #{status.exitstatus}: #{stderr_str}"
+          pswd = %x(#{@key_password_command})
+          if $?.success?
+            pswd.chomp
+          else
+            raise "Key password failed with code #{status.exitstatus}: #{stderr_str}"
+          end
         end
 
         # Controls session reuse.  Allowed values are as follows:
