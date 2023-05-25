@@ -88,7 +88,7 @@ class TestOutOfBandServer < Minitest::Test
     oob_server app_wait: true, max_threads: 2
     requests_sent.times {skts << send_http(req_str); sleep 0.0001 }
 
-    results = read_response_array skts, requests_sent
+    results = read_response_array skts
 
     @mutex.synchronize do
       @app_finished.signal
