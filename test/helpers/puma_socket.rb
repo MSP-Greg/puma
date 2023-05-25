@@ -218,6 +218,7 @@ module TestPuma
             rescue StandardError => e
               results[idx] = e.class.to_s
             end
+            skt.close unless skt.closed?
             skts[idx] = nil
           end
         end
