@@ -13,6 +13,7 @@ module TestPuma
     RESP_READ_TIMEOUT = 10
     RESP_SPLIT = "\r\n\r\n"
     NO_ENTITY_BODY = Puma::STATUS_WITH_NO_ENTITY_BODY
+    EMPTY_200 = [200, {}, ['']]
 
     def before_setup
       @ios_to_close ||= []
