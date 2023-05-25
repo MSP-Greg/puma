@@ -83,7 +83,7 @@ class TestBusyWorker < Minitest::Test
       end
     }
 
-    results = read_response_array skts, n
+    results = read_response_array skts
 
     assert_equal [resp], results.uniq
   end
