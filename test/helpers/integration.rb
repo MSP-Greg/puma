@@ -130,10 +130,10 @@ class TestIntegration < Minitest::Test
 
   def restart_server_and_listen(argv, log: false)
     cli_server argv, log: log
-    connection = connect
+    connection = fast_connect
     initial_reply = read_body(connection)
     restart_server connection
-    [initial_reply, read_body(connect)]
+    [initial_reply, read_body(fast_connect)]
   end
 
   # reuses an existing connection to make sure that works
