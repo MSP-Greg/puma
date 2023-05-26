@@ -7,22 +7,22 @@
 require_relative "helper"
 require_relative "helpers/puma_socket"
 
-if ::Puma::HAS_SSL && ENV['PUMA_TEST_DEBUG']
+if ::Puma::HAS_SSL
   require "puma/minissl"
-  require "net/http"
-
-  # net/http (loaded in helper) does not necessarily load OpenSSL
   require "openssl" unless Object.const_defined? :OpenSSL
-  if Puma::IS_JRUBY
-    puts "", RUBY_DESCRIPTION, "RUBYOPT: #{ENV['RUBYOPT']}",
-      "                         OpenSSL",
-      "OPENSSL_LIBRARY_VERSION: #{OpenSSL::OPENSSL_LIBRARY_VERSION}",
-      "        OPENSSL_VERSION: #{OpenSSL::OPENSSL_VERSION}", ""
-  else
-    puts "", RUBY_DESCRIPTION, "RUBYOPT: #{ENV['RUBYOPT']}",
-      "                         Puma::MiniSSL                   OpenSSL",
-      "OPENSSL_LIBRARY_VERSION: #{Puma::MiniSSL::OPENSSL_LIBRARY_VERSION.ljust 32}#{OpenSSL::OPENSSL_LIBRARY_VERSION}",
-      "        OPENSSL_VERSION: #{Puma::MiniSSL::OPENSSL_VERSION.ljust 32}#{OpenSSL::OPENSSL_VERSION}", ""
+
+  if ENV['PUMA_TEST_DEBUG']
+    if Puma::IS_JRUBY
+      puts "", RUBY_DESCRIPTION, "RUBYOPT: #{ENV['RUBYOPT']}",
+        "                         OpenSSL",
+        "OPENSSL_LIBRARY_VERSION: #{OpenSSL::OPENSSL_LIBRARY_VERSION}",
+        "        OPENSSL_VERSION: #{OpenSSL::OPENSSL_VERSION}", ""
+    else
+      puts "", RUBY_DESCRIPTION, "RUBYOPT: #{ENV['RUBYOPT']}",
+        "                         Puma::MiniSSL                   OpenSSL",
+        "OPENSSL_LIBRARY_VERSION: #{Puma::MiniSSL::OPENSSL_LIBRARY_VERSION.ljust 32}#{OpenSSL::OPENSSL_LIBRARY_VERSION}",
+        "        OPENSSL_VERSION: #{Puma::MiniSSL::OPENSSL_VERSION.ljust 32}#{OpenSSL::OPENSSL_VERSION}", ""
+    end
   end
 end
 

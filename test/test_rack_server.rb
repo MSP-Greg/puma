@@ -157,8 +157,6 @@ class TestRackServer < Minitest::Test
 
     headers = header_hash resp_hdrs
 
-    content_length = headers["Content-Length"].to_i
-
     assert_equal "Hello", body
     assert_equal body.bytesize, headers["Content-Length"].to_i
 
