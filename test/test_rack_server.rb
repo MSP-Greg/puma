@@ -78,7 +78,7 @@ class TestRackServer < Minitest::Test
   def header_hash(str)
     t = str.split "\r\n"
     t.shift; t.map! { |line| line.split(/:\s?/) }
-    t.to_h
+    t.map { |e| [e[0].downcase, e[1]] }.to_h
   end
 
   def test_lint
@@ -158,7 +158,7 @@ class TestRackServer < Minitest::Test
     headers = header_hash resp_hdrs
 
     assert_equal "Hello", body
-    assert_equal body.bytesize, headers["Content-Length"].to_i
+    assert_equal body.bytesize, headers["content-length"].to_i
 
     # When after_reply breaks the connection it will write the expected HTTP
     # response followed by a second HTTP response: HTTP/1.1 500
@@ -214,9 +214,9 @@ class TestRackServer < Minitest::Test
     stop
 
     if Rack.release.start_with? '1.'
-      assert_equal "chunked", headers["Transfer-Encoding"]
+      assert_equal "chunked", headers["transfer-encoding"]
     else
-      assert_equal str_ary_bytes, headers["Content-Length"].to_i
+      assert_equal str_ary_bytes, headers["content-length"].to_i
     end
   end
 
