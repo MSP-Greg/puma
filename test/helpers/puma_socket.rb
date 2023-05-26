@@ -139,7 +139,7 @@ module TestPuma
               self.to_io.wait_readable to
             when :wait_writable # :wait_writable for ssl
               to = time_end - Process.clock_gettime(Process::CLOCK_MONOTONIC)
-              self.to_io.wait_readable to
+              self.to_io.wait_writable to
             when nil
               if response.empty?
                 raise EOFError
