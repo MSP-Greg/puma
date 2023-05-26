@@ -443,15 +443,11 @@ class TestIntegrationCluster < TestIntegration
 
     Process.kill :TTIN, @pid
 
-    @server.wait_readable 3
-    line = @server.gets
-    assert_match(/Worker 2 \(PID: \d+\) booted in/, line)
+    assert wait_for_server_to_match(/Worker 2 \(PID: \d+\) booted in/)
 
     Process.kill :TTOU, @pid
 
-    @server.wait_readable 3
-    line = @server.gets
-    assert_match(/Worker 1 \(PID: \d+\) terminating/, line)
+    assert wait_for_server_to_match(/Worker 1 \(PID: \d+\) terminating/)
   end
 
   def test_hook_data
