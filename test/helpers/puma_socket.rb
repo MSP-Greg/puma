@@ -123,19 +123,23 @@ module TestPuma
                         response = TestPuma::PumaSocket.chunked_body hdrs, body
                       end
                       true
+                    else
+                      false
                     end
                   elsif !hdrs.empty? && !body.empty?
                     true
                   else
                     false
                   end
-                if ret
-                  return response
-                end
+                return response if ret
               end
               sleep 0.000_1
-            when :wait_readable, :wait_writable # :wait_writable for ssl
-              sleep 0.000_2
+            when :wait_readable
+              to = time_end - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+              self.to_io.wait_readable to
+            when :wait_writable # :wait_writable for ssl
+              to = time_end - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+              self.to_io.wait_readable to
             when nil
               if response.empty?
                 raise EOFError
