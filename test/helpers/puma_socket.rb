@@ -53,18 +53,18 @@ module TestPuma
 
     # Sends a request and returns the response body
     #
-    def send_http_read_resp_body(req, host: nil, port: nil, path: nil,
-        ctx: nil, session: nil, len: nil, timeout: nil, decode_chunked: nil)
+    def send_http_read_resp_body(req, host: nil, port: nil, path: nil, ctx: nil,
+        session: nil, len: nil, timeout: nil, decode_chunked: nil, times: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_body timeout, len: len, decode_chunked: decode_chunked
+      skt.read_body timeout, len: len, decode_chunked: decode_chunked, times: times
     end
 
     # Sends a request and returns the response string
     #
-    def send_http_read_response(req, host: nil, port: nil, path: nil,
-        ctx: nil, session: nil, len: nil, timeout: nil, decode_chunked: nil)
+    def send_http_read_response(req, host: nil, port: nil, path: nil, ctx: nil,
+        session: nil, len: nil, timeout: nil, decode_chunked: nil, times: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_response timeout, len: len, decode_chunked: decode_chunked
+      skt.read_response timeout, len: len, decode_chunked: decode_chunked, times: times
     end
 
     # Sends a request and returns the socket
@@ -75,27 +75,28 @@ module TestPuma
       skt
     end
 
-    READ_BODY = -> (timeout = nil, len: nil, decode_chunked: nil) {
-      self.read_response(timeout, len: len, decode_chunked: decode_chunked).split(RESP_SPLIT, 2).last
+    READ_BODY = -> (timeout = nil, len: nil, decode_chunked: nil, times: nil) {
+      self.read_response(timeout, len: len, decode_chunked: decode_chunked, times: times)
+        .split(RESP_SPLIT, 2).last
     }
 
-    READ_RESPONSE = -> (timeout = nil, len: nil, decode_chunked: nil) do
+    READ_RESPONSE = -> (timeout = nil, len: nil, decode_chunked: nil, times: nil) do
       timeout ||= RESP_READ_TIMEOUT
       content_length = nil
       chunked = nil
       status = nil
       no_body = nil
       response = +''
-      time_end = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
-
       read_len = len || RESP_READ_LEN
-
+      time_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      time_end   = time_start + timeout
       if self.to_io.wait_readable timeout
         loop do
           begin
             part = self.read_nonblock(read_len, exception: false)
             case part
             when String
+              times << Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_start if times
               status ||= part[/\AHTTP\/1\.[01] (\d{3})/, 1]
               if status
                 no_body ||= NO_ENTITY_BODY.key? status.to_i || status.to_i < 200
@@ -105,7 +106,7 @@ module TestPuma
               end
 
               unless content_length || chunked
-                chunked ||= part.include? "\r\nTransfer-Encoding: chunked\r\n"
+                chunked ||= part.downcase.include? "\r\ntransfer-encoding: chunked\r\n"
                 content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
               end
 
@@ -239,6 +240,7 @@ module TestPuma
       loop do
         size, body = body.split "\r\n", 2
         size = size.to_i 16
+
         decoded << body.byteslice(0, size)
         body = body.byteslice (size+2)..-1         # remove segment ending "\r\n"
         break if body.empty?
