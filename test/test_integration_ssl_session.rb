@@ -13,6 +13,8 @@ require_relative 'helpers/puma_socket'
 # the server process isn't affected by whatever is loaded in the CI process.
 
 class TestIntegrationSSLSession < TestIntegration
+  # parallel seems to run fine locally
+  parallelize_me! if ::Puma::IS_MRI && !ENV['GITHUB_ACTIONS']
 
   require "openssl" unless defined?(::OpenSSL::SSL)
 
