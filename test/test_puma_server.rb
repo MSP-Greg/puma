@@ -5,7 +5,6 @@ require_relative "helpers/puma_socket"
 
 require "puma/events"
 require "puma/server"
-require "net/http"
 require "nio"
 require "ipaddr"
 
@@ -238,14 +237,10 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, {}, [env['SERVER_PORT']]]
     end
 
-    req = Net::HTTP::Get.new '/'
-    req['HOST'] = 'example.com'
+    body = send_http_read_resp_body "GET / HTTP/1.1\r\n" \
+      "Host: example.com\r\n\r\n"
 
-    res = Net::HTTP.start @host, @port do |http|
-      http.request(req)
-    end
-
-    assert_equal "80", res.body
+    assert_equal "80", body
   end
 
   def test_default_server_port_respects_x_forwarded_proto
@@ -253,15 +248,10 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, {}, [env['SERVER_PORT']]]
     end
 
-    req = Net::HTTP::Get.new("/")
-    req['HOST'] = "example.com"
-    req['X-FORWARDED-PROTO'] = "https,http"
+    body = send_http_read_resp_body "GET / HTTP/1.1\r\n" \
+      "Host: example.com\r\nX-Forwarded-Proto: https,http\r\n\r\n"
 
-    res = Net::HTTP.start @host, @port do |http|
-      http.request(req)
-    end
-
-    assert_equal "443", res.body
+    assert_equal "443", body
   end
 
   def test_HEAD_has_no_body
@@ -1393,23 +1383,6 @@ class TestPumaServer_P < TestPumaServer_Base
     assert_equal @host, remote_addr
   end
 
-  def get_chunk_times
-    body = +''
-    times = []
-    Net::HTTP.start @host, @port do |http|
-      req = Net::HTTP::Get.new '/'
-      http.request req do |resp|
-        resp.read_body do |chunk|
-          next if chunk.empty?
-          body << chunk
-          times << Process.clock_gettime(Process::CLOCK_MONOTONIC)
-        end
-
-      end
-    end
-    [body, times]
-  end
-
   # see https://github.com/sinatra/sinatra/blob/master/examples/stream.ru
   def test_streaming_enum_body_1
     str = "Hello Puma World"
@@ -1429,7 +1402,9 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, hdrs, body]
     end
 
-    resp_body, times = get_chunk_times
+    times = []
+    resp_body = send_http_read_resp_body GET_11, decode_chunked: true, times: times
+
     assert_equal body_len, resp_body.bytesize, 'body length incorrrect'
     assert_equal str * 3, resp_body
     assert_operator times[1] - times[0], :>, 0.4, '2nd chunk'
@@ -1456,7 +1431,10 @@ class TestPumaServer_P < TestPumaServer_Base
       end
       [200, hdrs, body]
     end
-    resp_body, times = get_chunk_times
+
+    times = []
+    resp_body = send_http_read_resp_body GET_11, decode_chunked: true, times: times
+
     assert_equal body_len, resp_body.bytesize
     assert_equal str * loops, resp_body
     assert_operator times.last - times.first, :>, 1.0
