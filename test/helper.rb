@@ -18,7 +18,6 @@ require "minitest/autorun"
 require "minitest/pride"
 require "minitest/proveit"
 require "minitest/stub_const"
-require "net/http"
 require_relative "helpers/apps"
 require_relative "helpers/tmp_path"
 
@@ -49,23 +48,6 @@ if Puma::HAS_SSL
       self.addr = ssl_socket.peeraddr.last rescue "<unknown>"
       self.cert = ssl_socket.peercert
     end
-  end
-end
-
-# Either takes a string to do a get request against, or a tuple of [URI, HTTP] where
-# HTTP is some kind of Net::HTTP request object (POST, HEAD, etc.)
-def hit(uris)
-  uris.map do |u|
-    response =
-      if u.kind_of? String
-        Net::HTTP.get(URI.parse(u))
-      else
-        url = URI.parse(u[0])
-        Net::HTTP.new(url.host, url.port).start {|h| h.request(u[1]) }
-      end
-
-    assert response, "Didn't get a response: #{u}"
-    response
   end
 end
 
