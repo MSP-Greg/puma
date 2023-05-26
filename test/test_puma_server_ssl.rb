@@ -27,7 +27,7 @@ if ::Puma::HAS_SSL
 end
 
 class TestPumaServerSSL < Minitest::Test
-  parallelize_me!
+  parallelize_me! if ::Puma::IS_MRI || ::Puma::IS_JRUBY # TruffleRuby freeze
 
   include TestPuma::PumaSocket
 
