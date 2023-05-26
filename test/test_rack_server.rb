@@ -1,7 +1,7 @@
 # frozen_string_literal: true
+
 require_relative "helper"
 require_relative "helpers/puma_socket"
-require "net/http"
 
 # don't load Rack, as it autoloads everything
 begin
@@ -106,7 +106,7 @@ class TestRackServer < Minitest::Test
 
     hdrs = "Content-Type: application/x-www-form-urlencoded\r\n" \
            "Content-Length: #{body.bytesize}\r\n"
- 
+
     send_http "POST /test HTTP/1.1\r\n#{hdrs}\r\n#{body}"
 
     stop
