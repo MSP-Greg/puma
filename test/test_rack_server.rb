@@ -75,8 +75,8 @@ class TestRackServer < Minitest::Test
     @server.stop(true) unless @stopped
   end
 
-  def header_hash(socket)
-    t = socket.readline("\r\n\r\n").split("\r\n")
+  def header_hash(str)
+    t = str.split "\r\n"
     t.shift; t.map! { |line| line.split(/:\s?/) }
     t.to_h
   end
@@ -87,7 +87,7 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    send_http_read_response "GET /test HTTP/1.1\r\n\r\n"
+    send_http_read_response GET_11
 
     stop
 
@@ -102,8 +102,12 @@ class TestRackServer < Minitest::Test
 
     big = "x" * (1024 * 16)
 
-    Net::HTTP.post_form URI.parse("#{@tcp}/test"),
-                 { "big" => big }
+    body = "big=#{big}"
+
+    hdrs = "Content-Type: application/x-www-form-urlencoded\r\n" \
+           "Content-Length: #{body.bytesize}\r\n"
+ 
+    send_http "POST /test HTTP/1.1\r\n#{hdrs}\r\n#{body}"
 
     stop
 
@@ -149,12 +153,14 @@ class TestRackServer < Minitest::Test
 
     skt = send_http "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
 
-    headers = header_hash skt
+    resp_hdrs, body = skt.read_response.split "\r\n\r\n", 2
+
+    headers = header_hash resp_hdrs
 
     content_length = headers["Content-Length"].to_i
-    real_response_body = skt.read(content_length)
 
-    assert_equal "Hello", real_response_body
+    assert_equal "Hello", body
+    assert_equal body.bytesize, headers["Content-Length"].to_i
 
     # When after_reply breaks the connection it will write the expected HTTP
     # response followed by a second HTTP response: HTTP/1.1 500
@@ -201,9 +207,11 @@ class TestRackServer < Minitest::Test
 
     @server.run
 
-    skt = send_http "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
+    resp = send_http_read_response "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
 
-    headers = header_hash skt
+    resp_hdrs, body = resp.split RESP_SPLIT, 2
+
+    headers = header_hash resp_hdrs
 
     stop
 
@@ -237,9 +245,15 @@ class TestRackServer < Minitest::Test
     @server.app = rack_app
     @server.run
 
-    resp = Net::HTTP.get_response URI(@tcp)
-    assert_equal 'chunked', resp['transfer-encoding']
-    assert_equal STR_1KB, resp.body.force_encoding(Encoding::UTF_8)
+    resp = send_http_read_response "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n",
+      decode_chunked: true
+
+    resp_hdrs, resp_body = resp.split RESP_SPLIT, 2
+
+    headers = header_hash resp_hdrs
+
+    assert_equal 'chunked', headers['transfer-encoding']
+    assert_equal STR_1KB, resp_body.force_encoding(Encoding::UTF_8)
   end if Rack.release < '3.1'
 
   def test_rack_chunked_array10
@@ -249,18 +263,32 @@ class TestRackServer < Minitest::Test
     @server.app = rack_app
     @server.run
 
-    resp = Net::HTTP.get_response URI(@tcp)
-    assert_equal 'chunked', resp['transfer-encoding']
-    assert_equal STR_1KB * 10, resp.body.force_encoding(Encoding::UTF_8)
+    resp = send_http_read_response "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n",
+      decode_chunked: true
+
+    resp_hdrs, resp_body = resp.split RESP_SPLIT, 2
+
+    headers = header_hash resp_hdrs
+
+    assert_equal 'chunked', headers['transfer-encoding']
+    assert_equal STR_1KB * 10, resp_body.force_encoding(Encoding::UTF_8)
   end if Rack.release < '3.1'
 
   def test_puma_enum
     body = Array.new(10, STR_1KB).to_enum
-    @server.app = lambda { |env| [200, { 'content-type' => 'text/plain; charset=utf-8' }, body] }
+    app = lambda { |env| [200, { 'content-type' => 'text/plain; charset=utf-8' }, body] }
+    rack_app = Rack::Chunked.new app
+    @server.app = rack_app
     @server.run
 
-    resp = Net::HTTP.get_response URI(@tcp)
-    assert_equal 'chunked', resp['transfer-encoding']
-    assert_equal STR_1KB * 10, resp.body.force_encoding(Encoding::UTF_8)
+    resp = send_http_read_response "GET /test HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n",
+      decode_chunked: true
+
+    resp_hdrs, resp_body = resp.split RESP_SPLIT, 2
+
+    headers = header_hash resp_hdrs
+
+    assert_equal 'chunked', headers['transfer-encoding']
+    assert_equal STR_1KB * 10, resp_body.force_encoding(Encoding::UTF_8)
   end
 end
