@@ -222,7 +222,7 @@ class TestIntegrationSingle_1 < TestIntegration
 end
 
 class TestIntegrationSingle_2 < TestIntegration
-  parallelize_me! unless DARWIN
+    parallelize_me! if ::Puma::IS_MRI && !DARWIN
 
   def workers ; 0 ; end
 
