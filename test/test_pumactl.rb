@@ -1,12 +1,14 @@
 require_relative "helper"
 require_relative "helpers/config_file"
 require_relative "helpers/ssl"
+require_relative "helpers/puma_socket"
 
 require 'pathname'
 require 'puma/control_cli'
 
 class TestPumaControlCli < TestConfigFileBase
   include SSLHelper
+  include TestPuma::PumaSocket
 
   def setup
     # use a pipe to get info across thread boundary
@@ -185,9 +187,8 @@ class TestPumaControlCli < TestConfigFileBase
   end
 
   def test_control_url_and_status
-    host = "127.0.0.1"
     port = UniquePort.call
-    url = "tcp://#{host}:#{port}/"
+    url = "tcp://#{HOST}:#{port}/"
 
     opts = [
       "--control-url", url,
@@ -202,18 +203,16 @@ class TestPumaControlCli < TestConfigFileBase
 
     wait_booted
 
-    s = TCPSocket.new host, 9292
-    s << "GET / HTTP/1.0\r\n\r\n"
-    body = s.read
-    assert_match "200 OK", body
-    assert_match "embedded app", body
+    resp = send_http_read_response GET_10, port: 9292
+
+    expected = "HTTP/1.0 200 OK\r\nContent-Length: 12\r\n\r\nembedded app"
+
+    assert_equal expected, resp
 
     assert_command_cli_output opts + ["status"], "Puma is started"
     assert_command_cli_output opts + ["stop"], "Command stop sent success"
 
     assert_kind_of Thread, t.join, "server didn't stop"
-  ensure
-    s.close
   end
 
   # This checks that a 'signal only' command is sent
@@ -222,9 +221,8 @@ class TestPumaControlCli < TestConfigFileBase
   def test_control_url_with_signal_only_cmd
     skip_if :windows
     skip unless defined? Puma::ControlCLI::NO_REQ_COMMANDS
-    host = "127.0.0.1"
     port = UniquePort.call
-    url = "tcp://#{host}:#{port}/"
+    url = "tcp://#{HOST}:#{port}/"
 
     opts = [
       "--control-url", url,
