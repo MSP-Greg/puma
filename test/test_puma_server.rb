@@ -1582,6 +1582,7 @@ end
 # These tests intermittently freeze, run serial
 #
 class TestPumaServer_S < TestPumaServer_Base
+#  parallelize_me!
 
   def test_timeout_in_data_phase(**options)
     server_run(first_data_timeout: 1, **options)
@@ -1614,10 +1615,11 @@ class TestPumaServer_S < TestPumaServer_Base
     end
 
     # Send two requests, allow serverto generate response
-    connections = Array.new(2) { wait << true; send_http req }
+    wait << true << true
+    connections = send_http_array 2, req
     connections.each { |skt| skt.read_response }
 
-    connections = Array.new(num_connections) { send_http req }
+    connections = send_http_array num_connections, req
 
     @server.stop
     wait.close
@@ -1663,11 +1665,13 @@ class TestPumaServer_S < TestPumaServer_Base
       [200, {}, ["DONE"]]
     end
 
-    # Send two requests, allow serverto generate response
-    connections = Array.new(2) { wait << true; send_http req }
+    # Send two requests, allow server to generate response
+    wait << true << true
+    connections = send_http_array 2, req
     connections.each { |skt| skt.read_response }
 
-    connections = Array.new(num_connections) { send_http (req * 2) }
+    # send array of 'double' requests
+    connections = send_http_array num_connections, req * 2
 
     @server.stop
     wait.close
