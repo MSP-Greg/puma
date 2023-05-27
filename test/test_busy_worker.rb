@@ -66,13 +66,12 @@ class TestBusyWorker < Minitest::Test
   def run_requests(n)
     # send all requests first, read later
     max_retries = 5
-    req = "GET / HTTP/1.0\r\n\r\n"
     resp = "HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World"
 
     skts = Array.new(n) {
       retries = 0
       begin
-        send_http req
+        send_http GET_10
       rescue Errno::ECONNREFUSED
         retries += 1
         if retries < max_retries
@@ -91,7 +90,7 @@ class TestBusyWorker < Minitest::Test
   # Multiple concurrent requests are not processed
   # sequentially as a small delay is introduced
   def test_multiple_requests_waiting_on_less_busy_worker
-    with_server(wait_for_less_busy_worker: 1.0)
+    with_server(wait_for_less_busy_worker: 2.0)
     n = 4
     run_requests n
 
