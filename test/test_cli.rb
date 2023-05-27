@@ -195,7 +195,7 @@ class TestCLI < Minitest::Test
 
     # send real requests to server
     3.times do
-      send_http_read_resp_body "GET / HTTP/1.0\r\n\r\n"
+      send_http_read_resp_body GET_10
     end
 
     body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", port: cntl
