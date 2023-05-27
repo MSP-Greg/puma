@@ -73,7 +73,7 @@ module TestPuma
 
     # Sends a request and returns the socket
     #
-    def send_http(req, host: nil, port: nil, path: nil, ctx: nil, session: nil)
+    def send_http(req = GET_11, host: nil, port: nil, path: nil, ctx: nil, session: nil)
       skt = new_connection host: host, port: port, path: path, ctx: ctx, session: session
       skt.syswrite req
       skt
@@ -199,6 +199,26 @@ module TestPuma
       end
       skt
     end
+
+    # Creates an array of sockets, sending a request on each
+    def send_http_array(len, req = GET_11, dly: 0.000_1, max_retries: 5)
+      Array.new(len) {
+        retries = 0
+        begin
+          skt = send_http req
+          sleep 0.000_1
+          skt
+        rescue Errno::ECONNREFUSED
+          retries += 1
+          if retries < max_retries
+            retry
+          else
+            flunk 'Generate requests failed from Errno::ECONNREFUSED'
+          end
+        end
+      }
+    end
+
 
     # Reads an array of sockets that have already had requests sent.
     # @param skts [Array<Sockets]] an array of sockets that have already had
