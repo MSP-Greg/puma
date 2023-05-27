@@ -84,7 +84,8 @@ class TestOutOfBandServer < Minitest::Test
     skts = []
 
     oob_server app_wait: true, max_threads: 2
-    requests_sent.times {skts << send_http(GET_10); sleep 0.0001 }
+
+    skts = send_http_array requests_sent, GET_10
 
     results = read_response_array skts
 
