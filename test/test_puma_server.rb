@@ -66,8 +66,8 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, {}, [env["SERVER_NAME"], "\n", env["SERVER_PORT"]]]
     end
 
-    data = send_http_read_response GET_10
-    assert_equal "localhost\n80", data.split("\r\n").last
+    resp = send_http_read_response GET_10
+    assert_equal "localhost\n80", resp.split("\r\n").last
   end
 
   def test_normalize_host_header_hostname
@@ -75,11 +75,11 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, {}, [env["SERVER_NAME"], "\n", env["SERVER_PORT"]]]
     end
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nHost: example.com:456\r\n\r\n"
-    assert_equal "example.com\n456", data.split("\r\n").last
+    resp = send_http_read_response "GET / HTTP/1.0\r\nHost: example.com:456\r\n\r\n"
+    assert_equal "example.com\n456", resp.split("\r\n").last
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n"
-    assert_equal "example.com\n80", data.split("\r\n").last
+    resp = send_http_read_response "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n"
+    assert_equal "example.com\n80", resp.split("\r\n").last
   end
 
   def test_normalize_host_header_ipv4
@@ -87,11 +87,11 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, {}, [env["SERVER_NAME"], "\n", env["SERVER_PORT"]]]
     end
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nHost: 123.123.123.123:456\r\n\r\n"
-    assert_equal "123.123.123.123\n456", data.split("\r\n").last
+    resp = send_http_read_response "GET / HTTP/1.0\r\nHost: 123.123.123.123:456\r\n\r\n"
+    assert_equal "123.123.123.123\n456", resp.split("\r\n").last
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nHost: 123.123.123.123\r\n\r\n"
-    assert_equal "123.123.123.123\n80", data.split("\r\n").last
+    resp = send_http_read_response "GET / HTTP/1.0\r\nHost: 123.123.123.123\r\n\r\n"
+    assert_equal "123.123.123.123\n80", resp.split("\r\n").last
   end
 
   def test_normalize_host_header_ipv6
@@ -99,14 +99,14 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, {}, [env["SERVER_NAME"], "\n", env["SERVER_PORT"]]]
     end
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nHost: [::ffff:127.0.0.1]:9292\r\n\r\n"
-    assert_equal "[::ffff:127.0.0.1]\n9292", data.split("\r\n").last
+    resp = send_http_read_response "GET / HTTP/1.0\r\nHost: [::ffff:127.0.0.1]:9292\r\n\r\n"
+    assert_equal "[::ffff:127.0.0.1]\n9292", resp.split("\r\n").last
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nHost: [::1]:9292\r\n\r\n"
-    assert_equal "[::1]\n9292", data.split("\r\n").last
+    resp = send_http_read_response "GET / HTTP/1.0\r\nHost: [::1]:9292\r\n\r\n"
+    assert_equal "[::1]\n9292", resp.split("\r\n").last
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nHost: [::1]\r\n\r\n"
-    assert_equal "[::1]\n80", data.split("\r\n").last
+    resp = send_http_read_response "GET / HTTP/1.0\r\nHost: [::1]\r\n\r\n"
+    assert_equal "[::1]\n80", resp.split("\r\n").last
   end
 
   def test_streaming_body
@@ -119,9 +119,9 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, {}, body]
     end
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
+    body = send_http_read_resp_body "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
 
-    assert_equal "Hello World", data.split(RESP_SPLIT, 2).last
+    assert_equal "Hello World", body
   end
 
   def test_file_body
@@ -160,10 +160,10 @@ class TestPumaServer_P < TestPumaServer_Base
   end
 
   def test_proper_stringio_body
-    data = nil
+    req_body = nil
 
     server_run do |env|
-      data = env['rack.input'].read
+      req_body = env['rack.input'].read
       [200, {}, ["ok"]]
     end
 
@@ -176,21 +176,21 @@ class TestPumaServer_P < TestPumaServer_Base
 
     sock.read_response
 
-    assert_equal "#{fifteen}#{fifteen}", data
+    assert_equal "#{fifteen}#{fifteen}", req_body
   end
 
   def test_puma_socket
-    body = "HTTP/1.1 750 Upgraded to Awesome\r\nDone: Yep!\r\n"
+    expected = "HTTP/1.1 750 Upgraded to Awesome\r\nDone: Yep!\r\n"
     server_run do |env|
       io = env['puma.socket']
-      io.syswrite body
+      io.syswrite expected
       io.close
       [-1, {}, []]
     end
 
-    data = send_http_read_response "PUT / HTTP/1.0\r\n\r\nHello"
+    resp = send_http_read_response "PUT / HTTP/1.0\r\n\r\nHello"
 
-    assert_equal body, data
+    assert_equal expected, resp
   end
 
   def test_very_large_return
@@ -257,17 +257,17 @@ class TestPumaServer_P < TestPumaServer_Base
   def test_HEAD_has_no_body
     server_run { [200, {"Foo" => "Bar"}, ["hello"]] }
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    assert_equal "HTTP/1.0 200 OK\r\nFoo: Bar\r\nContent-Length: 5\r\n\r\n", data
+    assert_equal "HTTP/1.0 200 OK\r\nFoo: Bar\r\nContent-Length: 5\r\n\r\n", resp
   end
 
   def test_GET_with_empty_body_has_sane_chunking
     server_run { EMPTY_200 }
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    assert_equal "HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n", resp
   end
 
   def test_early_hints_works
@@ -276,9 +276,9 @@ class TestPumaServer_P < TestPumaServer_Base
      [200, { "X-Hello" => "World" }, ["Hello world!"]]
     end
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    expected_data = <<~EOF.gsub("\n", "\r\n") + "\r\n"
+    expected = <<~RESP.gsub("\n", "\r\n") + "\r\n"
       HTTP/1.1 103 Early Hints
       Link: </style.css>; rel=preload; as=style
       Link: </script.js>; rel=preload
@@ -286,10 +286,10 @@ class TestPumaServer_P < TestPumaServer_Base
       HTTP/1.0 200 OK
       X-Hello: World
       Content-Length: 12
-    EOF
+    RESP
 
     assert_equal true, @server.early_hints
-    assert_equal expected_data, data
+    assert_equal expected, resp
   end
 
   def test_early_hints_are_ignored_if_connection_lost
@@ -319,16 +319,16 @@ class TestPumaServer_P < TestPumaServer_Base
      [200, { "X-Hello" => "World" }, ["Hello world!"]]
     end
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    expected_data = <<~EOF.gsub("\n", "\r\n") + "\r\n"
+    expected = <<~RESP.gsub("\n", "\r\n") + "\r\n"
       HTTP/1.0 200 OK
       X-Hello: World
       Content-Length: 12
-    EOF
+    RESP
 
     assert_nil @server.early_hints
-    assert_equal expected_data, data
+    assert_equal expected, resp
   end
 
   def test_request_payload_too_large
@@ -337,11 +337,10 @@ class TestPumaServer_P < TestPumaServer_Base
     sock = send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 19\r\n\r\n"
     sock << "hello world foo bar"
 
-    sock.wait_readable 3
-    data = sock.gets
+    resp = sock.read_response
 
     # Content Too Large
-    assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}\r\n", data
+    assert_includes resp, "HTTP/1.1 413 #{STATUS_CODES[413]}\r\n"
   end
 
   def test_http_11_keep_alive_with_large_payload
@@ -359,18 +358,18 @@ class TestPumaServer_P < TestPumaServer_Base
   def test_GET_with_no_body_has_sane_chunking
     server_run { [200, {}, []] }
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    assert_equal "HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n", resp
   end
 
   def test_doesnt_print_backtrace_in_production
     server_run(environment: :production) { raise "don't leak me bro" }
 
-    data = send_http_read_response GET_10
+    resp = send_http_read_response GET_10
 
-    refute_match(/don't leak me bro/, data)
-    assert_match(/HTTP\/1.0 500 Internal Server Error/, data)
+    refute_includes resp, "don't leak me bro"
+    assert_includes resp, "HTTP/1.0 500 Internal Server Error"
   end
 
   def test_eof_on_connection_close_is_not_logged_as_an_error
@@ -390,11 +389,11 @@ class TestPumaServer_P < TestPumaServer_Base
       sleep 5
     end
 
-    data = send_http_read_response GET_10
+    resp = send_http_read_response GET_10
 
-    assert_match(/HTTP\/1.0 500 Internal Server Error/, data)
-    assert_match(/Content-Type: application\/json/, data)
-    assert_match(/{}\n$/, data)
+    assert_includes resp, "HTTP/1.0 500 Internal Server Error"
+    assert_includes resp, "Content-Type: application/json"
+    assert_match(/{}\n$/, resp)
   end
 
   class ArrayClose < Array
@@ -416,12 +415,12 @@ class TestPumaServer_P < TestPumaServer_Base
       [[0,1], {}, app_body]
     end
 
-    data = send_http_read_response GET_10
+    resp = send_http_read_response GET_10
 
-    assert_includes data, 'HTTP/1.0 500 Internal Server Error'
-    assert_includes data, "Puma caught this error: undefined method `to_i' for"
-    assert_includes data, "Array"
-    refute_includes data, 'lowlevel_error'
+    assert_includes resp, 'HTTP/1.0 500 Internal Server Error'
+    assert_includes resp, "Puma caught this error: undefined method `to_i' for"
+    assert_includes resp, "Array"
+    refute_includes resp, 'lowlevel_error'
     sleep 0.1 unless ::Puma::IS_MRI
     assert app_body.closed?
   end
@@ -431,11 +430,11 @@ class TestPumaServer_P < TestPumaServer_Base
       raise NoMethodError, "Oh no an error"
     end
 
-    data = send_http_read_response GET_10
+    resp = send_http_read_response GET_10
 
     # Internal Server Error
-    assert_includes data, "HTTP/1.0 500 #{STATUS_CODES[500]}"
-    assert_match(/Puma caught this error: Oh no an error.*\(NoMethodError\).*test\/test_puma_server.rb/m, data)
+    assert_includes resp, "HTTP/1.0 500 #{STATUS_CODES[500]}"
+    assert_match(/Puma caught this error: Oh no an error.*\(NoMethodError\).*test\/test_puma_server.rb/m, resp)
   end
 
   def test_lowlevel_error_message_without_backtrace
@@ -443,11 +442,11 @@ class TestPumaServer_P < TestPumaServer_Base
       raise WithoutBacktraceError.new
     end
 
-    data = send_http_read_response GET_11
-    assert_includes data, 'HTTP/1.1 500 Internal Server Error'
+    resp = send_http_read_response GET_11
+    assert_includes resp, 'HTTP/1.1 500 Internal Server Error'
 
-    assert_includes data, 'Puma caught this error: no backtrace error (WithoutBacktraceError)'
-    assert_includes data, '<no backtrace available>'
+    assert_includes resp, 'Puma caught this error: no backtrace error (WithoutBacktraceError)'
+    assert_includes resp, '<no backtrace available>'
   end
 
   def test_force_shutdown_error_default
@@ -456,19 +455,19 @@ class TestPumaServer_P < TestPumaServer_Base
       sleep 5
     end
 
-    data = send_http_read_response GET_10
+    resp = send_http_read_response GET_10
 
-    assert_match(/HTTP\/1.0 503 Service Unavailable/, data)
-    assert_match(/Puma caught this error.+Puma::ThreadPool::ForceShutdown/, data)
+    assert_includes resp, "HTTP/1.0 503 Service Unavailable"
+    assert_match(/Puma caught this error.+Puma::ThreadPool::ForceShutdown/, resp)
   end
 
   def test_prints_custom_error
     re = lambda { |err| [302, {'Content-Type' => 'text', 'Location' => 'foo.html'}, ['302 found']] }
     server_run(lowlevel_error_handler: re) { raise "don't leak me bro" }
 
-    data = send_http_read_response GET_10
+    resp = send_http_read_response GET_10
 
-    assert_match(/HTTP\/1.0 302 Found/, data)
+    assert_includes resp, "HTTP/1.0 302 Found\r\n"
   end
 
   def test_leh_gets_env_as_well
@@ -479,9 +478,10 @@ class TestPumaServer_P < TestPumaServer_Base
 
     server_run(lowlevel_error_handler: re) { raise "don't leak me bro" }
 
-    data = send_http_read_response GET_10
+    resp = send_http_read_response GET_10
 
-    assert_match(/HTTP\/1.0 302 Found/, data)
+    assert_includes resp, "HTTP/1.0 302 Found\r\n"
+    assert_includes resp, "\r\n\r\n302 found"
   end
 
   def test_leh_has_status
@@ -492,34 +492,37 @@ class TestPumaServer_P < TestPumaServer_Base
 
     server_run(lowlevel_error_handler: re) { raise "don't leak me bro" }
 
-    data = send_http_read_response GET_10
+    resp = send_http_read_response GET_10
 
-    assert_match(/HTTP\/1.0 302 Found/, data)
+    assert_includes resp, "HTTP/1.0 302 Found\r\n"
+    assert_includes resp, "\r\n\r\n302 found"
   end
 
   def test_custom_http_codes_10
     server_run { [449, {}, [""]] }
 
-    data = send_http_read_response GET_10
+    resp = send_http_read_response GET_10
 
-    assert_equal "HTTP/1.0 449 CUSTOM\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "HTTP/1.0 449 CUSTOM\r\nContent-Length: 0\r\n\r\n", resp
   end
 
   def test_custom_http_codes_11
     server_run { [449, {}, [""]] }
 
-    data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
+    resp = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
 
-    assert_equal "HTTP/1.1 449 CUSTOM\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "HTTP/1.1 449 CUSTOM\r\nConnection: close\r\n" \
+      "Content-Length: 0\r\n\r\n", resp
   end
 
   def test_HEAD_returns_content_headers
     server_run { [200, {"Content-Type" => "application/pdf",
                                      "Content-Length" => "4242"}, []] }
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    assert_equal "HTTP/1.0 200 OK\r\nContent-Type: application/pdf\r\nContent-Length: 4242\r\n\r\n", data
+    assert_equal "HTTP/1.0 200 OK\r\nContent-Type: application/pdf\r\n" \
+      "Content-Length: 4242\r\n\r\n", resp
   end
 
   def test_status_hook_fires_when_server_changes_states
@@ -550,14 +553,13 @@ class TestPumaServer_P < TestPumaServer_Base
 
     sock << "hello"
     sleep 0.5
-    sock << "world"
+    sock << " world"
     sleep 0.5
     sock << "!"
 
-    sock.wait_readable 3
-    data = sock.gets
+    resp = sock.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\n", data
+    assert_includes resp, "HTTP/1.1 200 OK\r\n"
   end
 
   def test_no_timeout_after_data_received_no_queue
@@ -570,23 +572,25 @@ class TestPumaServer_P < TestPumaServer_Base
 
     sock = send_http "GET / HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n"
 
-    h = header sock
+    hdrs, body = sock.read_response.split RESP_SPLIT, 2
 
-    sock.wait_readable 3
-    body = sock.gets
+    expected = <<~RESP.gsub("\n", "\r\n")
+      HTTP/1.1 200 OK
+      Content-Type: plain/text
+      Content-Length: 6
+    RESP
 
-    assert_equal ["HTTP/1.1 200 OK", "Content-Type: plain/text", "Content-Length: 6"], h
+    assert_equal expected.rstrip, hdrs
     assert_equal "hello\n", body
-
-    sock.close
   end
 
   def test_http_11_close_with_body
     server_run { [200, {"Content-Type" => "plain/text"}, ["hello"]] }
 
-    data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
+    resp = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
 
-    assert_equal "HTTP/1.1 200 OK\r\nContent-Type: plain/text\r\nConnection: close\r\nContent-Length: 5\r\n\r\nhello", data
+    assert_equal "HTTP/1.1 200 OK\r\nContent-Type: plain/text\r\n" \
+      "Connection: close\r\nContent-Length: 5\r\n\r\nhello", resp
   end
 
   def test_http_11_keep_alive_without_body
@@ -628,9 +632,9 @@ class TestPumaServer_P < TestPumaServer_Base
   def test_http_10_close_with_body
     server_run { [200, {"Content-Type" => "plain/text"}, ["hello"]] }
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
+    resp = send_http_read_response "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
 
-    assert_equal "HTTP/1.0 200 OK\r\nContent-Type: plain/text\r\nContent-Length: 5\r\n\r\nhello", data
+    assert_equal "HTTP/1.0 200 OK\r\nContent-Type: plain/text\r\nContent-Length: 5\r\n\r\nhello", resp
   end
 
   def test_http_10_keep_alive_without_body
@@ -646,34 +650,33 @@ class TestPumaServer_P < TestPumaServer_Base
   def test_http_10_close_without_body
     server_run { [204, {}, []] }
 
-    data = send_http_read_response "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
+    resp = send_http_read_response "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
 
-    assert_equal "HTTP/1.0 204 No Content\r\n\r\n", data
+    assert_equal "HTTP/1.0 204 No Content\r\n\r\n", resp
   end
 
   def test_Expect_100
     server_run { EMPTY_200 }
 
-    skt = send_http "GET / HTTP/1.1\r\nConnection: close\r\nExpect: 100-continue\r\n\r\n"
-    data = skt.read_response
-    assert_equal "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    resp = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nExpect: 100-continue\r\n\r\n"
+    assert_equal "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
   end
 
   def test_chunked_request
-    body = nil
+    req_body = nil
     content_length = nil
     transfer_encoding = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       transfer_encoding = env['HTTP_TRANSFER_ENCODING']
       EMPTY_200
     }
 
-    data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: gzip,chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
+    resp = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: gzip,chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal "hello", body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal "hello", req_body
     assert_equal "5", content_length
     assert_nil transfer_encoding
   end
@@ -700,19 +703,19 @@ class TestPumaServer_P < TestPumaServer_Base
       request_body = '.' * size
       request = "#{header}#{size.to_s(16)}\r\n#{request_body}\r\n0\r\n\r\n"
 
-      data = send_http_read_response request
+      resp = send_http_read_response request
 
-      assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+      assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
       assert_equal size, Integer(content_length)
       assert_equal request_body, body
     end
   end
 
   def test_chunked_request_pause_before_value
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -721,18 +724,18 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 1
     sock << "h\r\n4\r\nello\r\n0\r\n\r\n"
 
-    data = sock.read_response
+    resp = sock.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal "hello", body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal "hello", req_body
     assert_equal "5", content_length
   end
 
   def test_chunked_request_pause_between_chunks
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -741,18 +744,18 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 1
     sock << "4\r\nello\r\n0\r\n\r\n"
 
-    data = sock.read_response
+    resp = sock.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal "hello", body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal "hello", req_body
     assert_equal "5", content_length
   end
 
   def test_chunked_request_pause_mid_count
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -761,18 +764,18 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 1
     sock << "\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
-    data = sock.read_response
+    resp = sock.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal "hello", body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal "hello", req_body
     assert_equal "5", content_length
   end
 
   def test_chunked_request_pause_before_count_newline
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -781,18 +784,18 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 1
     sock << "\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
-    data = sock.read_response
+    resp = sock.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal "hello", body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal "hello", req_body
     assert_equal "5", content_length
   end
 
   def test_chunked_request_pause_mid_value
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -801,18 +804,18 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 1
     sock << "llo\r\n0\r\n\r\n"
 
-    data = sock.read_response
+    resp = sock.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal "hello", body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal "hello", req_body
     assert_equal "5", content_length
   end
 
   def test_chunked_request_pause_between_cr_lf_after_size_of_second_chunk
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -827,18 +830,18 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 0.1
     sock << chunked_body[-9..-1]
 
-    data = sock.read_response
+    resp = sock.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal (part1 + 'b'), body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal (part1 + 'b'), req_body
     assert_equal "4201", content_length
   end
 
   def test_chunked_request_pause_between_closing_cr_lf
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -847,18 +850,18 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 1
     sock << "\n0\r\n\r\n"
 
-    data = sock.read_response
+    resp = sock.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal 'hello', body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal 'hello', req_body
     assert_equal "5", content_length
   end
 
   def test_chunked_request_pause_before_closing_cr_lf
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -867,34 +870,34 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 1
     sock << "\r\n0\r\n\r\n"
 
-    data = sock.read_response
+    resp = sock.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal 'hello', body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal 'hello', req_body
     assert_equal "5", content_length
   end
 
   def test_chunked_request_header_case
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
 
-    data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: Chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
+    resp = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: Chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
-    assert_equal "hello", body
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    assert_equal "hello", req_body
     assert_equal "5", content_length
   end
 
   def test_chunked_keep_alive
-    body = nil
+    req_body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -904,7 +907,7 @@ class TestPumaServer_P < TestPumaServer_Base
     h = header sock
 
     assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], h
-    assert_equal "hello", body
+    assert_equal "hello", req_body
     assert_equal "5", content_length
 
     sock.close
@@ -952,11 +955,11 @@ class TestPumaServer_P < TestPumaServer_Base
   end
 
   def test_chunked_keep_alive_two_back_to_back_with_set_remote_address
-    body = nil
+    req_body = nil
     content_length = nil
     remote_addr =nil
     server_run(remote_address: :header, remote_address_header: 'HTTP_X_FORWARDED_FOR') { |env|
-      body = env['rack.input'].read
+      req_body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       remote_addr = env['REMOTE_ADDR']
       EMPTY_200
@@ -966,7 +969,7 @@ class TestPumaServer_P < TestPumaServer_Base
 
     h = header sock
     assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], h
-    assert_equal "hello", body
+    assert_equal "hello", req_body
     assert_equal "5", content_length
     assert_equal "127.0.0.1", remote_addr
 
@@ -976,7 +979,7 @@ class TestPumaServer_P < TestPumaServer_Base
     h = header(sock)
 
     assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], h
-    assert_equal "goodbye", body
+    assert_equal "goodbye", req_body
     assert_equal "7", content_length
     assert_equal "127.0.0.2", remote_addr
 
@@ -1009,9 +1012,9 @@ class TestPumaServer_P < TestPumaServer_Base
   def test_empty_header_values
     server_run { [200, {"X-Empty-Header" => ""}, []] }
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    assert_equal "HTTP/1.0 200 OK\r\nX-Empty-Header: \r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "HTTP/1.0 200 OK\r\nX-Empty-Header: \r\nContent-Length: 0\r\n\r\n", resp
   end
 
   def test_request_body_wait
@@ -1069,9 +1072,9 @@ class TestPumaServer_P < TestPumaServer_Base
   def test_newline_splits
     server_run { [200, {'X-header' => "first line\nsecond line"}, ["Hello"]] }
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    assert_match "X-header: first line\r\nX-header: second line\r\n", data
+    assert_includes resp, "X-header: first line\r\nX-header: second line\r\n"
   end
 
   def test_newline_splits_in_early_hint
@@ -1080,9 +1083,9 @@ class TestPumaServer_P < TestPumaServer_Base
       [200, {}, ["Hello world!"]]
     end
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    assert_match "X-header: first line\r\nX-header: second line\r\n", data
+    assert_includes resp, "X-header: first line\r\nX-header: second line\r\n"
   end
 
   def test_proxy_protocol
@@ -1105,9 +1108,9 @@ class TestPumaServer_P < TestPumaServer_Base
   def assert_does_not_allow_http_injection(app, opts = {})
     server_run(early_hints: opts[:early_hints], &app)
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    resp = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    refute_match(/[\r\n]Cookie: hack[\r\n]/, data)
+    refute_match(/[\r\n]Cookie: hack[\r\n]/, resp)
   end
 
   # HTTP Injection Tests
