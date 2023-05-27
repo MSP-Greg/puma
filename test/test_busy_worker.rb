@@ -5,7 +5,7 @@ require_relative "helpers/puma_socket"
 
 class TestBusyWorker < Minitest::Test
   # below may have intermittent failures
-  #parallelize_me! if ::Puma::IS_MRI
+  # parallelize_me! if ::Puma::IS_MRI
 
   include TestPuma::PumaSocket
 
@@ -14,7 +14,6 @@ class TestBusyWorker < Minitest::Test
   def setup
     skip_unless :mri # This feature only makes sense on MRI
 
-    @host = '127.0.0.1'
     @app = -> (env) {
       sleep 0.1
       RESPONSE
@@ -65,22 +64,9 @@ class TestBusyWorker < Minitest::Test
 
   def run_requests(n)
     # send all requests first, read later
-    max_retries = 5
     resp = "HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World"
 
-    skts = Array.new(n) {
-      retries = 0
-      begin
-        send_http GET_10
-      rescue Errno::ECONNREFUSED
-        retries += 1
-        if retries < max_retries
-          retry
-        else
-          flunk 'Generate requests failed from Errno::ECONNREFUSED'
-        end
-      end
-    }
+    skts = send_http_array n, GET_10
 
     results = read_response_array skts
 
