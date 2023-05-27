@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'socket'
+
 module TestPuma
 
   # Note: no setup or teardown, make sure to initialize @ios = []
@@ -14,6 +16,8 @@ module TestPuma
     RESP_SPLIT = "\r\n\r\n"
     NO_ENTITY_BODY = Puma::STATUS_WITH_NO_ENTITY_BODY
     EMPTY_200 = [200, {}, ['']]
+
+    SET_TCP_NODELAY = ::Socket.const_defined? :TCP_NODELAY
 
     def before_setup
       @ios_to_close ||= []
@@ -175,6 +179,7 @@ module TestPuma
           UNIXSocket.new path.sub(/\A@/, "\0") # sub is for abstract
         elsif port && !path
           tcp = TCPSocket.new @host, port
+          tcp.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1) if SET_TCP_NODELAY
           if ctx
             ::OpenSSL::SSL::SSLSocket.new tcp, ctx
           else
