@@ -80,13 +80,11 @@ class TestOutOfBandServer < Minitest::Test
   # Stream of requests on concurrent connections should trigger
   # out_of_band hooks only once after the final request.
   def test_stream
-    req_str = "GET / HTTP/1.0\r\n\r\n"
     requests_sent = 100
-    #skts = Thread::Queue.new
     skts = []
 
     oob_server app_wait: true, max_threads: 2
-    requests_sent.times {skts << send_http(req_str); sleep 0.0001 }
+    requests_sent.times {skts << send_http(GET_10); sleep 0.0001 }
 
     results = read_response_array skts
 
