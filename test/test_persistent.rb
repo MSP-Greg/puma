@@ -168,8 +168,10 @@ class TestPersistent < Minitest::Test
     end
   end
 
+  # Puma will calculate the content-length of an array, but will always send an
+  # enumerable body as chunked, unless content-length is specified by the app
   def test_app_sets_content_length
-    @body = ["hello", " world"]
+    @body = ["hello", " world"].to_enum
     @headers['Content-Length'] = "11"
 
     @client << VALID_REQUEST
