@@ -7,12 +7,26 @@ gem "rake-compiler", "~> 1.1.1"
 
 gem "json", "~> 2.3"
 gem "nio4r", "~> 2.0"
-gem "rack", ">= 1.6.13"
 gem "minitest", "~> 5.11"
 gem "minitest-retry"
 gem "minitest-proveit"
 gem "minitest-stub-const"
 gem "sd_notify"
+
+use_rackup = false
+rack_vers =
+  case ENV.key?('PUMA_CI_RACK') && ENV['PUMA_CI_RACK'].strip
+  when 'rack2'
+    '~> 2.2'
+  when 'rack1'
+    '~> 1.6'
+  else
+    use_rackup = true
+    '>= 2.2'
+  end
+
+gem "rack", rack_vers
+gem "rackup" if use_rackup
 
 gem "jruby-openssl", :platform => "jruby"
 
