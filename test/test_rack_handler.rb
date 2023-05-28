@@ -1,17 +1,32 @@
 require_relative "helper"
 
-require "rack/handler/puma"
+begin
+  require 'rackup/handler'
+rescue LoadError
+  require 'rack/handler'
+end
 
-class TestHandlerGetStrSym < Minitest::Test
+require 'rack/version.rb'
+require 'rack/handler/puma'
+
+class TestRackUpBase < Minitest::Test
+  RACK_HANDLER = Object.const_defined?(:Rackup) ?
+    ::Rackup::Handler : ::Rack::Handler
+end
+
+class TestHandlerGetStrSym < TestRackUpBase
   def test_handler
-    handler = Rack::Handler.get(:puma)
-    assert_equal Rack::Handler::Puma, handler
-    handler = Rack::Handler.get('Puma')
-    assert_equal Rack::Handler::Puma, handler
+    rack_handler = Object.const_defined?(:Rackup) ?
+      ::Rackup::Handler : ::Rack::Handler
+
+    handler = RACK_HANDLER.get(:puma)
+    assert_equal RACK_HANDLER::Puma, handler
+    handler = RACK_HANDLER.get('Puma')
+    assert_equal RACK_HANDLER::Puma, handler
   end
 end
 
-class TestPathHandler < Minitest::Test
+class TestPathHandler < TestRackUpBase
   def app
     Proc.new {|env| @input = env; [200, {}, ["hello world"]]}
   end
@@ -26,7 +41,7 @@ class TestPathHandler < Minitest::Test
 
     @launcher = nil
     thread = Thread.new do
-      Rack::Handler::Puma.run(app, **options) do |s, p|
+      RACK_HANDLER::Puma.run(app, **options) do |s, p|
         @launcher = s
       end
     end
@@ -54,7 +69,7 @@ class TestPathHandler < Minitest::Test
   end
 end
 
-class TestUserSuppliedOptionsPortIsSet < Minitest::Test
+class TestUserSuppliedOptionsPortIsSet < TestRackUpBase
   def setup
     @options = {}
     @options[:user_supplied_options] = [:Port]
@@ -70,7 +85,7 @@ class TestUserSuppliedOptionsPortIsSet < Minitest::Test
         File.open("config/puma.rb", "w") { |f| f << "port #{file_port}" }
 
         @options[:Port] = user_port
-        conf = Rack::Handler::Puma.config(->{}, @options)
+        conf = RACK_HANDLER::Puma.config(->{}, @options)
         conf.load
 
         assert_equal ["tcp://0.0.0.0:#{user_port}"], conf.options[:binds]
@@ -79,7 +94,7 @@ class TestUserSuppliedOptionsPortIsSet < Minitest::Test
   end
 end
 
-class TestUserSuppliedOptionsHostIsSet < Minitest::Test
+class TestUserSuppliedOptionsHostIsSet < TestRackUpBase
   def setup
     @options = {}
     @options[:user_supplied_options] = [:Host]
@@ -91,7 +106,7 @@ class TestUserSuppliedOptionsHostIsSet < Minitest::Test
 
     @options[:Host] = user_host
     @options[:Port] = user_port
-    conf = Rack::Handler::Puma.config(->{}, @options)
+    conf = RACK_HANDLER::Puma.config(->{}, @options)
     conf.load
 
     assert_equal ["tcp://#{user_host}:#{user_port}"], conf.options[:binds]
@@ -99,14 +114,14 @@ class TestUserSuppliedOptionsHostIsSet < Minitest::Test
 
   def test_ipv6_host_supplied_port_default
     @options[:Host] = "::1"
-    conf = Rack::Handler::Puma.config(->{}, @options)
+    conf = RACK_HANDLER::Puma.config(->{}, @options)
     conf.load
 
     assert_equal ["tcp://[::1]:9292"], conf.options[:binds]
   end
 end
 
-class TestUserSuppliedOptionsIsEmpty < Minitest::Test
+class TestUserSuppliedOptionsIsEmpty < TestRackUpBase
   def setup
     @options = {}
     @options[:user_supplied_options] = []
@@ -122,7 +137,7 @@ class TestUserSuppliedOptionsIsEmpty < Minitest::Test
         File.open("config/puma.rb", "w") { |f| f << "port #{file_port}" }
 
         @options[:Port] = user_port
-        conf = Rack::Handler::Puma.config(->{}, @options)
+        conf = RACK_HANDLER::Puma.config(->{}, @options)
         conf.load
 
         assert_equal ["tcp://0.0.0.0:#{file_port}"], conf.options[:binds]
@@ -141,7 +156,7 @@ class TestUserSuppliedOptionsIsEmpty < Minitest::Test
 
         @options[:Host] = "localhost"
         @options[:Port] = user_port
-        conf = Rack::Handler::Puma.config(->{}, @options)
+        conf = RACK_HANDLER::Puma.config(->{}, @options)
         conf.load
 
         assert_equal ["tcp://localhost:#{file_port}"], conf.options[:binds]
@@ -160,7 +175,7 @@ class TestUserSuppliedOptionsIsEmpty < Minitest::Test
 
         @options[:Host] = "localhost"
         @options[:Port] = user_port
-        conf = Rack::Handler::Puma.config(->{}, @options)
+        conf = RACK_HANDLER::Puma.config(->{}, @options)
         conf.load
 
         assert_equal ["tcp://1.2.3.4:#{file_port}"], conf.options[:binds]
@@ -169,13 +184,13 @@ class TestUserSuppliedOptionsIsEmpty < Minitest::Test
   end
 end
 
-class TestUserSuppliedOptionsIsNotPresent < Minitest::Test
+class TestUserSuppliedOptionsIsNotPresent < TestRackUpBase
   def setup
     @options = {}
   end
 
   def test_default_port_when_no_config_file
-    conf = Rack::Handler::Puma.config(->{}, @options)
+    conf = RACK_HANDLER::Puma.config(->{}, @options)
     conf.load
 
     assert_equal ["tcp://0.0.0.0:9292"], conf.options[:binds]
@@ -189,7 +204,7 @@ class TestUserSuppliedOptionsIsNotPresent < Minitest::Test
         FileUtils.mkdir("config")
         File.open("config/puma.rb", "w") { |f| f << "port #{file_port}" }
 
-        conf = Rack::Handler::Puma.config(->{}, @options)
+        conf = RACK_HANDLER::Puma.config(->{}, @options)
         conf.load
 
         assert_equal ["tcp://0.0.0.0:#{file_port}"], conf.options[:binds]
@@ -201,7 +216,7 @@ class TestUserSuppliedOptionsIsNotPresent < Minitest::Test
     user_port = 5001
     @options[:user_supplied_options] = []
     @options[:Port] = user_port
-    conf = Rack::Handler::Puma.config(->{}, @options)
+    conf = RACK_HANDLER::Puma.config(->{}, @options)
     conf.load
 
     assert_equal ["tcp://0.0.0.0:#{user_port}"], conf.options[:binds]
@@ -210,7 +225,7 @@ class TestUserSuppliedOptionsIsNotPresent < Minitest::Test
   def test_user_port_wins_over_default
     user_port = 5001
     @options[:Port] = user_port
-    conf = Rack::Handler::Puma.config(->{}, @options)
+    conf = RACK_HANDLER::Puma.config(->{}, @options)
     conf.load
 
     assert_equal ["tcp://0.0.0.0:#{user_port}"], conf.options[:binds]
@@ -226,7 +241,7 @@ class TestUserSuppliedOptionsIsNotPresent < Minitest::Test
         File.open("config/puma.rb", "w") { |f| f << "port #{file_port}" }
 
         @options[:Port] = user_port
-        conf = Rack::Handler::Puma.config(->{}, @options)
+        conf = RACK_HANDLER::Puma.config(->{}, @options)
         conf.load
 
         assert_equal ["tcp://0.0.0.0:#{user_port}"], conf.options[:binds]
@@ -235,7 +250,7 @@ class TestUserSuppliedOptionsIsNotPresent < Minitest::Test
   end
 
   def test_default_log_request_when_no_config_file
-    conf = Rack::Handler::Puma.config(->{}, @options)
+    conf = RACK_HANDLER::Puma.config(->{}, @options)
     conf.load
 
     assert_equal false, conf.options[:log_requests]
@@ -248,7 +263,7 @@ class TestUserSuppliedOptionsIsNotPresent < Minitest::Test
       'test/config/t1_conf.rb'
     ]
 
-    conf = Rack::Handler::Puma.config(->{}, @options)
+    conf = RACK_HANDLER::Puma.config(->{}, @options)
     conf.load
 
     assert_equal file_log_requests_config, conf.options[:log_requests]
@@ -262,7 +277,7 @@ class TestUserSuppliedOptionsIsNotPresent < Minitest::Test
       'test/config/t1_conf.rb'
     ]
 
-    conf = Rack::Handler::Puma.config(->{}, @options)
+    conf = RACK_HANDLER::Puma.config(->{}, @options)
     conf.load
 
     assert_equal user_log_requests_config, conf.options[:log_requests]

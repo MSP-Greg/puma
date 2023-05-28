@@ -2,7 +2,22 @@
 require_relative "helper"
 require "net/http"
 
-require "rack"
+# don't load Rack, as it autoloads everything
+begin
+  require "rack/body_proxy"
+  require "rack/lint"
+  require "rack/version"
+  require "rack/common_logger"
+  require "rack/constants"
+rescue LoadError # Rack 1.6
+  require "rack"
+end
+
+# Rack::Chunked is loaded by Rack v2, needs to be required by Rack 3.0,
+# and is removed in Rack 3.1
+require "rack/chunked" if Rack.release.start_with? '3.0'
+
+require "nio"
 
 class TestRackServer < Minitest::Test
   parallelize_me!
@@ -27,7 +42,11 @@ class TestRackServer < Minitest::Test
 
   class ServerLint < Rack::Lint
     def call(env)
-      check_env env
+      if Rack.release < '3'
+        check_env env
+      else
+        Wrapper.new(@app, env).check_environment env
+      end
 
       @app.call(env)
     end
