@@ -38,10 +38,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-20.04, ubuntu-18.04, macos-10.15, macos-11, windows-2022 ]
+        os: [ ubuntu-20.04, macos-11, windows-2022 ]
         ruby: [ 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, '3.0', 3.1, head ]
         no-ssl: ['']
         yjit: ['']
+        rack-v: ['rack2']
         include:
           - { os: windows-2022 , ruby: ucrt }
           - { os: windows-2022 , ruby: mswin }
@@ -49,16 +50,20 @@ jobs:
           - { os: ubuntu-20.04 , ruby: head , yjit: ' yjit' }
           - { os: ubuntu-20.04 , ruby: 2.7  , no-ssl: ' no SSL' }
           - { os: ubuntu-22.04 , ruby: 3.1  }
+          - { os: ubuntu-22.04 , ruby: 3.2  }
+          # Rack 3 test
+          - { os: ubuntu-22.04 , ruby: 2.4, rack-v: '' }
+          - { os: ubuntu-22.04 , ruby: 3.2, rack-v: '' }
           - { os: ubuntu-22.04 , ruby: head }
+          - { os: macos-12     , ruby: 2.5  }
+          - { os: macos-12     , ruby: 2.7  }
+          - { os: macos-12     , ruby: 3.0  }
+          - { os: macos-12     , ruby: 3.2  }
 
         exclude:
           - { os: ubuntu-20.04 , ruby: 2.2  }
           - { os: ubuntu-20.04 , ruby: 2.3  }
           - { os: windows-2022 , ruby: head }
-          - { os: macos-10.15  , ruby: 2.6  }
-          - { os: macos-10.15  , ruby: 2.7  }
-          - { os: macos-10.15  , ruby: '3.0'}
-          - { os: macos-10.15  , ruby: 3.1  }
           - { os: macos-11     , ruby: 2.2  }
           - { os: macos-11     , ruby: 2.3  }
           - { os: macos-11     , ruby: 2.4  }
@@ -66,6 +71,10 @@ jobs:
     steps:
       - name: repo checkout
         uses: actions/checkout@v3
+
+      - name: Set Rack version, see Gemfile
+        shell: bash
+        run: echo 'PUMA_CI_RACK=${{ matrix.rack-v }}' >> $GITHUB_ENV
 
       - name: load ruby
         uses: ruby/setup-ruby-pkgs@v1
