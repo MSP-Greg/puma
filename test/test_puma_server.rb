@@ -1532,8 +1532,8 @@ class TestPumaServer_P < TestPumaServer_Base
       body = [env['REQUEST_METHOD']]
       [200, {}, body]
     end
-    resp = send_http_and_read "PROPFIND / HTTP/1.0\r\n\r\n"
-    assert_match 'PROPFIND', resp
+    resp = send_http_read_response "PROPFIND / HTTP/1.0\r\n\r\n"
+    assert_includes resp, 'PROPFIND'
   end
 
   def test_supported_http_methods_no_match
@@ -1541,8 +1541,8 @@ class TestPumaServer_P < TestPumaServer_Base
       body = [env['REQUEST_METHOD']]
       [200, {}, body]
     end
-    resp = send_http_and_read "GET / HTTP/1.0\r\n\r\n"
-    assert_match 'Not Implemented', resp
+    resp = send_http_read_response GET_10
+    assert_includes resp, "HTTP/1.0 501 #{STATUS_CODES[501]}\r\n"
   end
 
   def test_supported_http_methods_accept_all
@@ -1550,8 +1550,8 @@ class TestPumaServer_P < TestPumaServer_Base
       body = [env['REQUEST_METHOD']]
       [200, {}, body]
     end
-    resp = send_http_and_read "YOUR_SPECIAL_METHOD / HTTP/1.0\r\n\r\n"
-    assert_match 'YOUR_SPECIAL_METHOD', resp
+    resp = send_http_read_response "YOUR_SPECIAL_METHOD / HTTP/1.0\r\n\r\n"
+    assert_includes resp, 'YOUR_SPECIAL_METHOD'
   end
 
   def test_supported_http_methods_empty
@@ -1559,10 +1559,9 @@ class TestPumaServer_P < TestPumaServer_Base
       body = [env['REQUEST_METHOD']]
       [200, {}, body]
     end
-    resp = send_http_and_read "GET / HTTP/1.0\r\n\r\n"
-    assert_match(/\AHTTP\/1\.0 501 Not Implemented/, resp)
+    resp = send_http_read_response GET_10
+    assert_includes resp, "HTTP/1.0 501 #{STATUS_CODES[501]}\r\n"
   end
-
 
   def spawn_cmd(env = {}, cmd)
     opts = {}
