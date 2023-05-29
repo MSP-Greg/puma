@@ -18,7 +18,7 @@ class TestHandler
 end
 
 class WebServerTest < Minitest::Test
-  parallelize_me!
+#  parallelize_me!
 
   include TestPuma::PumaSocket
 
@@ -81,17 +81,15 @@ class WebServerTest < Minitest::Test
   end
 
   def test_supported_http_method
-    socket = do_test("PATCH www.zedshaw.com:443 HTTP/1.1\r\nConnection: close\r\n\r\n", 100)
-    response = socket.read
-    assert_match "hello", response
-    socket.close
-#     req = "PATCH www.zedshaw.com:443 HTTP/1.1\r\nConnection: close\r\n\r\n"
-#     assert_match "hello", do_test(req, 100)
+     req = "PATCH www.zedshaw.com:443 HTTP/1.1\r\nConnection: close\r\n\r\n"
+     resp = do_test req, 100
+     assert_includes resp, "hello"
+     assert_includes resp, "HTTP/1.1 200 OK\r\n"
   end
 
   def test_nonexistent_http_method
     req = "FOOBARBAZ www.zedshaw.com:443 HTTP/1.1\r\nConnection: close\r\n\r\n"
-    assert_match "Not Implemented", do_test(req, 100)
+    assert_match "HTTP/1.1 501 Not Implemented\r\n", do_test(req, 100)
   end
 
   private
