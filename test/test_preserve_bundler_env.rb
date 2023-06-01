@@ -27,7 +27,7 @@ class TestPreserveBundlerEnv < TestIntegration
     Dir.chdir(File.expand_path("bundle_preservation_test", __dir__)) do
       cli_server "-q -w 1 --prune-bundler", env: env
     end
-    connection = connect
+    connection = fast_connect
     initial_reply = read_body(connection)
     assert_match("Gemfile.bundle_env_preservation_test", initial_reply)
     restart_server connection
@@ -48,7 +48,7 @@ class TestPreserveBundlerEnv < TestIntegration
     Dir.chdir File.expand_path("bundle_app_config_test", __dir__) do
       cli_server "-q -w 1 --prune-bundler", env: env
     end
-    reply = read_body(connect)
+    reply = read_body(fast_connect)
     assert_equal("Hello World", reply)
   end
 
@@ -63,7 +63,7 @@ class TestPreserveBundlerEnv < TestIntegration
     Dir.chdir(current_release_symlink) do
       cli_server "-q -w 1 --prune-bundler", env: env
     end
-    connection = connect
+    connection = fast_connect
 
     # Bundler itself sets ENV['BUNDLE_GEMFILE'] to the Gemfile it finds if ENV['BUNDLE_GEMFILE'] was unspecified
     initial_reply = read_body(connection)
@@ -73,7 +73,7 @@ class TestPreserveBundlerEnv < TestIntegration
     set_release_symlink File.expand_path("bundle_preservation_test/version2", __dir__)
     start_phased_restart
 
-    connection = connect
+    connection = fast_connect
     new_reply = read_body(connection)
     expected_gemfile = File.expand_path("bundle_preservation_test/version2/Gemfile", __dir__).inspect
     assert_equal(expected_gemfile, new_reply)
