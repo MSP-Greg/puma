@@ -57,7 +57,7 @@ module TestPuma
 
     # Sends a request and returns the response body
     #
-    def send_http_read_resp_body(req, host: nil, port: nil, path: nil, ctx: nil,
+    def send_http_read_resp_body(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: nil, timeout: nil, decode_chunked: nil, times: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
       skt.read_body timeout, len: len, decode_chunked: decode_chunked, times: times
@@ -65,7 +65,7 @@ module TestPuma
 
     # Sends a request and returns the response string
     #
-    def send_http_read_response(req, host: nil, port: nil, path: nil, ctx: nil,
+    def send_http_read_response(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: nil, timeout: nil, decode_chunked: nil, times: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
       skt.read_response timeout, len: len, decode_chunked: decode_chunked, times: times
