@@ -232,8 +232,8 @@ module TestPuma
         until skts.compact.empty?
           skts.each_with_index do |skt, idx|
             next if skt.nil?
-            next unless skt.wait_readable 0.000_5
             begin
+              next unless skt.wait_readable 0.000_5
               if resp_count
                 resp = skt.read_response.dup
                 cntr = 0
