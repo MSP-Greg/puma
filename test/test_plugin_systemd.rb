@@ -1,8 +1,11 @@
 require_relative "helper"
 require_relative "helpers/integration"
+require_relative "helpers/puma_socket"
 
 class TestPluginSystemd < TestIntegration
   parallelize_me! if ::Puma::IS_MRI && ::Puma::IS_LINUX
+
+  include TestPuma::PumaSocket
 
   THREAD_LOG = TRUFFLE ? "{ 0/16 threads, 16 available, 0 backlog }" :
     "{ 0/5 threads, 5 available, 0 backlog }"
@@ -86,12 +89,12 @@ class TestPluginSystemd < TestIntegration
     assert_message 'READY=1'
 
     Process.kill signal, @pid
-    connect.write "GET / HTTP/1.1\r\n\r\n"
+    send_http_read_response
     assert_message 'RELOADING=1'
     assert_message 'READY=1'
 
     Process.kill signal, @pid
-    connect.write "GET / HTTP/1.1\r\n\r\n"
+    send_http_read_response
     assert_message 'RELOADING=1'
     assert_message 'READY=1'
 
