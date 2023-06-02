@@ -61,7 +61,7 @@ class TestIntegrationSingle_1 < TestIntegration
     skip_unless_signal_exist? :TERM
 
     cli_server "-C test/config/suppress_exception.rb test/rackup/hello.ru"
-    reply = read_body(fast_connect)
+    read_body(fast_connect)
 
     _, status = stop_server
 
