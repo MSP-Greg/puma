@@ -1,3 +1,3 @@
 on_booted do
-  puts "on_booted called"
+  puts "first on_booted called"
 end
