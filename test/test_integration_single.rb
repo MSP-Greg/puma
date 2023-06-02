@@ -61,6 +61,8 @@ class TestIntegrationSingle_1 < TestIntegration
     skip_unless_signal_exist? :TERM
 
     cli_server "-C test/config/suppress_exception.rb test/rackup/hello.ru"
+    reply = read_body(fast_connect)
+
     _, status = stop_server
 
     assert_equal 0, status
@@ -71,7 +73,7 @@ class TestIntegrationSingle_1 < TestIntegration
 
     cli_server("test/rackup/url_scheme.ru")
 
-    reply = read_body(connect)
+    reply = read_body(fast_connect)
     stop_server
 
     assert_equal 'http', reply
@@ -82,7 +84,7 @@ class TestIntegrationSingle_1 < TestIntegration
 
     cli_server("-C test/config/rack_url_scheme.rb test/rackup/url_scheme.ru")
 
-    reply = read_body(connect)
+    reply = read_body(fast_connect)
     stop_server
 
     assert_equal 'https', reply
@@ -92,7 +94,7 @@ class TestIntegrationSingle_1 < TestIntegration
     skip_unless_signal_exist? :TERM
 
     cli_server "-C test/config/with_rackup_from_dsl.rb test/rackup/hello.ru"
-    reply = read_body(connect)
+    reply = read_body(fast_connect)
     stop_server
 
     assert_equal 'Hello World', reply
