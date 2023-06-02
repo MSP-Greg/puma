@@ -215,12 +215,6 @@ class TestIntegrationSingle_1 < TestIntegration
     # linux IOError, macOS Errno::EBADF
     assert_match(/Exception handling servers: (#<IOError: closed stream>|#<Errno::EBADF: Bad file descriptor>)/, server_err)
   end
-
-  def test_puma_debug_loaded_exts
-    cli_server "#{set_pumactl_args} test/rackup/hello.ru", puma_debug: true
-
-    assert wait_for_server_to_include('Loaded Extensions:')
-  end
 end
 
 class TestIntegrationSingle_2 < TestIntegration
@@ -280,5 +274,11 @@ class TestIntegrationSingle_2 < TestIntegration
     assert_equal "Puma is started\n", out
   ensure
     File.unlink 't2-pid' if File.file? 't2-pid'
+  end
+
+  def test_puma_debug_loaded_exts
+    cli_server "#{set_pumactl_args} test/rackup/hello.ru", puma_debug: true
+
+    assert wait_for_server_to_include('Loaded Extensions:')
   end
 end
