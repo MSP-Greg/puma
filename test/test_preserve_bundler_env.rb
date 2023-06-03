@@ -23,9 +23,8 @@ class TestPreserveBundlerEnv < TestIntegration
       # Don't allow our (rake test's) original env to interfere with the child process
       "BUNDLER_ORIG_BUNDLE_GEMFILE" => nil
     }
-    # Must use `bundle exec puma` here, because otherwise Bundler may not be defined, which is required to trigger the bug
     Dir.chdir(File.expand_path("bundle_preservation_test", __dir__)) do
-      cli_server "-q -w 1 --prune-bundler", env: env
+      cli_server "-q -w 1 -t1:5 --prune-bundler", env: env
     end
     connection = fast_connect
     initial_reply = read_body(connection)
@@ -46,7 +45,7 @@ class TestPreserveBundlerEnv < TestIntegration
       "BUNDLER_ORIG_BUNDLE_GEMFILE" => nil
     }
     Dir.chdir File.expand_path("bundle_app_config_test", __dir__) do
-      cli_server "-q -w 1 --prune-bundler", env: env
+      cli_server "-q -w 1 -t1:5 --prune-bundler", env: env
     end
     reply = read_body(fast_connect)
     assert_equal("Hello World", reply)
@@ -61,7 +60,7 @@ class TestPreserveBundlerEnv < TestIntegration
     }
     set_release_symlink File.expand_path("bundle_preservation_test/version1", __dir__)
     Dir.chdir(current_release_symlink) do
-      cli_server "-q -w 1 --prune-bundler", env: env
+      cli_server "-q -w 1 -t1:5 --prune-bundler", env: env
     end
     connection = fast_connect
 
@@ -93,6 +92,6 @@ class TestPreserveBundlerEnv < TestIntegration
   def start_phased_restart
     Process.kill :USR1, @pid
 
-    assert wait_for_server_to_match(/booted in [.0-9]+s, phase: 1/)
+    assert wait_for_server_to_match(/booted in [.\d]+s, phase: 1/)
   end
 end
