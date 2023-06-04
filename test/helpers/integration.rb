@@ -67,7 +67,7 @@ class TestIntegration < Minitest::Test
       File.unlink(@bind_path) rescue nil
     end
 
-    # STDOUT.syswrite("\n-----------------------------------err_out\n#{err_out}\n") unless err_out.strip.empty?
+    STDOUT.syswrite("\n-----------------------------------err_out\n#{err_out.strip}\n") unless err_out.strip.empty?
   end
 
   private
