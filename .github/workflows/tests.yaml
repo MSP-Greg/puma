@@ -101,8 +101,8 @@ jobs:
       - name: set BUNDLE_CACHE_PATH
         shell: bash
         run: |
-          mkdir -p ./vendor/bundle/cache
-          echo "BUNDLE_CACHE_PATH=$PWD/vendor/bundle/cache" >> $GITHUB_ENV
+          mkdir -p vendor/bundle/cache
+          echo "BUNDLE_CACHE_PATH=$GITHUB_WORKSPACE/vendor/bundle/cache" >> $GITHUB_ENV
 
       - name: Set Rack version, see Gemfile
         shell: bash
