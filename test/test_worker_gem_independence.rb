@@ -6,6 +6,8 @@ require "open3"
 
 class TestWorkerGemIndependence < TestIntegration
 
+  BUNDLE_CACHE = ENV['BUNDLE_CACHE_PATH']
+
   def setup
     skip_unless :fork
   end
@@ -148,9 +150,8 @@ class TestWorkerGemIndependence < TestIntegration
     status = nil
     begin
       Timeout::timeout(10) {
-        env = (cache = ENV['BUNDLE_CACHE_PATH']) ?
-          { 'BUNDLE_CACHE_PATH' => cache } : nil
-        stdout, stderr, pid = spawn_cmd 'bundle install', env: env
+        env = BUNDLE_CACHE ? { 'BUNDLE_CACHE_PATH' => BUNDLE_CACHE } : {}
+        stdout, stderr, pid = spawn_cmd env, 'bundle install'
         _, status = Process.wait2 pid
       }
       unless status.success?
