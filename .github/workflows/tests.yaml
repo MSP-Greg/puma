@@ -98,6 +98,12 @@ jobs:
         shell: bash
         run: echo 'PUMA_DISABLE_SSL=true' >> $GITHUB_ENV
 
+      - name: set BUNDLE_CACHE_PATH
+        shell: bash
+        run: |
+          mkdir -p ./vendor/bundle/cache
+          echo "BUNDLE_CACHE_PATH=$PWD/vendor/bundle/cache" >> $GITHUB_ENV
+
       - name: Set Rack version, see Gemfile
         shell: bash
         run: echo 'PUMA_CI_RACK=${{ matrix.rack-v }}' >> $GITHUB_ENV
