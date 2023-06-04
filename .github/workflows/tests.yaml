@@ -154,6 +154,10 @@ jobs:
         timeout-minutes: 6
         run: bundle exec rake test:all
 
+      - name: show BUNDLE_CACHE_PATH
+        shell: bash
+        run: ls -d vendor/bundle/cache/*
+
   test_non_mri:
     name: >-
       NON-MRI: ${{ matrix.os }} ${{ matrix.ruby }}${{ matrix.no-ssl }}
