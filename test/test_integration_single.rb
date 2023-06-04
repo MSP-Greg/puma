@@ -147,13 +147,9 @@ class TestIntegrationSingle_1 < TestIntegration
     skip_unless_signal_exist? :INFO
 
     cli_server 'test/rackup/hello.ru'
-    output = []
-    t = Thread.new { output << @server.readlines }
     Process.kill :INFO, @pid
-    Process.kill :INT , @pid
-    t.join
 
-    assert_includes output.join, 'Thread: TID'
+    assert wait_for_server_to_include('Thread: TID')
   end
 
   def test_application_logs_are_flushed_on_write
