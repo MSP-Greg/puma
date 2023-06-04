@@ -87,7 +87,8 @@ module TimeoutEveryTestCase
   end
 
   def run
-    use_timeout = self.class.const_defined?(:PUMA_TTO) && self.class::PUMA_TTO
+    use_timeout = self.is_a?(::TestIntegration) ||
+      self.class.const_defined?(:PUMA_TTO) && self.class::PUMA_TTO
 
     with_info_handler do
       time_it do
@@ -264,6 +265,29 @@ Minitest.after_run do
         puts "", "##[group]#{txt}", out, dash * wid, '', '::[endgroup]'
       else
         puts "", txt, out, dash * wid, ''
+      end
+    end
+  end
+
+  if Object.const_defined?(:TestIntegration) && ::TestIntegration.const_defined?(:PID_QUEUE)
+    pid_queue = ::TestIntegration::PID_QUEUE
+    pid_queue.close
+
+    unless pid_queue.empty?
+      if ENV['CI']
+        pid_ary = []
+        pid_ary << pid_queue.pop until pid_queue.empty?
+        pid_ary.sort!
+        pid_str = +''
+        pid_ary.each { |ary| pid_str << format("%6d  %s\n", *ary) }
+
+        dash = "\u2500"
+        wid = ENV['GITHUB_ACTIONS'] ? 88 : 90
+        txt = " PID Info #{dash * 2}".rjust wid, dash
+
+        if ENV['GITHUB_ACTIONS']
+          puts "", "##[group]#{txt}", pid_str, dash * wid, '', '::[endgroup]'
+        end
       end
     end
   end

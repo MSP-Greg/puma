@@ -21,6 +21,8 @@ class TestIntegration < Minitest::Test
   BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -Ilib" :
     "#{Gem.ruby} -Ilib"
 
+  PID_QUEUE = Queue.new
+
   def before_setup
     super
     @server = nil
@@ -65,7 +67,7 @@ class TestIntegration < Minitest::Test
       File.unlink(@bind_path) rescue nil
     end
 
-    STDOUT.syswrite("\n-----------------------------------err_out\n#{err_out}\n") unless err_out.strip.empty?
+    # STDOUT.syswrite("\n-----------------------------------err_out\n#{err_out}\n") unless err_out.strip.empty?
   end
 
   private
@@ -108,6 +110,8 @@ class TestIntegration < Minitest::Test
     # STDOUT.syswrite "\nPID #{@pid} #{self.class.to_s}##{name}\n"
 
     @ios_to_close << @server << @server_err
+
+    PID_QUEUE << [@pid, full_name]
 
     wait_for_server_to_boot(log: log) unless no_wait
     @server
@@ -168,7 +172,7 @@ class TestIntegration < Minitest::Test
   def wait_for_server_to_include(str, io: @server, log: false, ret_false_str: nil)
     wait_readable_timeouts = 0
     @log_out = +''
-    @log_out << "Waiting for '#{str}'\n"
+    @log_out << "Waiting for '#{str}'  #{full_name}\n"
     sleep 0.05 until io.is_a?(IO)
     t_end = Process.clock_gettime(Process::CLOCK_MONOTONIC) + WAIT_SERVER_TIMEOUT
     begin
@@ -203,7 +207,7 @@ class TestIntegration < Minitest::Test
   def wait_for_server_to_match(re, idx = nil, io: @server, log: false, ret_false_re: nil)
     wait_readable_timeouts = 0
     log_out = +''
-    log_out << "Waiting for '#{re.inspect}'\n"
+    log_out << "Waiting for '#{re.inspect}'  #{full_name}\n"
     sleep 0.05 until io.is_a?(IO)
     t_end = Process.clock_gettime(Process::CLOCK_MONOTONIC) + WAIT_SERVER_TIMEOUT
     begin
