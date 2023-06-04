@@ -2,6 +2,11 @@
 # Copyright (c) 2011 Evan Phoenix
 # Copyright (c) 2005 Zed A. Shaw
 
+# value often has repeated item -r<bundler/setup path>
+if ENV['RUBYOPT']
+  ENV['RUBYOPT'] = ENV['RUBYOPT'].split(/ +/).uniq.join ' '
+end
+
 if RUBY_VERSION == '2.4.1'
   begin
     require 'stopgap_13632'
