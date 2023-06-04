@@ -87,8 +87,7 @@ module TimeoutEveryTestCase
   end
 
   def run
-    use_timeout = self.is_a?(::TestIntegration) ||
-      self.class.const_defined?(:PUMA_TTO) && self.class::PUMA_TTO
+    use_timeout = self.class.const_defined?(:PUMA_TTO) && self.class::PUMA_TTO
 
     with_info_handler do
       time_it do
