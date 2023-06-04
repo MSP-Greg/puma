@@ -32,6 +32,8 @@ class TestIntegrationSSLSession < TestIntegration
 
   def teardown
     return if skipped?
+    cli_pumactl 'stop'
+    assert wait_for_server_to_include 'Goodbye!'
     @server.close unless @server.is_a?(IO) && @server.closed?
     @server = nil
     super
@@ -56,10 +58,6 @@ class TestIntegrationSSLSession < TestIntegration
   def with_server(config)
     cli_server set_pumactl_args, config: config, config_bind: true
     yield
-  ensure
-    cli_pumactl 'stop'
-    @server.wait_readable 1
-    assert wait_for_server_to_include 'Goodbye!'
   end
 
   def run_session(reuse, tls = nil)
