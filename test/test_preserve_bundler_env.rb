@@ -2,6 +2,9 @@ require_relative "helper"
 require_relative "helpers/integration"
 
 class TestPreserveBundlerEnv < TestIntegration
+
+  BUNDLE_CACHE = ENV['BUNDLE_CACHE_PATH']
+
   def setup
     skip_unless :fork
     super
@@ -23,6 +26,7 @@ class TestPreserveBundlerEnv < TestIntegration
       # Don't allow our (rake test's) original env to interfere with the child process
       "BUNDLER_ORIG_BUNDLE_GEMFILE" => nil
     }
+    env['BUNDLE_CACHE_PATH'] = BUNDLE_CACHE if BUNDLE_CACHE
     Dir.chdir(File.expand_path("bundle_preservation_test", __dir__)) do
       cli_server "-q -w 1 -t1:5 --prune-bundler", env: env
     end
@@ -44,6 +48,7 @@ class TestPreserveBundlerEnv < TestIntegration
       "BUNDLE_GEMFILE" => nil,
       "BUNDLER_ORIG_BUNDLE_GEMFILE" => nil
     }
+    env['BUNDLE_CACHE_PATH'] = BUNDLE_CACHE if BUNDLE_CACHE
     Dir.chdir File.expand_path("bundle_app_config_test", __dir__) do
       cli_server "-q -w 1 -t1:5 --prune-bundler", env: env
     end
@@ -58,6 +63,7 @@ class TestPreserveBundlerEnv < TestIntegration
       "BUNDLE_GEMFILE" => nil,
       "BUNDLER_ORIG_BUNDLE_GEMFILE" => nil
     }
+    env['BUNDLE_CACHE_PATH'] = BUNDLE_CACHE if BUNDLE_CACHE
     set_release_symlink File.expand_path("bundle_preservation_test/version1", __dir__)
     Dir.chdir(current_release_symlink) do
       cli_server "-q -w 1 -t1:5 --prune-bundler", env: env

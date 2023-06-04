@@ -141,14 +141,16 @@ class TestWorkerGemIndependence < TestIntegration
     end
   end
 
-  # Bundler may timeout even though it's install all needed gems
+  # Bundler may timeout even though it's installed all needed gems
   #
   def open3_bundle_install
     stdout, stderr, pid = nil, nil, nil
     status = nil
     begin
       Timeout::timeout(10) {
-        stdout, stderr, pid = spawn_cmd 'bundle install'
+        env = (cache = ENV['BUNDLE_CACHE_PATH']) ?
+          { 'BUNDLE_CACHE_PATH' => cache } : nil
+        stdout, stderr, pid = spawn_cmd 'bundle install', env: env
         _, status = Process.wait2 pid
       }
       unless status.success?
