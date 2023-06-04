@@ -47,7 +47,7 @@ class TestIntegration < Minitest::Test
       end
     end
 
-    if @server && defined?(@control_tcp_port) && Puma.windows?
+    if @server && defined?(@control_tcp_port)
       cli_pumactl 'stop'
     elsif @server && @pid && !Puma.windows?
       stop_server @pid, signal: :INT
