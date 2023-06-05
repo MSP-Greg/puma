@@ -290,7 +290,7 @@ class TestPumaServerSSLClient < Minitest::Test
   include TestPuma::PumaSocket
 
   CERT_PATH = File.expand_path "../examples/puma/client-certs", __dir__
-  
+
   CLIENT_CERT = File.read "#{CERT_PATH}/client.crt"
   CLIENT_KEY  = File.read "#{CERT_PATH}/client.key"
 
@@ -309,7 +309,7 @@ class TestPumaServerSSLClient < Minitest::Test
 
   def assert_ssl_client_error_match(error, subject: nil, context: CTX, &blk)
     host = Puma::IS_JRUBY ? "127.0.0.1" : "localhost"
-    
+
     port = 0
 
     app = lambda { |env| [200, {}, [env['rack.url_scheme']]] }
