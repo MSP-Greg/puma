@@ -50,7 +50,7 @@ class TestIntegration < Minitest::Test
       end
     end
 
-    if @server && defined?(@control_tcp_port)
+    if @server && defined?(@control_tcp_port) && !Puma::IS_JRUBY
       cli_pumactl 'stop'
       begin
         if @server.wait_readable 1
@@ -58,7 +58,7 @@ class TestIntegration < Minitest::Test
         end
       rescue RuntimeError, IOError
       end
-    elsif @server && @pid && !Puma.windows?
+    elsif @server && @pid && !Puma::IS_WINDOWS
       stop_server @pid, signal: :INT
     end
     @server.close if @server.respond_to?(:close) && !@server.closed?
