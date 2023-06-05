@@ -44,6 +44,7 @@ module TestPuma
           io = nil
         end
       end
+      @ios_to_close = []
       super
     end
 

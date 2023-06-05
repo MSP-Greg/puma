@@ -4,6 +4,8 @@ require "puma/control_cli"
 require "json"
 require "io/wait" unless Puma::HAS_NATIVE_IO_WAIT
 
+require_relative 'puma_socket'
+
 class TestIntegration < Minitest::Test
   DARWIN = RUBY_PLATFORM.include? 'darwin'
   HOST  = "127.0.0.1"
@@ -22,6 +24,8 @@ class TestIntegration < Minitest::Test
     "#{Gem.ruby} -Ilib"
 
   PID_QUEUE = Queue.new
+
+  prepend TestPuma::PumaSocket
 
   def before_setup
     super

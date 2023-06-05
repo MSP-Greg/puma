@@ -2,7 +2,6 @@
 
 require_relative 'helper'
 require_relative 'helpers/integration'
-require_relative 'helpers/puma_socket'
 
 # These tests are used to verify that Puma works with SSL sockets.  Only
 # integration tests isolate the server from the test environment, so there
@@ -17,8 +16,6 @@ class TestIntegrationSSLSession < TestIntegration
   parallelize_me! if ::Puma::IS_MRI && !ENV['GITHUB_ACTIONS']
 
   require "openssl" unless defined?(::OpenSSL::SSL)
-
-  include TestPuma::PumaSocket
 
   OSSL = ::OpenSSL::SSL
 
