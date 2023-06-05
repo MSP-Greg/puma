@@ -255,11 +255,15 @@ module TestPuma
             rescue StandardError => e
               results[idx] = e.class.to_s
             end
-            skt.close unless skt.closed?
+            begin
+              skt.close unless skt.closed? # skt.close may return Errno::EBADF
+            rescue StandardError => e
+              results[idx] ||= e.class.to_s
+            end
             skts[idx] = nil
           end
         end
-      end.join 10
+      end.join 15
       results
     end
 
