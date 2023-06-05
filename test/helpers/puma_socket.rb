@@ -37,9 +37,11 @@ module TestPuma
             io.sysclose unless !io.closed?
           else
             io.close if io.respond_to?(:close) && !io.closed?
-            File.unlink io.path if io.is_a? File
+            if io.is_a?(File) && (path = io&.path) && File.exist?(path)
+              File.unlink path
+            end
           end
-        rescue Errno::EBADF
+        rescue Errno::EBADF, Errno::ENOENT, IOError
         ensure
           io = nil
         end
