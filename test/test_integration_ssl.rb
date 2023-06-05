@@ -2,7 +2,6 @@
 
 require_relative 'helper'
 require_relative "helpers/integration"
-require_relative "helpers/puma_socket"
 
 # These tests are used to verify that Puma works with SSL sockets.  Only
 # integration tests isolate the server from the test environment, so there
@@ -15,8 +14,6 @@ require_relative "helpers/puma_socket"
 class TestIntegrationSSL < TestIntegration
   parallelize_me! if ::Puma.mri?
 
-  include TestPuma::PumaSocket
-
   require "openssl"
 
   CERT_PATH = File.expand_path '../examples/puma', __dir__
@@ -24,15 +21,6 @@ class TestIntegrationSSL < TestIntegration
   def setup
     @tcp_port = UniquePort.call
     @control_tcp_port = UniquePort.call
-  end
-
-  def teardown
-    return if skipped?
-    cli_pumactl 'stop'
-    assert wait_for_server_to_include('Goodbye!')
-
-    @server.close if @server && !@server.closed?
-    @server = nil
   end
 
   def test_ssl_run

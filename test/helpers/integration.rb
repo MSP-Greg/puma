@@ -25,7 +25,7 @@ class TestIntegration < Minitest::Test
 
   PID_QUEUE = Queue.new
 
-  prepend TestPuma::PumaSocket
+  prepend ::TestPuma::PumaSocket
 
   def before_setup
     super
@@ -33,7 +33,6 @@ class TestIntegration < Minitest::Test
     @server_err = nil
     @check_server_err = true
     @pid = nil
-    @ios_to_close = []
     @bind_path = nil
   end
 
@@ -53,9 +52,17 @@ class TestIntegration < Minitest::Test
 
     if @server && defined?(@control_tcp_port)
       cli_pumactl 'stop'
+      begin
+        if @server.wait_readable 1
+          assert wait_for_server_to_include 'Goodbye!'
+        end
+      rescue RuntimeError, IOError
+      end
     elsif @server && @pid && !Puma.windows?
       stop_server @pid, signal: :INT
     end
+    @server.close if @server.respond_to?(:close) && !@server.closed?
+    @server = nil
 
     @ios_to_close.each do |io|
       begin

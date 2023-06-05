@@ -27,15 +27,6 @@ class TestIntegrationSSLSession < TestIntegration
 
   CERT_PATH = File.expand_path "../examples/puma/client-certs", __dir__
 
-  def teardown
-    return if skipped?
-    cli_pumactl 'stop'
-    assert wait_for_server_to_include 'Goodbye!'
-    @server.close unless @server.is_a?(IO) && @server.closed?
-    @server = nil
-    super
-  end
-
   def set_reuse(reuse)
     <<~CONFIG
       ssl_bind '#{HOST}', 0, {

@@ -18,11 +18,6 @@ class TestIntegrationCluster < TestIntegration
     super
   end
 
-  def teardown
-    return if skipped?
-    super
-  end
-
   def test_hot_restart_does_not_drop_connections_threads
     hot_restart_does_not_drop_connections num_threads: 10, total_requests: 3_000
   end
