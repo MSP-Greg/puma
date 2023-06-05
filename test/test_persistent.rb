@@ -28,7 +28,7 @@ class TestPersistent < Minitest::Test
     @port = (@server.add_tcp_listener HOST, 0).addr[1]
     @server.run
     sleep 0.1 until @server.running == opts[:min_threads]
-    @client = new_connection
+    @client = new_socket
   end
 
   def teardown

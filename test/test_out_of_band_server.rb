@@ -104,7 +104,7 @@ class TestOutOfBandServer < Minitest::Test
     oob_server oob_wait: true, max_threads: 2
 
     # Establish connection for Req2 before OOB
-    req2 = new_connection
+    req2 = new_socket
     sleep 0.01
 
     @mutex.synchronize do
@@ -128,7 +128,7 @@ class TestOutOfBandServer < Minitest::Test
   # Partial requests should not trigger OOB.
   def test_partial_request
     oob_server
-    new_connection.close
+    new_socket.close
     sleep 0.01
     assert_equal 0, @oob_count
   end
@@ -154,8 +154,8 @@ class TestOutOfBandServer < Minitest::Test
     end
     accepted = false
     io = @server.binder.ios.last
-    io.stub(:accept_nonblock, -> {accepted = true; new_connection}) do
-      new_connection.close
+    io.stub(:accept_nonblock, -> {accepted = true; new_socket}) do |skt|
+      skt.close
       sleep 0.01
     end
     refute accepted, 'New connection accepted during out of band'

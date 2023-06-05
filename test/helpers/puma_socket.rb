@@ -32,8 +32,13 @@ module TestPuma
       # Errno::EBADF raised on macOS
       @ios_to_close.each do |io|
         begin
-          io.close if io.respond_to?(:close) && !io.closed?
-          File.unlink io.path if io.is_a? File
+          if io.respond_to? :sysclose
+            io.sync_close = true
+            io.sysclose unless !io.closed?
+          else
+            io.close if io.respond_to?(:close) && !io.closed?
+            File.unlink io.path if io.is_a? File
+          end
         rescue Errno::EBADF
         ensure
           io = nil
@@ -74,7 +79,7 @@ module TestPuma
     # Sends a request and returns the socket
     #
     def send_http(req = GET_11, host: nil, port: nil, path: nil, ctx: nil, session: nil)
-      skt = new_connection host: host, port: port, path: path, ctx: ctx, session: session
+      skt = new_socket host: host, port: port, path: path, ctx: ctx, session: session
       skt.syswrite req
       skt
     end
@@ -170,7 +175,7 @@ module TestPuma
       ctx
     end
 
-    def new_connection(host: nil, port: nil, path: nil, ctx: nil, session: nil)
+    def new_socket(host: nil, port: nil, path: nil, ctx: nil, session: nil)
       port  ||= @port || @tcp_port
       path  ||= @bind_path
       @host ||= host || HOST

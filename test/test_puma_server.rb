@@ -50,7 +50,7 @@ class TestPumaServer_P < TestPumaServer_Base
     addr = IPAddr.new(remote_ip)
     family = addr.ipv4? ? "TCP4" : "TCP6"
     target = addr.ipv4? ? "127.0.0.1" : "::1"
-    conn = new_connection
+    conn = new_socket
     if multisend
       conn << "PROXY #{family} #{remote_ip} #{target} 10000 80\r\n"
       sleep 0.15
@@ -375,7 +375,7 @@ class TestPumaServer_P < TestPumaServer_Base
   def test_eof_on_connection_close_is_not_logged_as_an_error
     server_run
 
-    new_connection.close # Make a connection and close without writing
+    new_socket.close # Make a connection and close without writing
 
     @server.stop(true)
     stderr = @log_writer.stderr.string
@@ -1276,7 +1276,7 @@ class TestPumaServer_P < TestPumaServer_Base
     end
 
     @server.run
-    @skt = new_connection
+    @skt = new_socket
     sleep 0.03
   end
 
@@ -1329,7 +1329,7 @@ class TestPumaServer_P < TestPumaServer_Base
 
   def test_idle_connections_closed_immediately_on_shutdown
     server_run
-    sock = new_connection
+    sock = new_socket
     sleep 0.5 # give enough time for new connection to enter reactor
     @server.stop false
 

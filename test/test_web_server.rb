@@ -96,7 +96,7 @@ class WebServerTest < Minitest::Test
 
   def do_test(string, chunk)
     # Do not use instance variables here, because it needs to be thread safe
-    socket = new_connection
+    socket = new_socket
     request = StringIO.new(string)
     chunks_out = 0
 
@@ -108,7 +108,7 @@ class WebServerTest < Minitest::Test
 
   def do_test_raise(string, chunk, close_after = nil)
     # Do not use instance variables here, because it needs to be thread safe
-    socket = new_connection
+    socket = new_socket
     request = StringIO.new(string)
     chunks_out = 0
 

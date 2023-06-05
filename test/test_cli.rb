@@ -266,7 +266,7 @@ class TestCLI < Minitest::Test
     cntl_port = UniquePort.call
     cntl = "tcp://127.0.0.1:#{cntl_port}/"
 
-    control_gc_stats(uri, cntl) { new_connection port: cntl_port }
+    control_gc_stats(uri, cntl) { new_socket port: cntl_port }
   end
 
   def test_control_gc_stats_unix
@@ -275,7 +275,7 @@ class TestCLI < Minitest::Test
     uri  = "unix://#{@tmp_path2}"
     cntl = "unix://#{@tmp_path}"
 
-    control_gc_stats(uri, cntl) { new_connection path: @tmp_path }
+    control_gc_stats(uri, cntl) { new_socket path: @tmp_path }
   end
 
   def test_tmp_control
