@@ -15,7 +15,8 @@ class TestRedirectIO < TestIntegration
     @out_file_path = tmp_file_path 'puma-out'
     @err_file_path = tmp_file_path 'puma-err'
 
-    @cli_args = ['--redirect-stdout', @out_file_path,
+    @cli_args = [
+      '--redirect-stdout', @out_file_path,
       '--redirect-stderr', @err_file_path,
       'test/rackup/hello.ru'
     ]
@@ -34,8 +35,6 @@ class TestRedirectIO < TestIntegration
   end
 
   def test_sighup_redirects_io_single
-    skip_if :jruby # Server isn't coming up in CI, TODO Fix
-
     cli_server @cli_args.join ' '
 
     rotate_check_logs
