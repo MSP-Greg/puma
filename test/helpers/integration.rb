@@ -46,11 +46,12 @@ class TestIntegration < Minitest::Test
         if @server_err.wait_readable 0.25
           err_out = @server_err.read_nonblock(2_048, exception: false) || ''
         end
+        @server_err.close
       rescue IOError, Errno::EBADF
       end
     end
 
-    if @server && defined?(@control_tcp_port) && !Puma::IS_JRUBY
+    if @server && defined?(@control_tcp_port)
       cli_pumactl 'stop'
       begin
         if @server.wait_readable 1
@@ -119,8 +120,6 @@ class TestIntegration < Minitest::Test
     @server, @server_err, @pid = spawn_cmd env, cmd
     # =below helpful may be helpful for debugging
     # STDOUT.syswrite "\nPID #{@pid} #{self.class.to_s}##{name}\n"
-
-    @ios_to_close << @server << @server_err
 
     PID_QUEUE << [@pid, full_name]
 
