@@ -332,7 +332,7 @@ module TestRackUp
       Dir.chdir('tmp/rackup') { @out, @err, @pid = spawn_cmd "bundle exec rackup -p 0" }
 
       assert wait_for_server_to_include 'Puma version', io: @out
-      @port = wait_for_server_to_match(/Listening on http:\/\/#{HOST}:(\d+)/o, 1, io: @out)
+      @port = wait_for_server_to_match(/Listening on http:\/\/#{HOST}:(\d+)/o, 1, io: @out, log: true)
       assert wait_for_server_to_include 'Use Ctrl-C to stop', io: @out
 
       body = send_http_read_resp_body
