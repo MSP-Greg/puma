@@ -34,6 +34,7 @@ class TestIntegration < Minitest::Test
     @check_server_err = true
     @pid = nil
     @bind_path = nil
+    @stop_server_called = false
   end
 
   def after_teardown
@@ -51,24 +52,26 @@ class TestIntegration < Minitest::Test
       end
     end
 
-    if @server && defined?(@control_tcp_port)
-      cli_pumactl 'stop'
-      begin
-        if @server.wait_readable 1
-          assert wait_for_server_to_include 'Goodbye!'
+    unless @stop_server_called
+      if @server && defined?(@control_tcp_port)
+        cli_pumactl 'stop'
+        begin
+          if @server.wait_readable 1
+            assert wait_for_server_to_include 'Goodbye!'
+          end
+        rescue RuntimeError, IOError
         end
-      rescue RuntimeError, IOError
+      elsif @server && @pid && !Puma::IS_WINDOWS
+        stop_server @pid, signal: :INT
       end
-    elsif @server && @pid && !Puma::IS_WINDOWS
-      stop_server @pid, signal: :INT
-    end
-    @server.close if @server.respond_to?(:close) && !@server.closed?
-    @server = nil
+      @server.close if @server.respond_to?(:close) && !@server.closed?
+      @server = nil
 
-    if @pid
-      begin
-        Process.wait2 @pid
-      rescue Errno::ECHILD
+      if @pid
+        begin
+          Process.wait2 @pid
+        rescue Errno::ECHILD
+        end
       end
     end
 
@@ -143,13 +146,13 @@ class TestIntegration < Minitest::Test
       Process.kill signal, pid
     rescue Errno::ESRCH
     end
+    @server.close if @server.respond_to?(:close) && !@server.closed?
+    @server = nil
+    @stop_server_called = true
     begin
       Process.wait2 pid
     rescue Errno::ECHILD
     end
-    @server.close if @server.respond_to?(:close) && !@server.closed?
-    @server = nil
-    @pid = nil
   end
 
   def restart_server_and_listen(argv, log: false)
