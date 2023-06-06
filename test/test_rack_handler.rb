@@ -338,7 +338,8 @@ module TestRackUp
       host, _, port = ip.rpartition ':'
       host = HOST4 if host == '0.0.0.0'
 
-      body = send_http_read_resp_body host: host, port: port
+      # Rack v1 sends the body chunked
+      body = send_http_read_resp_body host: host, port: port, decode_chunked: true
       assert_equal 'Hello World', body
     end
   end
