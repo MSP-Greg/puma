@@ -88,8 +88,14 @@ class TestIntegration < Minitest::Test
       refute File.exist?(@bind_path), "Bind path must be removed after stop"
       File.unlink(@bind_path) rescue nil
     end
-
-    STDOUT.syswrite("\n-----------------------------------err_out\n#{err_out.strip}\n") unless err_out.strip.empty?
+    
+    unless err_out.strip.empty?
+      begin
+        STDOUT.syswrite "\n----------------------------------- " \
+          "err_out\n#{err_out.strip}\n"
+      rescue ThreadError
+      end
+    end
   end
 
   private
