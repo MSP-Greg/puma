@@ -445,16 +445,16 @@ class TestIntegration < Minitest::Test
     num_requests = (total_requests/num_threads).to_i
 
     req_loop = -> () {
+      req_str = "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
       num_requests.times do |req_num|
         begin
           begin
-            socket = TCPSocket.new HOST, @tcp_port
-            fast_write socket, "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
+            socket = send_http req_str
           rescue => e
             replies[:write_error] += 1
             raise e
           end
-          body = read_body(socket, 10)
+          body = socket.read_body
           if body == "Hello World"
             mutex.synchronize {
               replies[:success] += 1
