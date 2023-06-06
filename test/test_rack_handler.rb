@@ -331,10 +331,13 @@ module TestRackUp
 
       Dir.chdir('tmp/rackup') { @out, @err, @pid = spawn_cmd "bundle exec rackup -p 0" }
       assert wait_for_server_to_include 'Puma version', io: @out
-      @port = wait_for_server_to_match(/Listening on http:\/\/\d+\.\d+\.\d+\.\d+:(\d+)/o, 1, io: @out)
+      # host may be 127.0.0.1, 0.0.0.0, [::], or [::1]
+      ip = wait_for_server_to_match(/Listening on http:\/\/(\S+)/o, 1, io: @out)
       assert wait_for_server_to_include 'Use Ctrl-C to stop', io: @out
 
-      body = send_http_read_resp_body
+      host, _, port = ip.rpartition ':'
+
+      body = send_http_read_resp_body host: host, port: port
       assert_equal 'Hello World', body
     end
   end
