@@ -291,6 +291,8 @@ Minitest.after_run do
 
         if ENV['GITHUB_ACTIONS']
           puts "", "##[group]#{txt}", pid_str, dash * wid, '', '::[endgroup]'
+        else
+          puts "", txt, pid_str, dash * wid, ''
         end
       end
     end

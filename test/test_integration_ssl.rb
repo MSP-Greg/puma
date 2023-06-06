@@ -20,7 +20,6 @@ class TestIntegrationSSL < TestIntegration
 
   def setup
     @tcp_port = UniquePort.call
-    @control_tcp_port = UniquePort.call
   end
 
   def test_ssl_run
@@ -49,7 +48,7 @@ class TestIntegrationSSL < TestIntegration
 
     cli_server set_pumactl_args, config: config, config_bind: true
 
-    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    body = send_http_read_resp_body ctx: new_ctx
     assert_equal 'https', body
   end
 
@@ -80,7 +79,7 @@ class TestIntegrationSSL < TestIntegration
 
     cli_server set_pumactl_args, config: config, config_bind: true
 
-    body = send_http_read_resp_body GET_11, host: HOST,
+    body = send_http_read_resp_body host: HOST,
       ctx: new_ctx { |c|
         ca   = "#{cert_path}/ca.crt"
         cert = "#{cert_path}/client.crt"
@@ -119,7 +118,7 @@ class TestIntegrationSSL < TestIntegration
 
     cli_server set_pumactl_args, config: config, config_bind: true
 
-    skt = send_http GET_11, ctx: new_ctx
+    skt = send_http ctx: new_ctx
     body = skt.read_body
 
     svr_pem = File.read "#{CERT_PATH}/cert_puma.pem"
@@ -142,7 +141,7 @@ class TestIntegrationSSL < TestIntegration
 
     cli_server set_pumactl_args, config: config, config_bind: true
 
-    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    body = send_http_read_resp_body ctx: new_ctx
     assert_equal 'https', body
   end
 
@@ -169,7 +168,7 @@ class TestIntegrationSSL < TestIntegration
 
     cli_server set_pumactl_args, config: config, config_bind: true
 
-    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    body = send_http_read_resp_body ctx: new_ctx
     assert_equal 'https', body
   end
 
@@ -196,7 +195,7 @@ class TestIntegrationSSL < TestIntegration
 
     cli_server set_pumactl_args, config: config, config_bind: true
 
-    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    body = send_http_read_resp_body ctx: new_ctx
     assert_equal 'https', body
   end
 end if ::Puma::HAS_SSL

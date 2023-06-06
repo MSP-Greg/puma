@@ -65,6 +65,13 @@ class TestIntegration < Minitest::Test
     @server.close if @server.respond_to?(:close) && !@server.closed?
     @server = nil
 
+    if @pid
+      begin
+        Process.wait2 @pid
+      rescue Errno::ECHILD
+      end
+    end
+
     @ios_to_close.each do |io|
       begin
         io.close if io.respond_to?(:close) && !io.closed?
@@ -140,6 +147,9 @@ class TestIntegration < Minitest::Test
       Process.wait2 pid
     rescue Errno::ECHILD
     end
+    @server.close if @server.respond_to?(:close) && !@server.closed?
+    @server = nil
+    @pid = nil
   end
 
   def restart_server_and_listen(argv, log: false)

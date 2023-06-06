@@ -2,13 +2,20 @@ require_relative "helper"
 require_relative "helpers/integration"
 
 class TestPlugin < TestIntegration
+
+  def teardown
+    return if skipped?
+    @server.close if @server.respond_to?(:close) && !@server.closed?
+    @server = nil
+    File.unlink('tmp/restart.txt') if File.exist?('tmp/restart.txt')
+  end
+
   def test_plugin
     skip "Skipped on Windows Ruby < 2.5.0, Ruby bug" if windows? && RUBY_VERSION < '2.5.0'
-    @control_tcp_port = UniquePort.call
 
     Dir.mkdir("tmp") unless Dir.exist?("tmp")
 
-    cli_server "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN} test/rackup/hello.ru",
+    cli_server "#{set_pumactl_args} test/rackup/hello.ru",
       config: "plugin 'tmp_restart'"
 
     File.open('tmp/restart.txt', mode: 'wb') { |f| f.puts "Restart #{Time.now}" }
@@ -20,8 +27,5 @@ class TestPlugin < TestIntegration
     cli_pumactl "stop"
 
     assert wait_for_server_to_include('Goodbye')
-
-    @server.close
-    @server = nil
   end
 end
