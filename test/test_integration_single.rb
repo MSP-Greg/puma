@@ -63,7 +63,7 @@ class TestIntegrationSingle_1 < TestIntegration
     skip_unless :mri # non MRI platforms return nil for TERM exit code
 
     cli_server "-C test/config/suppress_exception.rb test/rackup/hello.ru"
-    read_body(fast_connect)
+    send_http_read_response
 
     _, status = stop_server
 
@@ -75,31 +75,31 @@ class TestIntegrationSingle_1 < TestIntegration
 
     cli_server("test/rackup/url_scheme.ru")
 
-    reply = read_body(fast_connect)
+    body = send_http_read_resp_body
     stop_server
 
-    assert_equal 'http', reply
+    assert_equal 'http', body
   end
 
   def test_conf_is_loaded_before_passing_it_to_binder
     skip_unless_signal_exist? :TERM
 
-    cli_server("-C test/config/rack_url_scheme.rb test/rackup/url_scheme.ru")
+    cli_server "-C test/config/rack_url_scheme.rb test/rackup/url_scheme.ru"
 
-    reply = read_body(fast_connect)
+    body = send_http_read_resp_body
     stop_server
 
-    assert_equal 'https', reply
+    assert_equal 'https', body
   end
 
   def test_prefer_rackup_file_specified_by_cli
     skip_unless_signal_exist? :TERM
 
     cli_server "-C test/config/with_rackup_from_dsl.rb test/rackup/hello.ru"
-    reply = read_body(fast_connect)
+    body = send_http_read_resp_body
     stop_server
 
-    assert_equal 'Hello World', reply
+    assert_equal 'Hello World', body
   end
 
   def test_term_not_accepts_new_connections
@@ -108,18 +108,18 @@ class TestIntegrationSingle_1 < TestIntegration
 
     cli_server 'test/rackup/sleep.ru'
 
-    skt = fast_connect 'sleep10'
+    skt = send_http "GET /sleep10 HTTP/1.1\r\n\r\n"
     sleep 1
     Process.kill :TERM, @pid
     assert wait_for_server_to_include('Gracefully stopping') # wait for server to begin graceful shutdown
 
     sleep 1
-    assert_raises(Errno::ECONNREFUSED) { fast_connect 'sleep0' }
+    assert_raises(Errno::ECONNREFUSED) { send_http "GET /sleep0 HTTP/1.1\r\n\r\n" }
 
     refute_nil Process.getpgid(@pid) # ensure server is still running
 
-    resp = read_response skt
-    assert_includes resp, 'Slept 10'
+    body = skt.read_body
+    assert_includes body, 'Slept 10'
 
     Process.wait @pid
     @server.close unless @server.closed?
@@ -132,16 +132,17 @@ class TestIntegrationSingle_1 < TestIntegration
 
     cli_server 'test/rackup/hello.ru'
     begin
-      sock = TCPSocket.new(HOST, @tcp_port)
-      sock.close
+      skt = new_socket
+      skt.close
     rescue => ex
       fail("Port didn't open properly: #{ex.message}")
     end
 
     Process.kill :INT, @pid
+    Process.kill :INT, @pid
     Process.wait @pid
 
-    assert_raises(Errno::ECONNREFUSED) { TCPSocket.new(HOST, @tcp_port) }
+    assert_raises(Errno::ECONNREFUSED) { new_socket }
   end
 
   def test_siginfo_thread_print
@@ -156,7 +157,7 @@ class TestIntegrationSingle_1 < TestIntegration
   def test_application_logs_are_flushed_on_write
     cli_server "#{set_pumactl_args} test/rackup/write_to_stdout.ru"
 
-    read_body fast_connect
+    send_http_read_response
 
     # below should be written before 'stop' command is issued
     assert wait_for_server_to_include("hello\n")
@@ -175,15 +176,15 @@ class TestIntegrationSingle_1 < TestIntegration
     skip_unless :mri    # ObjectSpace.each_object(::TCPServer) ??
     skip if DARWIN && RUBY_VERSION.start_with?('2.4')
     cli_server "test/rackup/close_listeners.ru"
-    connection = fast_connect
+    skt = send_http
 
     if DARWIN && RUBY_VERSION < '2.6' || TRUFFLE
       begin
-        read_body connection
+        skt.read_body
       rescue EOFError
       end
     else
-      read_body connection
+      skt.read_body
     end
 
     time_limit = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5.0
@@ -230,7 +231,7 @@ class TestIntegrationSingle_2 < TestIntegration
       pidfile "t1-pid"
     CONFIG
 
-    read_response fast_connect
+    send_http_read_response
 
     sleep 0.01 if DARWIN
 
@@ -255,7 +256,7 @@ class TestIntegrationSingle_2 < TestIntegration
       pidfile "t2-pid"
     CONFIG
 
-    read_response fast_connect
+    send_http_read_response
 
     out = cli_pumactl('-p t2-pid status', no_control_url: true).read
 

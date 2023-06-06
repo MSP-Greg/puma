@@ -1,6 +1,5 @@
 require_relative "helper"
 require_relative "helpers/integration"
-require_relative "helpers/puma_socket"
 
 class TestPluginSystemd < TestIntegration
   parallelize_me! if ::Puma::IS_MRI && ::Puma::IS_LINUX

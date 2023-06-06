@@ -1,6 +1,5 @@
 require_relative "helper"
 require_relative "helpers/integration"
-require "open3"
 
 # git clean -fdx -- test/**/vendor/bundle/**
 
@@ -100,8 +99,7 @@ class TestWorkerGemIndependence < TestIntegration
       end
     end
 
-    connection = connect
-    initial_reply = read_body(connection)
+    initial_reply = send_http_read_resp_body
     assert_equal old_version, initial_reply
 
     before_restart&.call
@@ -114,8 +112,7 @@ class TestWorkerGemIndependence < TestIntegration
     end
     start_phased_restart
 
-    connection = connect
-    new_reply = read_body(connection)
+    new_reply = send_http_read_resp_body
     assert_equal new_version, new_reply
   end
 

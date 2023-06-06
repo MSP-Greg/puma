@@ -49,8 +49,8 @@ class TestIntegrationCluster < TestIntegration
     @bind_path = tmp_file_path(['', '.bind'], 'pre existing', mode: File::BINARY)
 
     cli_server "-w #{workers} -t1:5 -q test/rackup/sleep_step.ru", unix: :unix
-    connection = connect unix: true
-    restart_server connection
+    skt = send_http
+    restart_server skt
 
     stop_server
 
@@ -243,33 +243,20 @@ class TestIntegrationCluster < TestIntegration
 
     pids = get_worker_pids 0, wrkrs
 
-    socks = []
+    skts = []
 
     # generates about 250 requests on Ubuntu, less on macOS
     until refork.read == 'Reforked'
-      socks << fast_connect
+      skts << send_http
       sleep 0.02
     end
 
     100.times {
-      socks << fast_connect
+      skts << send_http
       sleep 0.002
     }
 
-    results = Array.new socks.length
-    until socks.compact.empty?
-      socks.each_with_index do |sock, idx|
-        next if sock.nil?
-        if sock.wait_readable 0.000_5
-          begin
-            results[idx] = read_body sock
-          rescue StandardError => e
-            results[idx] = e.class
-          end
-          socks[idx] = nil
-        end
-      end
-    end
+    results = read_response_array skts, body_only: true
 
     assert_equal ['Hello World'], results.uniq
 
@@ -291,14 +278,14 @@ class TestIntegrationCluster < TestIntegration
       end
     RUBY
 
-    assert_equal '0', read_body(connect)
+    assert_equal '0', send_http_read_resp_body
   end
 
   def test_prune_bundler_with_multiple_workers
     cli_server "-C test/config/prune_bundler_with_multiple_workers.rb"
-    reply = read_body(connect)
+    body = send_http_read_resp_body
 
-    assert reply, "embedded app"
+    assert_equal body, "embedded app"
   end
 
   def test_load_path_includes_extra_deps
@@ -520,11 +507,11 @@ class TestIntegrationCluster < TestIntegration
     req_refused = unix ? Errno::ENOENT : Errno::ECONNREFUSED
 
     req_thread = Thread.new do
-      req_str = "sleep#{sleep_time}"
+      req_str = "GET /sleep#{sleep_time} HTTP/1.1\r\n\r\n"
       requests.times.each do |i|
         sleep req_interval
         begin
-          req_queue << [i, fast_connect(req_str, unix: unix)]
+          req_queue << [i, send_http(req_str)]
           if i == 20
             Process.kill :TERM, @pid
           end
@@ -621,11 +608,11 @@ class TestIntegrationCluster < TestIntegration
     req_refused = unix ? Errno::ENOENT : Errno::ECONNREFUSED
 
     req_thread = Thread.new do
-      req_str = "sleep#{sleep_time}"
+      req_str = "GET /sleep#{sleep_time} HTTP/1.1\r\n\r\n"
       requests.times.each do |i|
         sleep req_interval
         begin
-          req_queue << [i, fast_connect(req_str, unix: unix)]
+          req_queue << [i, send_http(req_str)]
           if i == 20
             Process.kill :USR1, @pid
           end
@@ -705,7 +692,7 @@ class TestIntegrationCluster < TestIntegration
     [35, 40].each do |sleep_time|
       threads << Thread.new do
         begin
-          connect "sleep#{sleep_time}"
+          send_http "GET /sleep#{sleep_time} HTTP/1.1\r\n\r\n"
           # stuck connections will raise IOError or Errno::ECONNRESET
           # when shutdown
         rescue IOError, Errno::ECONNRESET
@@ -759,7 +746,7 @@ class TestIntegrationCluster < TestIntegration
   def resp_status(replies, resp_reset, resp_errors, skt_info, mutex)
     i, skt = skt_info
     begin
-      body = read_body skt
+      body = skt.read_body
       mutex.synchronize { replies[i] = body }
     rescue resp_reset
       # connection was accepted but then closed

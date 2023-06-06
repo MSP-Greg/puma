@@ -1,6 +1,5 @@
 require_relative "helper"
 require_relative "helpers/integration"
-require_relative "helpers/puma_socket"
 
 # Most tests check that ::Rack::Handler::Puma works by itself
 # RackUp#test_bin runs Puma using the rackup bin file
