@@ -336,6 +336,7 @@ module TestRackUp
       assert wait_for_server_to_include 'Use Ctrl-C to stop', io: @out
 
       host, _, port = ip.rpartition ':'
+      host = HOST4 if host == '0.0.0.0'
 
       body = send_http_read_resp_body host: host, port: port
       assert_equal 'Hello World', body

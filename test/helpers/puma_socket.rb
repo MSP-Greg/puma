@@ -10,7 +10,11 @@ module TestPuma
     GET_10 = "GET / HTTP/1.0\r\n\r\n"
     GET_11 = "GET / HTTP/1.1\r\n\r\n"
 
-    HOST = '127.0.0.1'
+    HOST4 = '127.0.0.1'
+    HOST6 = '[::1]'
+
+    HOST = HOST4
+
     RESP_READ_LEN = 65_536
     RESP_READ_TIMEOUT = 10
     RESP_SPLIT = "\r\n\r\n"

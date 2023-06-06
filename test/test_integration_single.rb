@@ -43,7 +43,7 @@ class TestIntegrationSingle_1 < TestIntegration
 
   def test_term_exit_code
     skip_unless_signal_exist? :TERM
-    skip_if :jruby # JVM does not return correct exit code for TERM
+    skip_unless :mri # non MRI platforms return nil for TERM exit code
 
     cli_server "test/rackup/hello.ru"
     _, status = stop_server
@@ -60,6 +60,7 @@ class TestIntegrationSingle_1 < TestIntegration
 
   def test_term_suppress
     skip_unless_signal_exist? :TERM
+    skip_unless :mri # non MRI platforms return nil for TERM exit code
 
     cli_server "-C test/config/suppress_exception.rb test/rackup/hello.ru"
     read_body(fast_connect)
