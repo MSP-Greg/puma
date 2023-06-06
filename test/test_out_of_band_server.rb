@@ -55,7 +55,7 @@ class TestOutOfBandServer < Minitest::Test
     @port = @server.add_tcp_listener('127.0.0.1', 0).addr[1]
     @server.run
     sleep 0.1 until @server.running == options[:min_threads]
-    sleep 0.15 if Puma.jruby?
+    sleep 0.15 if Puma::IS_JRUBY
   end
 
   # Sequential requests should trigger out_of_band after every request.
@@ -122,7 +122,7 @@ class TestOutOfBandServer < Minitest::Test
       @oob_finished.signal # exit OOB
     end
 
-    refute_match(/OOB conflict/, req2.read_response)
+    refute_includes req2.read_response, 'OOB conflict'
   end
 
   # Partial requests should not trigger OOB.
@@ -154,8 +154,8 @@ class TestOutOfBandServer < Minitest::Test
     end
     accepted = false
     io = @server.binder.ios.last
-    io.stub(:accept_nonblock, -> {accepted = true; new_socket}) do |skt|
-      skt.close
+    io.stub(:accept_nonblock, -> {accepted = true; new_socket}) do
+      new_socket.close
       sleep 0.01
     end
     refute accepted, 'New connection accepted during out of band'
