@@ -88,7 +88,7 @@ class TestIntegration < Minitest::Test
       refute File.exist?(@bind_path), "Bind path must be removed after stop"
       File.unlink(@bind_path) rescue nil
     end
-    
+
     unless err_out.strip.empty?
       begin
         STDOUT.syswrite "\n----------------------------------- " \
@@ -163,16 +163,16 @@ class TestIntegration < Minitest::Test
 
   def restart_server_and_listen(argv, log: false)
     cli_server argv, log: log
-    connection = fast_connect
-    initial_reply = read_body(connection)
-    restart_server connection
-    [initial_reply, read_body(fast_connect)]
+    socket = send_http
+    initial_reply = socket.read_body
+    restart_server socket
+    [initial_reply, send_http_read_resp_body]
   end
 
   # reuses an existing connection to make sure that works
-  def restart_server(connection, log: false)
+  def restart_server(socket, log: false)
     Process.kill :USR2, @pid
-    connection.syswrite "GET / HTTP/1.1\r\n\r\n" # trigger it to start by sending a new request
+    socket.syswrite "GET / HTTP/1.1\r\n\r\n" # trigger it to start by sending a new request
     wait_for_server_to_boot log: log
   end
 
@@ -267,101 +267,6 @@ class TestIntegration < Minitest::Test
     rescue Errno::EBADF, Errno::ECONNREFUSED, Errno::ECONNRESET, IOError => e
       STDOUT.syswrite "\n#{log_out}\n"
       raise "#{e.class} #{e.message}\n  while waiting for server log to match '#{re.inspect}'"
-    end
-  end
-
-  def connect(path = nil, unix: false)
-    s = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @tcp_port)
-    @ios_to_close << s
-    s << "GET /#{path} HTTP/1.1\r\n\r\n"
-    s
-  end
-
-  # use only if all socket writes are fast
-  # does not wait for a read
-  def fast_connect(path = nil, unix: false)
-    s = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @tcp_port)
-    @ios_to_close << s
-    fast_write s, "GET /#{path} HTTP/1.1\r\n\r\n"
-    s
-  end
-
-  def fast_write(io, str)
-    n = 0
-    while true
-      begin
-        n = io.syswrite str
-      rescue Errno::EAGAIN, Errno::EWOULDBLOCK => e
-        unless io.wait_writable 5
-          raise e
-        end
-
-        retry
-      rescue Errno::EPIPE, SystemCallError, IOError => e
-        raise e
-      end
-
-      return if n == str.bytesize
-      str = str.byteslice(n..-1)
-    end
-  end
-
-  def read_body(connection, timeout = nil)
-    read_response(connection, timeout).split(RESP_SPLIT, 2).last
-  end
-
-  def read_response(connection, timeout = nil)
-    timeout ||= RESP_READ_TIMEOUT
-    content_length = nil
-    chunked = nil
-    response = +''
-    t_st = Process.clock_gettime Process::CLOCK_MONOTONIC
-    if connection.to_io.wait_readable timeout
-      loop do
-        begin
-          part = connection.read_nonblock(RESP_READ_LEN, exception: false)
-          case part
-          when String
-            unless content_length || chunked
-              chunked ||= part.include? "\r\nTransfer-Encoding: chunked\r\n"
-              content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
-            end
-
-            response << part
-            hdrs, body = response.split RESP_SPLIT, 2
-            unless body.nil?
-              # below could be simplified, but allows for debugging...
-              ret =
-                if content_length
-                  body.bytesize == content_length
-                elsif chunked
-                  body.end_with? "\r\n0\r\n\r\n"
-                elsif !hdrs.empty? && !body.empty?
-                  true
-                else
-                  false
-                end
-              if ret
-                return response
-              end
-            end
-            sleep 0.000_1
-          when :wait_readable, :wait_writable # :wait_writable for ssl
-            sleep 0.000_2
-          when nil
-            if response.empty?
-              raise EOFError
-            else
-              return response
-            end
-          end
-          if timeout < Process.clock_gettime(Process::CLOCK_MONOTONIC) - t_st
-            raise Timeout::Error, 'Client Read Timeout'
-          end
-        end
-      end
-    else
-      raise Timeout::Error, 'Client Read Timeout'
     end
   end
 
