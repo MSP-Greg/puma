@@ -202,8 +202,11 @@ class TestIntegration < Minitest::Test
     wait_readable_timeouts = 0
     @log_out = +''
     @log_out << "Waiting for '#{str}'  #{full_name}\n"
-    sleep 0.05 until io.is_a?(IO)
+
     t_end = Process.clock_gettime(Process::CLOCK_MONOTONIC) + WAIT_SERVER_TIMEOUT
+    sleep 0.05 until io.is_a?(IO) || Process.clock_gettime(Process::CLOCK_MONOTONIC) > t_end
+    raise "Waited too long for server to init (must be an io)" unless io.is_a? IO
+
     begin
       loop do
         if io.wait_readable 2
@@ -237,8 +240,11 @@ class TestIntegration < Minitest::Test
     wait_readable_timeouts = 0
     log_out = +''
     log_out << "Waiting for '#{re.inspect}'  #{full_name}\n"
-    sleep 0.05 until io.is_a?(IO)
+
     t_end = Process.clock_gettime(Process::CLOCK_MONOTONIC) + WAIT_SERVER_TIMEOUT
+    sleep 0.05 until io.is_a?(IO) || Process.clock_gettime(Process::CLOCK_MONOTONIC) > t_end
+    raise "Waited too long for server to init (must be an io)" unless io.is_a? IO
+
     begin
       loop do
         if io.wait_readable 2
