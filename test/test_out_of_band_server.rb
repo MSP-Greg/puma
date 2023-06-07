@@ -104,15 +104,15 @@ class TestOutOfBandServer < Minitest::Test
     oob_server oob_wait: true, max_threads: 2
 
     # Establish connection for Req2 before OOB
-    req2 = new_socket
+    req2 = send_http "GET / "
     sleep 0.01
 
     @mutex.synchronize do
       send_http GET_10
       @oob_finished.wait(@mutex) # enter OOB
 
-      # Send Req2
-      req2 << GET_10
+      # Send rest of Req2
+      req2 << "HTTP/1.0\r\n\r\n"
       # If Req2 is processed now it raises 'OOB Conflict' in the response.
       sleep 0.01
 
