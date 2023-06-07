@@ -1,8 +1,15 @@
+# frozen_string_literal: true
+
+require 'openssl'
+
 require 'puma/detect'
 require 'puma/log_writer'
 require_relative "helper"
+require_relative "helpers/puma_socket"
 
 class TestLogWriter < Minitest::Test
+  include TestPuma::PumaSocket
+
   def test_null
     log_writer = Puma::LogWriter.null
 
@@ -91,7 +98,7 @@ class TestLogWriter < Minitest::Test
       end
     end
 
-    assert_match %r!ERROR: interrupted!, err
+    assert_includes err, 'ERROR: interrupted'
   end
 
   def test_pid_formatter
@@ -127,21 +134,23 @@ class TestLogWriter < Minitest::Test
     log_writer = Puma::LogWriter.strings
     server = Puma::Server.new app, nil, {log_writer: log_writer}
 
-    host = '127.0.0.1'
-    port = (server.add_tcp_listener host, 0).addr[1]
+    @port = (server.add_tcp_listener HOST, 0).addr[1]
     server.run
 
-    sock = TCPSocket.new host, port
     path = "/"
     params = "a"*1024*10
 
-    sock << "GET #{path}?a=#{params} HTTP/1.1\r\nConnection: close\r\n\r\n"
-    sock.read
+    req = "GET #{path}?a=#{params} HTTP/1.1\r\nConnection: close\r\n\r\n"
+
+    send_http_read_response req
+
     sleep 0.1 # important so that the previous data is sent as a packet
-    assert_match %r!HTTP parse error, malformed request!, log_writer.stderr.string
-    assert_match %r!\("GET #{path}" - \(-\)\)!, log_writer.stderr.string
+    stderr = log_writer.stderr.string
+
+    assert_includes stderr, "HTTP parse error, malformed request"
+    assert_includes stderr, %Q[("GET #{path}" - (-))]
+    assert_includes stderr, "QUERY_STRING is longer than"
   ensure
-    sock.close if sock && !sock.closed?
     server.stop true
   end
 
@@ -164,15 +173,15 @@ class TestLogWriter < Minitest::Test
       obj
     }
 
-    log_writer.ssl_error OpenSSL::SSL::SSLError, ssl_mock.call(['127.0.0.1'], 'test_cert')
+    log_writer.ssl_error ::OpenSSL::SSL::SSLError, ssl_mock.call([HOST], 'test_cert')
     error = log_writer.stderr.string
     assert_includes error, "SSL error"
-    assert_includes error, "peer: 127.0.0.1"
+    assert_includes error, "peer: #{HOST}"
     assert_includes error, "cert: test_cert"
 
-    log_writer.stderr.string = ''
+    log_writer.stderr.reopen(+'')
 
-    log_writer.ssl_error OpenSSL::SSL::SSLError, ssl_mock.call(nil, nil)
+    log_writer.ssl_error ::OpenSSL::SSL::SSLError, ssl_mock.call(nil, nil)
     error = log_writer.stderr.string
     assert_includes error, "SSL error"
     assert_includes error, "peer: <unknown>"
