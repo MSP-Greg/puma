@@ -311,13 +311,15 @@ module TestRackUp
         FileUtils.rm 'config.ru'
       end
 
-      if Puma::IS_WINDOWS
-        `taskkill /F /PID #{@pid}`
-      else
-        Process.kill :TERM, @pid
-        begin
-          Process.wait2 @pid
-        rescue Errno::ECHILD
+      if @pid
+        if Puma::IS_WINDOWS
+          `taskkill /F /PID #{@pid}`
+        else
+          Process.kill :TERM, @pid
+          begin
+            Process.wait2 @pid
+          rescue Errno::ECHILD
+          end
         end
       end
       @out.close unless @out.closed?
