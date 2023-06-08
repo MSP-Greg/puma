@@ -618,14 +618,16 @@ class TestPumaServer_P < TestPumaServer_Base
   def test_http_10_keep_alive_with_body
     server_run { [200, {"Content-Type" => "plain/text"}, ["hello\n"]] }
 
-    sock = send_http "GET / HTTP/1.0\r\nConnection: Keep-Alive\r\n\r\n"
+    hdrs, body = send_http_read_response("GET / HTTP/1.0\r\nConnection: Keep-Alive\r\n\r\n").split "\r\n\r\n", 2
 
-    h = header sock
+    expected_hdrs = <<~HDRS.gsub("\n", "\r\n").rstrip
+      HTTP/1.0 200 OK
+      Content-Type: plain/text
+      Connection: Keep-Alive
+      Content-Length: 6
+    HDRS
 
-    sock.wait_readable 3
-    body = sock.gets
-
-    assert_equal ["HTTP/1.0 200 OK", "Content-Type: plain/text", "Connection: Keep-Alive", "Content-Length: 6"], h
+    assert_equal expected_hdrs, hdrs
     assert_equal "hello\n", body
   end
 
@@ -1028,8 +1030,7 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 1
     sock << "ello"
 
-    sock.wait_readable 3
-    sock.gets
+    sock.read_response
 
     assert request_body_wait.is_a?(Float)
     # Could be 1000 but the tests get flaky. We don't care if it's extremely precise so much as that
@@ -1048,8 +1049,7 @@ class TestPumaServer_P < TestPumaServer_Base
     sleep 3
     sock << "4\r\nello\r\n0\r\n\r\n"
 
-    sock.wait_readable 3
-    sock.gets
+    sock.read_response
 
     # Could be 1000 but the tests get flaky. We don't care if it's extremely precise so much as that
     # it is set to a reasonable number.
@@ -1058,10 +1058,10 @@ class TestPumaServer_P < TestPumaServer_Base
 
   def test_open_connection_wait(**options)
     server_run(**options) { [200, {}, ["Hello"]] }
-    s = send_http nil
+    skt = send_http nil
     sleep 0.1
-    s.syswrite GET_10
-    assert_equal 'Hello', s.readlines.last
+    skt << GET_10
+    assert_equal 'Hello', skt.read_body
   end
 
   def test_open_connection_wait_no_queue
@@ -1192,9 +1192,8 @@ class TestPumaServer_P < TestPumaServer_Base
     assert_match(s1_response, s1.gets) if s1_response
 
     # Send s2 after shutdown begins
-    s2.syswrite "\r\n" unless s2.wait_readable(0.2)
+    s2 << "\r\n" unless s2.wait_readable(0.2)
 
-    assert s2.wait_readable(10), 'timeout waiting for s2 response'
     s2_result = begin
       assert s2.wait_readable(10), 'timeout waiting for s2 response'
       s2.gets
