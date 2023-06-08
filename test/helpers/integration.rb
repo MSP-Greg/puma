@@ -155,10 +155,14 @@ class TestIntegration < Minitest::Test
     @server.close if @server.respond_to?(:close) && !@server.closed?
     @server = nil
     @stop_server_called = true
-    begin
-      Process.wait2 pid
-    rescue Errno::ECHILD
-    end
+    ret = nil
+    Thread.new {
+      ret = begin
+        Process.wait2 pid
+      rescue Errno::ECHILD, Errno::ESRCH
+      end
+    }.join(10)
+    ret
   end
 
   def restart_server_and_listen(argv, log: false)
