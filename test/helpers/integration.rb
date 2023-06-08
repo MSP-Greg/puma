@@ -328,6 +328,7 @@ class TestIntegration < Minitest::Test
     end
     w.close
     @ios_to_close << r
+    @stop_server_called = true if argv == 'stop'
     r
   end
 
