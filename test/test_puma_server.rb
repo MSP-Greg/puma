@@ -1225,16 +1225,14 @@ class TestPumaServer_P < TestPumaServer_Base
     shutdown_requests(**opts, post: true, s2_response: /408/)
   end
 
-  def test_http11_connection_header_
+  def test_http11_connection_header_queue
     server_run { EMPTY_200 }
 
-    headers = send_http_read_response(GET_11)
-      .split(RESP_SPLIT, 2).first.split "\r\n"
+    headers = send_http_read_resp_headers
 
     assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], headers
 
-    headers = send_http_read_response("GET / HTTP/1.1\r\nConnection: close\r\n\r\n")
-      .split(RESP_SPLIT).first.split "\r\n"
+    headers = send_http_read_resp_headers "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
 
     assert_equal ["HTTP/1.1 200 OK", "Connection: close", "Content-Length: 0"], headers
   end
@@ -1247,21 +1245,18 @@ class TestPumaServer_P < TestPumaServer_Base
 
     sock << GET_10
     assert_equal ["HTTP/1.0 200 OK", "Content-Length: 0"], header(sock)
-    sock.close
   end
 
   def test_http11_connection_header_no_queue
     server_run(queue_requests: false) { EMPTY_200 }
-    sock = send_http GET_11
-    assert_equal ["HTTP/1.1 200 OK", "Connection: close", "Content-Length: 0"], header(sock)
-    sock.close
+    headers = send_http_read_resp_headers
+    assert_equal ["HTTP/1.1 200 OK", "Connection: close", "Content-Length: 0"], headers
   end
 
   def test_http10_connection_header_no_queue
     server_run(queue_requests: false) { EMPTY_200 }
-    sock = send_http GET_10
-    assert_equal ["HTTP/1.0 200 OK", "Content-Length: 0"], header(sock)
-    sock.close
+    headers = send_http_read_resp_headers GET_10
+    assert_equal ["HTTP/1.0 200 OK", "Content-Length: 0"], headers
   end
 
   def stub_accept_nonblock(error)
