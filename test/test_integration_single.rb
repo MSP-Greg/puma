@@ -168,6 +168,7 @@ class TestIntegrationSingle_1 < TestIntegration
 
     @server.close unless @server.closed?
     @server = nil
+    @pid = nil
   end
 
   # listener is closed 'externally' while Puma is in the IO.select statement
