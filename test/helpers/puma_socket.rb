@@ -33,6 +33,7 @@ module TestPuma
 
     def after_teardown
       return if skipped?
+      super
       # Errno::EBADF raised on macOS
       @ios_to_close.each do |io|
         begin
@@ -51,7 +52,6 @@ module TestPuma
         end
       end
       @ios_to_close = []
-      super
     end
 
     def header(skt)

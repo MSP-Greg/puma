@@ -75,15 +75,6 @@ class TestIntegration < Minitest::Test
       end
     end
 
-    @ios_to_close.each do |io|
-      begin
-        io.close if io.respond_to?(:close) && !io.closed?
-      rescue
-      ensure
-        io = nil
-      end
-    end
-
     if @bind_path
       refute File.exist?(@bind_path), "Bind path must be removed after stop"
       File.unlink(@bind_path) rescue nil
