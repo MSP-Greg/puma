@@ -15,9 +15,9 @@ class TestIntegration < Minitest::Test
   RESP_SPLIT = "\r\n\r\n"
 
   WAIT_SERVER_TIMEOUT =
-    if    ::Puma::IS_MRI  ; 15
-    elsif ::Puma::IS_JRUBY; 25
-    else                  ; 20 # TruffleRuby
+    if    ::Puma::IS_MRI  ; 10
+    elsif ::Puma::IS_JRUBY; 15
+    else                  ; 15 # TruffleRuby
     end
 
   BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -Ilib" :

@@ -106,79 +106,77 @@ module TestPuma
     }
 
     READ_RESPONSE = -> (timeout = nil, len: nil, decode_chunked: nil, times: nil) do
-      timeout ||= RESP_READ_TIMEOUT
       content_length = nil
       chunked = nil
       status = nil
       no_body = nil
       response = +''
       read_len = len || RESP_READ_LEN
+
+      timeout  ||= RESP_READ_TIMEOUT
       time_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       time_end   = time_start + timeout
-      if self.to_io.wait_readable timeout
-        loop do
-          begin
-            part = self.read_nonblock(read_len, exception: false)
-            case part
-            when String
-              times << Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_start if times
-              status ||= part[/\AHTTP\/1\.[01] (\d{3})/, 1]
-              if status
-                no_body ||= NO_ENTITY_BODY.key? status.to_i || status.to_i < 200
-              end
-              if no_body && part.end_with?(RESP_SPLIT)
-                return response << part
-              end
 
-              unless content_length || chunked
-                chunked ||= part.downcase.include? "\r\ntransfer-encoding: chunked\r\n"
-                content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
-              end
+      loop do
+        begin
+          self.to_io.wait_readable timeout
+          part = self.read_nonblock(read_len, exception: false)
+          case part
+          when String
+            times << Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_start if times
+            status ||= part[/\AHTTP\/1\.[01] (\d{3})/, 1]
+            if status
+              no_body ||= NO_ENTITY_BODY.key? status.to_i || status.to_i < 200
+            end
+            if no_body && part.end_with?(RESP_SPLIT)
+              return response << part
+            end
 
-              response << part
-              hdrs, body = response.split RESP_SPLIT, 2
-              unless body.nil?
-                # below could be simplified, but allows for debugging...
-                ret =
-                  if content_length
-                    body.bytesize == content_length
-                  elsif chunked
-                    if body.end_with? "0\r\n\r\n"
-                      if decode_chunked
-                        response = TestPuma::PumaSocket.chunked_body hdrs, body
-                      end
-                      true
-                    else
-                      false
+            unless content_length || chunked
+              chunked ||= part.downcase.include? "\r\ntransfer-encoding: chunked\r\n"
+              content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
+            end
+
+            response << part
+            hdrs, body = response.split RESP_SPLIT, 2
+            unless body.nil?
+              # below could be simplified, but allows for debugging...
+              ret =
+                if content_length
+                  body.bytesize == content_length
+                elsif chunked
+                  if body.end_with? "0\r\n\r\n"
+                    if decode_chunked
+                      response = TestPuma::PumaSocket.chunked_body hdrs, body
                     end
-                  elsif !hdrs.empty? && !body.empty?
                     true
                   else
                     false
                   end
-                return response if ret
-              end
-              sleep 0.000_1
-            when :wait_readable
-              to = time_end - Process.clock_gettime(Process::CLOCK_MONOTONIC)
-              self.to_io.wait_readable to
-            when :wait_writable # :wait_writable for ssl
-              to = time_end - Process.clock_gettime(Process::CLOCK_MONOTONIC)
-              self.to_io.wait_writable to
-            when nil
-              if response.empty?
-                raise EOFError
-              else
-                return response
-              end
+                elsif !hdrs.empty? && !body.empty?
+                  true
+                else
+                  false
+                end
+              return response if ret
             end
-            if time_end < Process.clock_gettime(Process::CLOCK_MONOTONIC)
-              raise Timeout::Error, 'Client Read Timeout'
+            sleep 0.000_1
+          when :wait_readable
+          when :wait_writable # :wait_writable for ssl
+            to = time_end - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+            self.to_io.wait_writable to
+          when nil
+            if response.empty?
+              raise EOFError
+            else
+              return response
             end
           end
+          timeout = time_end - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          if timeout <= 0
+            raise Timeout::Error, 'Client Read Timeout'
+          end
         end
-      else
-        raise Timeout::Error, "Client 'wait_readable' Timeout"
       end
     end
 
