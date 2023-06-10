@@ -100,7 +100,7 @@ module TestPuma
       skt
     end
 
-    # Only works with TCP or SSL sockets
+    # Only works when Socket::TCP_INFO is defined, linux/Ubuntu
     def skt_closed_by_server(socket)
       skt = socket.to_io
       return false unless skt.kind_of?(TCPSocket)
