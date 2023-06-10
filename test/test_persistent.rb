@@ -161,11 +161,20 @@ class TestPersistent < Minitest::Test
     expected = "HTTP/1.1 200 OK\r\nX-Header: Works\r\nContent-Length: #{@cl}\r\n\r\n#{@body[0]}"
     assert_equal expected, @client.read_response
 
-    refute skt_closed_by_server(@client)
+    has_tcp_info = Socket.const_defined? :TCP_INFO
+
+    refute skt_closed_by_server(@client) if has_tcp_info
 
     sleep 2
 
-    assert skt_closed_by_server(@client)
+    if has_tcp_info
+      assert skt_closed_by_server(@client)
+    else
+      # IO::EAGAINWaitReadable may be raised by TruffleRuby
+      assert_raises EOFError, IO::EAGAINWaitReadable do
+        @client.read_nonblock(1)
+      end
+    end
   end
 
   # Puma will calculate the content-length of an array, but will always send an
