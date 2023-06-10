@@ -100,6 +100,22 @@ module TestPuma
       skt
     end
 
+    # Only works with TCP or SSL sockets
+    def skt_closed_by_server(socket)
+      skt = socket.to_io
+      return false unless skt.kind_of?(TCPSocket)
+
+      begin
+        tcp_info = skt.getsockopt(Socket::IPPROTO_TCP, Socket::TCP_INFO)
+      rescue IOError, SystemCallError
+        false
+      else
+        state = tcp_info.unpack('C')[0]
+        # TIME_WAIT: 6, CLOSE: 7, CLOSE_WAIT: 8, LAST_ACK: 9, CLOSING: 11
+        (state >= 6 && state <= 9) || state == 11
+      end
+    end
+
     READ_BODY = -> (timeout = nil, len: nil, decode_chunked: nil, times: nil) {
       self.read_response(timeout, len: len, decode_chunked: decode_chunked, times: times)
         .split(RESP_SPLIT, 2).last
