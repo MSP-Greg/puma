@@ -1610,7 +1610,7 @@ class TestPumaServer_S < TestPumaServer_Base
       [200, {}, ["DONE"]]
     end
 
-    # Send two requests, allow serverto generate response
+    # Send two requests, allow server to generate response
     wait << true << true
     connections = send_http_array 2, req
     connections.each { |skt| skt.read_response }
@@ -1620,7 +1620,7 @@ class TestPumaServer_S < TestPumaServer_Base
     @server.stop
     wait.close
 
-    # give server threads time to run
+    # give server threads time to run, seems to reduce retries
     5.times { Thread.pass; sleep 0.01 }
 
     results = read_response_array connections
@@ -1672,7 +1672,7 @@ class TestPumaServer_S < TestPumaServer_Base
     @server.stop
     wait.close
 
-    # give server threads time to run
+    # give server threads time to run, seems to reduce retries
     5.times { Thread.pass; sleep 0.01 }
 
     sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
