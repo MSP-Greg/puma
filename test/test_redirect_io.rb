@@ -80,15 +80,14 @@ class TestRedirectIO < TestIntegration
     loop do
       str = File.read path
       if str.include? include
-        assert_includes str, include,
-          "File #{File.basename(path)} does not include #{include}"
+        assert_includes str, include
         break
       else
         retries += 1
         if retries < retries_max
           sleep 0.2
         else
-          flunk "File read took too long contents:\n#{str}"
+          flunk "File read took too long, contents:\n#{str}"
         end
       end
     end
