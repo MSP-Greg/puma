@@ -1620,8 +1620,8 @@ class TestPumaServer_S < TestPumaServer_Base
     @server.stop
     wait.close
 
-    # give server threads time to run, two requests per connection
-    2.times { Thread.pass; sleep 0.000_5 }
+    # give server threads time to run
+    5.times { Thread.pass; sleep 0.01 }
 
     results = read_response_array connections
 
@@ -1672,8 +1672,8 @@ class TestPumaServer_S < TestPumaServer_Base
     @server.stop
     wait.close
 
-    # give server threads time to run, two requests per connection
-    2.times { Thread.pass; sleep 0.000_5 }
+    # give server threads time to run
+    5.times { Thread.pass; sleep 0.01 }
 
     sleep (::Puma::IS_MRI ? 0.01 : 0.1) # needed to allow 2nd requests to be processed?
 
