@@ -120,6 +120,7 @@ class TestIntegration < Minitest::Test
         cmd << " -b tcp://#{HOST}:#{@tcp_port}"
       end
     end
+    argv = argv.join(' ') if argv.is_a? Array
     cmd << " #{argv}" if argv
 
     env['PUMA_DEBUG'] = 'true' if puma_debug
