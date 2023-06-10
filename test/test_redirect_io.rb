@@ -35,7 +35,7 @@ class TestRedirectIO < TestIntegration
   end
 
   def test_sighup_redirects_io_single
-    cli_server @cli_args.join ' '
+    cli_server @cli_args
 
     rotate_check_logs
   end
@@ -43,7 +43,7 @@ class TestRedirectIO < TestIntegration
   def test_sighup_redirects_io_cluster
     skip_unless :fork
 
-    cli_server (['-w', '1'] + @cli_args).join ' '
+    cli_server (['-w', '2'] + @cli_args)
 
     rotate_check_logs
   end
@@ -76,20 +76,19 @@ class TestRedirectIO < TestIntegration
 
   def assert_file_contents(path, include = FILE_STR)
     retries = 0
-    retries_max = 50 # 5 seconds
-    File.open(path) do |file|
-      begin
-        file.read_nonblock 1
-        file.seek 0
-        assert_includes file.read, include,
+    retries_max = 25 # 5 seconds
+    loop do
+      str = File.read path
+      if str.include? include
+        assert_includes str, include,
           "File #{File.basename(path)} does not include #{include}"
-      rescue EOFError
-        sleep 0.1
+        break
+      else
         retries += 1
         if retries < retries_max
-          retry
+          sleep 0.2
         else
-          flunk 'File read took too long'
+          flunk "File read took too long contents:\n#{str}"
         end
       end
     end
