@@ -239,7 +239,7 @@ class TestIntegrationSingle_2 < TestIntegration
     stop_server
 
     # macos intermittently raises 'Errno::ENOENT: No such file'
-    sleep 0.25 unless File.exist? fn
+    sleep 0.5 unless File.exist? fn
     log = File.read fn
 
     assert_includes log, '"GET / HTTP/1.1"'
@@ -266,7 +266,7 @@ class TestIntegrationSingle_2 < TestIntegration
     stop_server
 
     # macos intermittently raises 'Errno::ENOENT: No such file'
-    sleep 0.25 unless File.exist? fn
+    sleep 0.5 unless File.exist? fn
     log = File.read fn
 
     assert_includes log, '"GET / HTTP/1.1"'
