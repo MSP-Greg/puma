@@ -536,6 +536,8 @@ class TestPumaSSLCertChain < Minitest::Test
   # OpenSSL::X509::Name#to_utf8 only available in Ruby 2.5 and later
   USE_TO_UTFT8 = OpenSSL::X509::Name.instance_methods(false).include? :to_utf8
 
+  include TestPuma::PumaSocket
+
   def cert_chain(&blk)
     @host = "127.0.0.1"
 
@@ -551,17 +553,13 @@ class TestPumaSSLCertChain < Minitest::Test
     @port = (@server.add_ssl_listener @host, 0, mini_ctx).addr[1]
     @server.run
 
-    tcp_skt = TCPSocket.new @host, @port
-    ctx = OpenSSL::SSL::SSLContext.new
-    ctx.verify_mode = OpenSSL::SSL::VERIFY_NONE
-    ssl_skt = OpenSSL::SSL::SSLSocket.new tcp_skt, ctx
-    ssl_skt.sync_close = true
-    ssl_skt.connect
+    ssl_skt = send_http ctx: new_ctx
+
     subj_chain = ssl_skt.peer_cert_chain.map(&:subject)
     subj_map = USE_TO_UTFT8 ?
       subj_chain.map { |subj| subj.to_utf8[/CN=(.+ - )?([^,]+)/,2] } :
       subj_chain.map { |subj| subj.to_s(OpenSSL::X509::Name::RFC2253)[/CN=(.+ - )?([^,]+)/,2] }
-    ssl_skt.sysclose
+
     @server&.stop true
 
     assert_equal ['test.puma.localhost', 'intermediate.puma.localhost', 'ca.puma.localhost'], subj_map
