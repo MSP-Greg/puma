@@ -39,7 +39,7 @@ module TestPuma
         begin
           if io.respond_to? :sysclose
             io.sync_close = true
-            io.sysclose unless !io.closed?
+            io.sysclose unless io.closed?
           else
             io.close if io.respond_to?(:close) && !io.closed?
             if io.is_a?(File) && (path = io&.path) && File.exist?(path)
@@ -51,7 +51,9 @@ module TestPuma
           io = nil
         end
       end
-      @ios_to_close = []
+      # not sure about below, may help with gc...
+      @ios_to_close.clear
+      @ios_to_close = nil
     end
 
     def header(skt)
