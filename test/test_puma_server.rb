@@ -1301,12 +1301,8 @@ class TestPumaServer_P < TestPumaServer_Base
 
     server_run(lowlevel_error_handler: handler) { [200, {}, ['Hello World']] }
 
-    # valid req & read, close
-    sock = send_http GET_10
-    sleep 0.05  # macOS TruffleRuby may not get the body without
-    resp = sock.sysread 256
-    sock.close
-    assert_match 'Hello World', resp
+    body = send_http_read_response GET_10
+    assert_match 'Hello World', body
     sleep 0.5
     assert_empty @log_writer.stdout.string
 
