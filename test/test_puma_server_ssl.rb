@@ -42,8 +42,6 @@ class TestPumaServerSSL < Minitest::Test
 
   # yields ctx to block, use for ctx setup & configuration
   def start_server(&blk)
-    @host = "127.0.0.1"
-
     app = @app || lambda { |env| [200, {}, [env['rack.url_scheme']]] }
 
     ctx = Puma::MiniSSL::Context.new
@@ -62,7 +60,7 @@ class TestPumaServerSSL < Minitest::Test
 
     @log_writer = SSLLogWriterHelper.new STDOUT, STDERR
     @server = Puma::Server.new app, nil, {log_writer: @log_writer}
-    @port = (@server.add_ssl_listener @host, 0, ctx).addr[1]
+    @port = (@server.add_ssl_listener HOST, 0, ctx).addr[1]
     @server.run
   end
 
@@ -308,7 +306,7 @@ class TestPumaServerSSLClient < Minitest::Test
   }
 
   def assert_ssl_client_error_match(error, subject: nil, context: CTX, &blk)
-    host = Puma::IS_JRUBY ? "127.0.0.1" : "localhost"
+    host = Puma::IS_JRUBY ? HOST : "localhost"
 
     port = 0
 
@@ -539,8 +537,6 @@ class TestPumaSSLCertChain < Minitest::Test
   include TestPuma::PumaSocket
 
   def cert_chain(&blk)
-    @host = "127.0.0.1"
-
     app = lambda { |env| [200, {}, [env['rack.url_scheme']]] }
 
     @log_writer = SSLLogWriterHelper.new STDOUT, STDERR
@@ -550,7 +546,7 @@ class TestPumaSSLCertChain < Minitest::Test
     mini_ctx.key  = "#{CHAIN_DIR}/cert.key"
     yield mini_ctx
 
-    @port = (@server.add_ssl_listener @host, 0, mini_ctx).addr[1]
+    @port = (@server.add_ssl_listener HOST, 0, mini_ctx).addr[1]
     @server.run
 
     ssl_skt = send_http ctx: new_ctx

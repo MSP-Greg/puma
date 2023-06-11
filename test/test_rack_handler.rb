@@ -79,9 +79,8 @@ module TestRackUp
     end
 
     def test_handler_boots
-      host = '127.0.0.1'
       port = UniquePort.call
-      opts = { Host: host, Port: port }
+      opts = { Host: HOST, Port: port }
       in_handler(app, opts) do |launcher|
         send_http_read_response "GET /test HTTP/1.1\r\n\r\n", port: port
         assert_equal("/test", @input["PATH_INFO"])

@@ -21,8 +21,6 @@ class TestRequestInvalid < Minitest::Test
   CHUNKED = "1\r\nH\r\n4\r\nello\r\n5\r\nWorld\r\n0\r\n\r\n"
 
   def setup
-    @host = '127.0.0.1'
-
     # this app should never be called, used for debugging
     app = ->(env) {
       body = +''
@@ -37,7 +35,7 @@ class TestRequestInvalid < Minitest::Test
 
     @log_writer = Puma::LogWriter.strings
     @server = Puma::Server.new app, nil, {log_writer: @log_writer}
-    @port = (@server.add_tcp_listener @host, 0).addr[1]
+    @port = (@server.add_tcp_listener HOST, 0).addr[1]
     @server.run
     sleep 0.15 if Puma.jruby?
   end

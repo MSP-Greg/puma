@@ -10,6 +10,8 @@ require 'rack'
 class TestConfigFile < TestConfigFileBase
   parallelize_me!
 
+  HOST = '127.0.0.1'
+
   def test_default_max_threads
     max_threads = 16
     max_threads = 5 if RUBY_ENGINE.nil? || RUBY_ENGINE == 'ruby'
@@ -22,7 +24,7 @@ class TestConfigFile < TestConfigFileBase
       bind = "tcp://0.0.0.0:9292"
     else
       fn = "test/rackup/hello-bind.ru"
-      bind = "tcp://127.0.0.1:9292"
+      bind = "tcp://#{HOST}:9292"
     end
 
     conf = Puma::Configuration.new do |c|

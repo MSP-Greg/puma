@@ -253,9 +253,8 @@ class TestPumaControlCli < TestConfigFileBase
   def test_control_ssl
     skip_unless :ssl
 
-    host = "127.0.0.1"
     port = UniquePort.call
-    url = "ssl://#{host}:#{port}?#{ssl_query}"
+    url = "ssl://#{HOST}:#{port}?#{ssl_query}"
 
     opts = [
       "--control-url", url,

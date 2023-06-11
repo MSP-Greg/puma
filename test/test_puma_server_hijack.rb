@@ -23,11 +23,7 @@ class TestPumaServerHijack < Minitest::Test
 
   include TestPuma::PumaSocket
 
-  STD_REQ_11 = "GET / HTTP/1.1\r\n\r\n"
-
   def setup
-    @host = "127.0.0.1"
-
     @ios = []
 
     @app = ->(env) { [200, {}, [env['rack.url_scheme']]] }
@@ -58,7 +54,7 @@ class TestPumaServerHijack < Minitest::Test
     options[:log_writer]  ||= @log_writer
     options[:min_threads] ||= 1
     @server = Puma::Server.new block || @app, @events, options
-    @port = (@server.add_tcp_listener @host, 0).addr[1]
+    @port = (@server.add_tcp_listener HOST, 0).addr[1]
     @server.run
   end
 
@@ -74,7 +70,7 @@ class TestPumaServerHijack < Minitest::Test
       [200, {}, body]
     end
 
-    sock = send_http STD_REQ_11
+    sock = send_http
 
     sock.wait_readable 2
     assert_equal "Server listening", sock.sysread(1_024)
@@ -106,7 +102,7 @@ class TestPumaServerHijack < Minitest::Test
       [101, headers, body]
     end
 
-    sock = send_http STD_REQ_11
+    sock = send_http
     sock.wait_readable 0.5
     resp = sock.sysread 1_024
     echo_msg = "This should echo..."
@@ -135,7 +131,7 @@ class TestPumaServerHijack < Minitest::Test
       [101, headers, []]
     end
 
-    sock = send_http STD_REQ_11
+    sock = send_http
     sock.wait_readable 0.5
     resp = sock.sysread 1_024
     echo_msg = "This should echo..."
@@ -198,7 +194,7 @@ class TestPumaServerHijack < Minitest::Test
       end
     end
 
-    sock1 = send_http STD_REQ_11
+    sock1 = send_http
     # response will often cause retries, can't repo locally
     sleep (Puma::IS_MRI ? 0.1 : 0.3)
     Thread.pass
@@ -207,7 +203,7 @@ class TestPumaServerHijack < Minitest::Test
 
     sleep 0.01 # time for close block to be called ?
 
-    sock2 = send_http STD_REQ_11
+    sock2 = send_http
     # response will often cause retries, can't repo locally
     sleep (Puma::IS_MRI ? 0.1 : 0.3)
     Thread.pass

@@ -60,11 +60,11 @@ end
 module UniquePort
   MUTEX = Mutex.new
   SELECTED_PORTS = {}
-  def self.call
+  def self.call(host = '127.0.0.1')
     port = 0
     MUTEX.synchronize do
       begin
-        TCPServer.open('127.0.0.1', 0) { |server|
+        TCPServer.open(host, 0) { |server|
           port = server.connect_address.ip_port
           server.close
         }

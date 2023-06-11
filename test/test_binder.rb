@@ -10,6 +10,8 @@ require "puma/configuration"
 class TestBinderBase < Minitest::Test
   include SSLHelper if ::Puma::HAS_SSL
 
+  HOST = '127.0.0.1'
+
   def setup
     @log_writer = Puma::LogWriter.strings
     @binder = Puma::Binder.new(@log_writer)
@@ -85,9 +87,9 @@ class TestBinderParallel < TestBinderBase
 
   def test_home_alters_listeners_for_tcp_addresses
     port = UniquePort.call
-    @binder.parse ["tcp://127.0.0.1:#{port}"], @log_writer
+    @binder.parse ["tcp://#{HOST}:#{port}"], @log_writer
 
-    assert_equal "tcp://127.0.0.1:#{port}", @binder.listeners[0][0]
+    assert_equal "tcp://#{HOST}:#{port}", @binder.listeners[0][0]
     assert_kind_of TCPServer, @binder.listeners[0][1]
   end
 
@@ -109,16 +111,16 @@ class TestBinderParallel < TestBinderBase
   def test_home_alters_listeners_for_ssl_addresses
     skip_unless :ssl
     port = UniquePort.call
-    @binder.parse ["ssl://127.0.0.1:#{port}?#{ssl_query}"], @log_writer
+    @binder.parse ["ssl://#{HOST}:#{port}?#{ssl_query}"], @log_writer
 
-    assert_equal "ssl://127.0.0.1:#{port}?#{ssl_query}", @binder.listeners[0][0]
+    assert_equal "ssl://#{HOST}:#{port}?#{ssl_query}", @binder.listeners[0][0]
     assert_kind_of TCPServer, @binder.listeners[0][1]
   end
 
   def test_correct_zero_port
     @binder.parse ["tcp://localhost:0"], @log_writer
 
-    m = %r!http://127.0.0.1:(\d+)!.match(@log_writer.stdout.string)
+    m = %r!http://#{HOST}:(\d+)!o.match(@log_writer.stdout.string)
     port = m[1].to_i
 
     refute_equal 0, port
@@ -127,7 +129,7 @@ class TestBinderParallel < TestBinderBase
   def test_correct_zero_port_ssl
     skip_unless :ssl
 
-    ssl_regex = %r!ssl://127.0.0.1:(\d+)!
+    ssl_regex = %r!ssl://#{HOST}:(\d+)!o
 
     @binder.parse ["ssl://localhost:0?#{ssl_query}"], @log_writer
 
@@ -142,7 +144,7 @@ class TestBinderParallel < TestBinderBase
 
     log = @log_writer.stdout.string
 
-    assert_match %r!http://127.0.0.1:\d+!, log
+    assert_match %r!http://#{HOST}:\d+!o, log
     if HAS_IPV6
       assert_match %r!http://\[::1\]:\d+!, log
     end
@@ -153,7 +155,7 @@ class TestBinderParallel < TestBinderBase
 
     @binder.parse ["ssl://localhost:0?#{ssl_query}"], @log_writer
 
-    assert_match %r!ssl://127.0.0.1:(\d+)!, @log_writer.stdout.string
+    assert_match %r!ssl://#{HOST}:(\d+)!o, @log_writer.stdout.string
     if HAS_IPV6
       assert_match %r!ssl://\[::1\]:(\d+)!, @log_writer.stdout.string
     end
@@ -312,7 +314,7 @@ class TestBinderParallel < TestBinderBase
   end
 
   def test_redirects_for_restart_creates_a_hash
-    @binder.parse ["tcp://127.0.0.1:0"], @log_writer
+    @binder.parse ["tcp://#{HOST}:0"], @log_writer
 
     result = @binder.redirects_for_restart
     ios = @binder.listeners.map { |_l, io| io.to_i }
@@ -322,7 +324,7 @@ class TestBinderParallel < TestBinderBase
   end
 
   def test_redirects_for_restart_env
-    @binder.parse ["tcp://127.0.0.1:0"], @log_writer
+    @binder.parse ["tcp://#{HOST}:0"], @log_writer
 
     result = @binder.redirects_for_restart_env
 
@@ -332,7 +334,7 @@ class TestBinderParallel < TestBinderBase
   end
 
   def test_close_listeners_closes_ios
-    @binder.parse ["tcp://127.0.0.1:#{UniquePort.call}"], @log_writer
+    @binder.parse ["tcp://#{HOST}:#{UniquePort.call}"], @log_writer
 
     refute @binder.listeners.any? { |_l, io| io.closed? }
 
@@ -342,7 +344,7 @@ class TestBinderParallel < TestBinderBase
   end
 
   def test_close_listeners_closes_ios_unless_closed?
-    @binder.parse ["tcp://127.0.0.1:0"], @log_writer
+    @binder.parse ["tcp://#{HOST}:0"], @log_writer
 
     bomb = @binder.listeners.first[1]
     bomb.close
@@ -367,7 +369,7 @@ class TestBinderParallel < TestBinderBase
   end
 
   def test_import_from_env_listen_inherit
-    @binder.parse ["tcp://127.0.0.1:0"], @log_writer
+    @binder.parse ["tcp://#{HOST}:0"], @log_writer
     removals = @binder.create_inherited_fds(@binder.redirects_for_restart_env)
 
     @binder.listeners.each do |l, io|
@@ -381,10 +383,9 @@ class TestBinderParallel < TestBinderBase
   # This is OK, because systemd obviously only works on Linux.
   def test_socket_activation_tcp
     skip_unless :unix
-    url = "127.0.0.1"
     port = UniquePort.call
-    sock = Addrinfo.tcp(url, port).listen
-    assert_activates_sockets(url: url, port: port, sock: sock)
+    sock = Addrinfo.tcp(HOST, port).listen
+    assert_activates_sockets(url: HOST, port: port, sock: sock)
   end
 
   def test_socket_activation_tcp_ipv6
@@ -456,8 +457,8 @@ class TestBinderParallel < TestBinderBase
 
     unix_path = tmp_unix '.sock'
     prepared_paths = {
-        ssl: "ssl://127.0.0.1:#{UniquePort.call}?#{ssl_query}",
-        tcp: "tcp://127.0.0.1:#{UniquePort.call}",
+        ssl: "ssl://#{HOST}:#{UniquePort.call}?#{ssl_query}",
+        tcp: "tcp://#{HOST}:#{UniquePort.call}",
         unix: "unix://#{unix_path}"
       }
 
@@ -482,17 +483,16 @@ class TestBinderSingle < TestBinderBase
   def test_ssl_binder_sets_backlog
     skip_unless :ssl
 
-    host = '127.0.0.1'
     port = UniquePort.call
     backlog_set = 0
-    tcp_server = TCPServer.new(host, port)
+    tcp_server = TCPServer.new(HOST, port)
     tcp_server.define_singleton_method(:listen) do |backlog|
       backlog_set = backlog
       super backlog
     end
 
     TCPServer.stub(:new, tcp_server) do
-      @binder.parse ["ssl://#{host}:#{port}?#{ssl_query}&backlog=2048"], @log_writer
+      @binder.parse ["ssl://#{HOST}:#{port}?#{ssl_query}&backlog=2048"], @log_writer
     end
     assert_equal 2048, backlog_set
   end

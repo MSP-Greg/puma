@@ -24,8 +24,6 @@ class TestRackServer < Minitest::Test
 
   include TestPuma::PumaSocket
 
-  HOST = '127.0.0.1'
-
   STR_1KB = "──#{SecureRandom.hex 507}─\n".freeze
 
   class ErrorChecker

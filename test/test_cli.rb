@@ -61,9 +61,9 @@ class TestCLI < Minitest::Test
 
   def test_control_for_tcp
     cntl = UniquePort.call
-    url = "tcp://127.0.0.1:#{cntl}/"
+    url = "tcp://#{HOST}:#{cntl}/"
 
-    cli = Puma::CLI.new ["-b", "tcp://127.0.0.1:0",
+    cli = Puma::CLI.new ["-b", "tcp://#{HOST}:0",
                          "--control-url", url,
                          "--control-token", "",
                          "test/rackup/hello.ru"], @log_writer, @events
@@ -83,11 +83,10 @@ class TestCLI < Minitest::Test
 
     require "net/http"
     control_port = UniquePort.call
-    control_host = "127.0.0.1"
-    control_url = "ssl://#{control_host}:#{control_port}?#{ssl_query}"
+    control_url = "ssl://#{HOST}:#{control_port}?#{ssl_query}"
     token = "token"
 
-    cli = Puma::CLI.new ["-b", "tcp://127.0.0.1:0",
+    cli = Puma::CLI.new ["-b", "tcp://#{HOST}:0",
                          "--control-url", control_url,
                          "--control-token", token,
                          "test/rackup/hello.ru"], @log_writer, @events
@@ -182,8 +181,8 @@ class TestCLI < Minitest::Test
     @port = UniquePort.call
     cntl  = UniquePort.call
 
-    cli = Puma::CLI.new ["-b", "tcp://127.0.0.1:#{@port}",
-                         "--control-url", "tcp://127.0.0.1:#{cntl}/",
+    cli = Puma::CLI.new ["-b", "tcp://#{HOST}:#{@port}",
+                         "--control-url", "tcp://#{HOST}:#{cntl}/",
                          "--control-token", "",
                          "test/rackup/hello.ru"], @log_writer, @events
 
@@ -262,9 +261,9 @@ class TestCLI < Minitest::Test
   end
 
   def test_control_gc_stats_tcp
-    uri  = "tcp://127.0.0.1:#{UniquePort.call}/"
+    uri  = "tcp://#{HOST}:#{UniquePort.call}/"
     cntl_port = UniquePort.call
-    cntl = "tcp://127.0.0.1:#{cntl_port}/"
+    cntl = "tcp://#{HOST}:#{cntl_port}/"
 
     control_gc_stats(uri, cntl) { new_socket port: cntl_port }
   end
@@ -345,7 +344,7 @@ class TestCLI < Minitest::Test
   end
 
   def test_state
-    url = "tcp://127.0.0.1:#{UniquePort.call}"
+    url = "tcp://#{HOST}:#{UniquePort.call}"
     cli = Puma::CLI.new ["--state", @tmp_path, "--control-url", url]
     cli.launcher.write_state
 

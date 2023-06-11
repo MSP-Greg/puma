@@ -25,11 +25,10 @@ class WebServerTest < Minitest::Test
   VALID_REQUEST = "GET / HTTP/1.1\r\nHost: www.zedshaw.com\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n"
 
   def setup
-    @host = '127.0.0.1'
     @tester = TestHandler.new
     @server = Puma::Server.new @tester, nil, {log_writer: Puma::LogWriter.strings}
-    @port = (@server.add_tcp_listener @host, 0).addr[1]
-    @tcp = "http://#{@host}:#{@port}"
+    @port = (@server.add_tcp_listener HOST, 0).addr[1]
+    @tcp = "http://#{HOST}:#{@port}"
     @server.run
   end
 

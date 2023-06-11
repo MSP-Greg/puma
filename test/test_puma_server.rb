@@ -18,9 +18,9 @@ class TestPumaServer_Base < Minitest::Test
 
   STATUS_CODES = ::Puma::HTTP_STATUS_CODES
 
-  def setup
-    @host = "127.0.0.1"
+  RACK_INPUT = ::Puma::Const::RACK_INPUT
 
+  def setup
     @app = ->(env) { [200, {}, [env['rack.url_scheme']]] }
 
     @log_writer = Puma::LogWriter.strings
@@ -35,7 +35,7 @@ class TestPumaServer_Base < Minitest::Test
     options[:log_writer]  ||= @log_writer
     options[:min_threads] ||= 1
     @server = Puma::Server.new block || @app, @events, options
-    @port = (@server.add_tcp_listener @host, 0).addr[1]
+    @port = (@server.add_tcp_listener HOST, 0).addr[1]
     if run
       @server.run
       sleep 0.1 until @server.running == options[:min_threads]
@@ -49,7 +49,7 @@ class TestPumaServer_P < TestPumaServer_Base
   def send_proxy_v1_http(req, remote_ip, multisend = false)
     addr = IPAddr.new(remote_ip)
     family = addr.ipv4? ? "TCP4" : "TCP6"
-    target = addr.ipv4? ? "127.0.0.1" : "::1"
+    target = addr.ipv4? ? HOST4 : "::1"
     conn = new_socket
     if multisend
       conn << "PROXY #{family} #{remote_ip} #{target} 10000 80\r\n"
@@ -163,7 +163,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
 
     server_run do |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       [200, {}, ["ok"]]
     end
 
@@ -669,7 +669,7 @@ class TestPumaServer_P < TestPumaServer_Base
     content_length = nil
     transfer_encoding = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       transfer_encoding = env['HTTP_TRANSFER_ENCODING']
       EMPTY_200
@@ -687,7 +687,7 @@ class TestPumaServer_P < TestPumaServer_Base
     body = nil
     content_length = nil
     server_run { |env|
-      body = env['rack.input'].read
+      body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -717,7 +717,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -737,7 +737,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -757,7 +757,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -777,7 +777,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -797,7 +797,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -817,7 +817,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -843,7 +843,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -863,7 +863,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -883,7 +883,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -899,7 +899,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -919,7 +919,7 @@ class TestPumaServer_P < TestPumaServer_Base
     req_body = nil
     content_length = nil
     server_run { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       EMPTY_200
     }
@@ -961,19 +961,19 @@ class TestPumaServer_P < TestPumaServer_Base
     content_length = nil
     remote_addr =nil
     server_run(remote_address: :header, remote_address_header: 'HTTP_X_FORWARDED_FOR') { |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       content_length = env['CONTENT_LENGTH']
       remote_addr = env['REMOTE_ADDR']
       EMPTY_200
     }
 
-    sock = send_http "GET / HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
+    sock = send_http "GET / HTTP/1.1\r\nX-Forwarded-For: #{HOST}\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
     h = header sock
     assert_equal ["HTTP/1.1 200 OK", "Content-Length: 0"], h
     assert_equal "hello", req_body
     assert_equal "5", content_length
-    assert_equal "127.0.0.1", remote_addr
+    assert_equal HOST, remote_addr
 
     sock << "GET / HTTP/1.1\r\nX-Forwarded-For: 127.0.0.2\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\n\r\n4\r\ngood\r\n3\r\nbye\r\n0\r\n\r\n"
     sleep 0.1
@@ -1260,7 +1260,7 @@ class TestPumaServer_P < TestPumaServer_Base
   end
 
   def stub_accept_nonblock(error)
-    @port = (@server.add_tcp_listener @host, 0).addr[1]
+    @port = (@server.add_tcp_listener HOST, 0).addr[1]
     io = @server.binder.ios.last
 
     accept_old = io.method(:accept_nonblock)
@@ -1373,7 +1373,7 @@ class TestPumaServer_P < TestPumaServer_Base
     # TODO: it would be great to test a connection from a non-localhost IP, but we can't really do that. For
     # now, at least test that it doesn't return garbage.
     remote_addr = send_http_read_resp_body GET_11
-    assert_equal @host, remote_addr
+    assert_equal HOST, remote_addr
   end
 
   # see https://github.com/sinatra/sinatra/blob/master/examples/stream.ru
@@ -1473,11 +1473,11 @@ class TestPumaServer_P < TestPumaServer_Base
     end
 
     server_run do |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       [200, {}, [req_body]]
     end
 
-    cmd = "curl -H 'transfer-encoding: chunked' --form data=@#{temp_file_path} http://127.0.0.1:#{@port}/"
+    cmd = "curl -H 'transfer-encoding: chunked' --form data=@#{temp_file_path} http://#{HOST}:#{@port}/"
 
     out_r, _, _ = spawn_cmd cmd
 
@@ -1501,11 +1501,11 @@ class TestPumaServer_P < TestPumaServer_Base
     temp_file_path = tmp_file_path 'win_utf8_', file_contents
 
     server_run do |env|
-      req_body = env['rack.input'].read
+      req_body = env[RACK_INPUT].read
       [200, {}, [req_body]]
     end
 
-    cmd = "curl -H 'transfer-encoding: chunked' --form data=@#{temp_file_path} http://127.0.0.1:#{@port}/"
+    cmd = "curl -H 'transfer-encoding: chunked' --form data=@#{temp_file_path} http://#{HOST}:#{@port}/"
 
     out_r, _, _ = spawn_cmd cmd
 

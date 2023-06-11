@@ -21,7 +21,7 @@ module TestPuma
     NO_ENTITY_BODY = Puma::STATUS_WITH_NO_ENTITY_BODY
     EMPTY_200 = [200, {}, ['']]
 
-    SET_TCP_NODELAY = ::Socket.const_defined? :TCP_NODELAY
+    SET_TCP_NODELAY = Socket.const_defined?(:IPPROTO_TCP) && ::Socket.const_defined?(:TCP_NODELAY)
 
     def before_setup
       @ios_to_close ||= []

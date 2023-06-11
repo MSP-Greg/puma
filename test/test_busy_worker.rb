@@ -56,7 +56,7 @@ class TestBusyWorker < Minitest::Test
     options[:log_writer] = log_writer ||= Puma::LogWriter.strings
 
     @server = Puma::Server.new request_handler, nil, **options
-    @port = (@server.add_tcp_listener '127.0.0.1', 0).addr[1]
+    @port = (@server.add_tcp_listener HOST, 0).addr[1]
     @server.run
     # server is running in thread, and creating threads
     sleep 0.1 until @server.running == 4
