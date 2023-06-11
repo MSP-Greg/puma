@@ -190,7 +190,6 @@ module Puma
 
         raw = @engine.peercert
         return nil unless raw
-        require 'openssl' unless Object.const_defined? :OpenSSL
         @peercert = ::OpenSSL::X509::Certificate.new raw
       end
     end
