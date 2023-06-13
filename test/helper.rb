@@ -104,8 +104,8 @@ module TimeoutEveryTestCase
             end
           end
 
-          capture_exceptions do
-            ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+          ::Timeout.timeout($test_case_timeout, TestTookTooLong) do
+            capture_exceptions do
               Minitest::Test::TEARDOWN_METHODS.each { |hook| self.send hook }
             end
           end
