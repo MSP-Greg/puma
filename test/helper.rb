@@ -173,7 +173,7 @@ module TestSkips
 
   JRUBY_HEAD = Puma::IS_JRUBY && RUBY_DESCRIPTION.include?('SNAPSHOT')
 
-  DARWIN = RUBY_PLATFORM.include? 'darwin'
+  DARWIN = Puma::IS_OSX
 
   TRUFFLE = RUBY_ENGINE == 'truffleruby'
   TRUFFLE_HEAD = TRUFFLE && RUBY_DESCRIPTION.include?('-dev-')
