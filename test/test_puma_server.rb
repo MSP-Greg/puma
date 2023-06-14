@@ -1574,7 +1574,7 @@ end
 # These tests intermittently freeze, run serial
 #
 class TestPumaServer_S < TestPumaServer_Base
-  parallelize_me!
+#  parallelize_me!
 
   def test_timeout_in_data_phase(**options)
     server_run(first_data_timeout: 1, **options)
