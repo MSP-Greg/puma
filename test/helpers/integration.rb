@@ -408,8 +408,9 @@ class TestIntegration < Minitest::Test
         else
           Process.kill :USR2, @pid
         end
+        wait_for_server_to_boot(no_error: true)
         restart_count += 1
-        sleep(Puma.windows? ? 2.0 : 1.0)
+        sleep(Puma.windows? ? 2.0 : 0.5)
       end
     end
 
