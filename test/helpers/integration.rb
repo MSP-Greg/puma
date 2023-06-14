@@ -484,6 +484,9 @@ class TestIntegration < Minitest::Test
     err_r, err_w = IO.pipe
     opts[:err] = err_w
 
+    out_w.sync = true
+    err_w.sync = true
+
     pid = spawn(env, cmd, opts)
     [out_w, err_w].each(&:close)
     [out_r, err_r, pid]
