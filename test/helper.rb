@@ -104,8 +104,10 @@ module TimeoutEveryTestCase
                 self.send self.name
               end
 
-              capture_exceptions do
-                Minitest::Test::TEARDOWN_METHODS.each { |hook| self.send hook }
+              Minitest::Test::TEARDOWN_METHODS.each do |hook|
+                capture_exceptions do
+                  self.send hook
+                end
               end
             end
           end
@@ -115,8 +117,10 @@ module TimeoutEveryTestCase
             self.send self.name
           end
 
-          capture_exceptions do
-            Minitest::Test::TEARDOWN_METHODS.each { |hook| self.send hook }
+          Minitest::Test::TEARDOWN_METHODS.each do |hook|
+            capture_exceptions do
+              self.send hook
+            end
           end
         end
         if respond_to? :clean_tmp_paths
