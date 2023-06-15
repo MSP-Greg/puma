@@ -331,12 +331,11 @@ class TestIntegration < Minitest::Test
   end
 
   def hot_restart_does_not_drop_connections(num_threads: 1, total_requests: 500)
-    puma_skipped = true
+    puma_started = false
     skip_if :jruby, suffix: "- JRuby file descriptors are not preserved on exec, " \
       "connection reset errors are expected during restarts"
 
     skip_if :truffleruby, suffix: ' - Undiagnosed failures on TruffleRuby'
-    puma_skipped = false
 
     replies = nil
     args = "-w#{workers} -t5:5 -q test/rackup/hello_with_delay.ru"
@@ -345,6 +344,8 @@ class TestIntegration < Minitest::Test
     else
       cli_server args
     end
+
+    puma_started = true
 
     replies = Hash.new 0
     refused = thread_run_refused unix: false
@@ -459,7 +460,7 @@ class TestIntegration < Minitest::Test
     assert_equal (num_threads * num_requests) - reset - refused, replies[:success]
 
   ensure
-    unless puma_skipped
+    if puma_started
       if passed? && replies
         refused = replies[:refused]
         reset   = replies[:reset]
