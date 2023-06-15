@@ -52,7 +52,9 @@ class TestIntegrationSingle_1 < TestIntegration
   end
 
   def test_on_booted
-    cli_server "-C test/config/event_on_booted.rb -C test/config/event_on_booted_exit.rb test/rackup/hello.ru"
+    skip_unless_signal_exist? :TERM
+    cli_server "-C test/config/event_on_booted.rb -C test/config/event_on_booted_exit.rb test/rackup/hello.ru",
+      no_wait: true
 
     assert wait_for_server_to_include "first on_booted called"
     assert wait_for_server_to_include "second on_booted called"
