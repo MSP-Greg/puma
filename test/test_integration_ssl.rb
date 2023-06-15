@@ -46,7 +46,7 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    cli_server set_pumactl_args, config: config, config_bind: true
+    cli_server "-t1:5 #{set_pumactl_args}", config: config, config_bind: true
 
     body = send_http_read_resp_body ctx: new_ctx
     assert_equal 'https', body
@@ -77,7 +77,7 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    cli_server set_pumactl_args, config: config, config_bind: true
+    cli_server "-t1:5 #{set_pumactl_args}", config: config, config_bind: true
 
     body = send_http_read_resp_body host: HOST,
       ctx: new_ctx { |c|
@@ -116,7 +116,7 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    cli_server set_pumactl_args, config: config, config_bind: true
+    cli_server "-t1:5 #{set_pumactl_args}", config: config, config_bind: true
 
     skt = send_http ctx: new_ctx
     body = skt.read_body
@@ -139,7 +139,7 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    cli_server set_pumactl_args, config: config, config_bind: true
+    cli_server "-t1:5 #{set_pumactl_args}", config: config, config_bind: true
 
     body = send_http_read_resp_body ctx: new_ctx
     assert_equal 'https', body
@@ -166,7 +166,7 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    cli_server set_pumactl_args, config: config, config_bind: true
+    cli_server "-t1:5 #{set_pumactl_args}", config: config, config_bind: true
 
     body = send_http_read_resp_body ctx: new_ctx
     assert_equal 'https', body
@@ -193,7 +193,7 @@ class TestIntegrationSSL < TestIntegration
       end
     RUBY
 
-    cli_server set_pumactl_args, config: config, config_bind: true
+    cli_server "-t1:5 #{set_pumactl_args}", config: config, config_bind: true
 
     body = send_http_read_resp_body ctx: new_ctx
     assert_equal 'https', body

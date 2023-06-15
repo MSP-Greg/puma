@@ -44,7 +44,7 @@ class TestIntegrationSSLSession < TestIntegration
   end
 
   def with_server(config)
-    cli_server set_pumactl_args, config: config, config_bind: true
+    cli_server "-t1:5 #{set_pumactl_args}", config: config, config_bind: true
     yield
   end
 
