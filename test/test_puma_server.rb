@@ -28,7 +28,7 @@ class TestPumaServer_Base < Minitest::Test
   end
 
   def teardown
-    @server.stop true
+    @server&.stop true
   end
 
   def server_run(run: true, **options, &block)
@@ -1207,6 +1207,7 @@ class TestPumaServer_P < TestPumaServer_Base
     else
       assert_nil s2_result
     end
+    @server = nil
   end
 
   # Shutdown should allow pending requests and app-responses to complete.
