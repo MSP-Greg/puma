@@ -18,14 +18,10 @@ class TestIntegrationSSL < TestIntegration
 
   CERT_PATH = File.expand_path '../examples/puma', __dir__
 
-  def setup
-    @tcp_port = UniquePort.call
-  end
-
   def test_ssl_run
     config = <<~RUBY
       if ::Puma.jruby?
-        ssl_bind '#{HOST}', '#{@tcp_port}', {
+        ssl_bind '#{HOST}', 0, {
           keystore: '#{CERT_PATH}/keystore.jks',
           keystore_pass:  'jruby_puma',
           verify_mode: 'none'
@@ -34,7 +30,7 @@ class TestIntegrationSSL < TestIntegration
         key  = '#{CERT_PATH}/puma_keypair.pem'
         cert = '#{CERT_PATH}/cert_puma.pem'
 
-        ssl_bind '#{HOST}', '#{@tcp_port}', {
+        ssl_bind '#{HOST}', 0, {
           cert: cert,
           key:  key,
           verify_mode: 'none'
@@ -57,13 +53,13 @@ class TestIntegrationSSL < TestIntegration
 
     config = <<~RUBY
       if ::Puma::IS_JRUBY
-        ssl_bind '#{HOST}', '#{@tcp_port}', {
+        ssl_bind '#{HOST}', 0, {
           keystore: '#{cert_path}/keystore.jks',
           keystore_pass: 'jruby_puma',
           verify_mode: 'force_peer'
         }
       else
-        ssl_bind '#{HOST}', '#{@tcp_port}', {
+        ssl_bind '#{HOST}', 0, {
           cert: '#{cert_path}/server.crt',
           key:  '#{cert_path}/server.key',
           ca:   '#{cert_path}/ca.crt',
@@ -105,7 +101,7 @@ class TestIntegrationSSL < TestIntegration
       key  = '#{CERT_PATH}/puma_keypair.pem'
       cert = '#{CERT_PATH}/cert_puma.pem'
 
-      ssl_bind '#{HOST}', '#{@tcp_port}', {
+      ssl_bind '#{HOST}', 0, {
         cert_pem: File.read(cert),
         key_pem:  File.read(key),
         verify_mode: 'none'
@@ -132,7 +128,7 @@ class TestIntegrationSSL < TestIntegration
 
     config = <<~RUBY
       require 'localhost'
-      ssl_bind '#{HOST}', '#{@tcp_port}'
+      ssl_bind '#{HOST}', 0
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
@@ -154,7 +150,7 @@ class TestIntegrationSSL < TestIntegration
       key_command = ::Puma::IS_WINDOWS ? 'echo hello world' :
         '#{File.expand_path '../examples/puma/key_password_command.sh', __dir__}'
 
-      ssl_bind '#{HOST}', '#{@tcp_port}', {
+      ssl_bind '#{HOST}', 0, {
         cert: cert_path,
         key: key_path,
         verify_mode: 'none',
@@ -181,7 +177,7 @@ class TestIntegrationSSL < TestIntegration
       key_command = ::Puma::IS_WINDOWS ? 'echo hello world' :
         '#{CERT_PATH}/key_password_command.sh'
 
-      ssl_bind '#{HOST}', '#{@tcp_port}', {
+      ssl_bind '#{HOST}', 0, {
         cert_pem: File.read(cert_path),
         key_pem: File.read(key_path),
         verify_mode: 'none',
