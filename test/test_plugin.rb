@@ -4,9 +4,6 @@ require_relative "helpers/integration"
 class TestPlugin < TestIntegration
 
   def teardown
-    return if skipped?
-    @server.close if @server.respond_to?(:close) && !@server.closed?
-    @server = nil
     File.unlink('tmp/restart.txt') if File.exist?('tmp/restart.txt')
   end
 
