@@ -92,7 +92,7 @@ module TimeoutEveryTestCase
   end
 
   def run
-    use_timeout = self.class.const_defined?(:PUMA_TTO) && self.class::PUMA_TTO
+    use_timeout = true # self.class.const_defined?(:PUMA_TTO) && self.class::PUMA_TTO
 
     with_info_handler do
       time_it do
