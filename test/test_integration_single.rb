@@ -4,7 +4,7 @@ require_relative "helper"
 require_relative "helpers/integration"
 
 class TestIntegrationSingle_1 < TestIntegration
-  parallelize_me! if ::Puma::IS_MRI
+  parallelize_me! if ::Puma::IS_MRI || (::Puma::IS_LINUX && !::Puma::IS_MRI)
 
   def workers ; 0 ; end
 
@@ -75,7 +75,7 @@ class TestIntegrationSingle_1 < TestIntegration
   def test_rack_url_scheme_default
     skip_unless_signal_exist? :TERM
 
-    cli_server("test/rackup/url_scheme.ru")
+    cli_server "test/rackup/url_scheme.ru"
 
     body = send_http_read_resp_body
     stop_server
@@ -84,12 +84,9 @@ class TestIntegrationSingle_1 < TestIntegration
   end
 
   def test_conf_is_loaded_before_passing_it_to_binder
-    skip_unless_signal_exist? :TERM
-
-    cli_server "-C test/config/rack_url_scheme.rb test/rackup/url_scheme.ru"
+    cli_server "#{set_pumactl_args} -C test/config/rack_url_scheme.rb test/rackup/url_scheme.ru"
 
     body = send_http_read_resp_body
-    stop_server
 
     assert_equal 'https', body
   end
@@ -225,28 +222,23 @@ class TestIntegrationSingle_2 < TestIntegration
   def workers ; 0 ; end
 
   def test_write_to_log
-    skip_unless_signal_exist? :TERM
-
     fn = tmp_path '.puma_log'
-    cli_server 'test/rackup/hello.ru', config: <<~CONFIG
+    cli_server "#{set_pumactl_args} test/rackup/hello.ru", config: <<~CONFIG
       log_requests
       stdout_redirect "#{fn}"
-      pidfile "t1-pid"
     CONFIG
 
     send_http_read_response
 
     sleep 0.01 if DARWIN
 
-    stop_server
+    cli_pumactl 'stop'
 
     # macos intermittently raises 'Errno::ENOENT: No such file'
     sleep 0.5 unless File.exist? fn
     log = File.read fn
 
     assert_includes log, '"GET / HTTP/1.1"'
-  ensure
-    File.unlink 't1-pid' if File.file? 't1-pid'
   end
 
   def test_puma_started_log_writing
