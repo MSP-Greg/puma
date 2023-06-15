@@ -171,7 +171,8 @@ class TestPersistent < Minitest::Test
       assert skt_closed_by_server(@client)
     else
       # IO::EAGAINWaitReadable may be raised by TruffleRuby
-      assert_raises EOFError, IO::EAGAINWaitReadable do
+      # IO::EWOULDBLOCKWaitReadable  may be raised by Windows
+      assert_raises EOFError, IO::EAGAINWaitReadable, IO::EWOULDBLOCKWaitReadable do
         @client.read_nonblock(1)
       end
     end
