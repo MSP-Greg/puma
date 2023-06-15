@@ -92,7 +92,7 @@ module TimeoutEveryTestCase
   end
 
   def run
-    use_timeout = true # self.class.const_defined?(:PUMA_TTO) && self.class::PUMA_TTO
+    use_timeout = !::Puma::IS_MRI || self.class.const_defined?(:PUMA_TTO) && self.class::PUMA_TTO
 
     with_info_handler do
       time_it do
@@ -124,7 +124,9 @@ module TimeoutEveryTestCase
           end
         end
         if respond_to? :clean_tmp_paths
-          clean_tmp_paths
+          capture_exceptions do
+            clean_tmp_paths
+          end
         end
       end
     end
