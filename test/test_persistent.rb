@@ -163,12 +163,13 @@ class TestPersistent < Minitest::Test
 
     has_tcp_info = Socket.const_defined? :TCP_INFO
 
+    # socket is still open
     refute skt_closed_by_server(@client) if has_tcp_info
 
     sleep 2
 
     if has_tcp_info
-      assert skt_closed_by_server(@client)
+      assert skt_closed_by_server(@client), "client socket was not closed by server"
     else
       # IO::EAGAINWaitReadable may be raised by TruffleRuby
       # IO::EWOULDBLOCKWaitReadable  may be raised by Windows
