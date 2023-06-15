@@ -338,6 +338,7 @@ class TestIntegration < Minitest::Test
     skip_if :truffleruby, suffix: ' - Undiagnosed failures on TruffleRuby'
     puma_skipped = false
 
+    replies = nil
     args = "-w#{workers} -t5:5 -q test/rackup/hello_with_delay.ru"
     if Puma.windows?
       cli_server "#{set_pumactl_args} #{args}"
@@ -459,7 +460,7 @@ class TestIntegration < Minitest::Test
 
   ensure
     unless puma_skipped
-      if passed?
+      if passed? && replies
         refused = replies[:refused]
         reset   = replies[:reset]
         msg = "    #{restart_count} restarts, #{reset} resets, #{refused} refused, " \
