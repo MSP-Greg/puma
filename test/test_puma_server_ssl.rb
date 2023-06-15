@@ -101,9 +101,16 @@ class TestPumaServerSSL < Minitest::Test
 
     start_server
 
-    body = send_http_read_resp_body GET_11, ctx: new_ctx
+    skt = send_http GET_11, ctx: new_ctx
 
-    assert_equal giant.bytesize, body.bytesize
+    unless ::Puma::IS_MRI # Truffle and JRuby intermittent failure
+      Thread.pass
+      sleep 0.2
+    end
+
+    body_byte_size = skt.read_body.bytesize
+
+    assert_equal giant.bytesize, body_byte_size
   end
 
   def test_form_submit
