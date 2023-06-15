@@ -15,9 +15,9 @@ class TestIntegration < Minitest::Test
   RESP_SPLIT = "\r\n\r\n"
 
   WAIT_SERVER_TIMEOUT =
-    if    ::Puma::IS_MRI  ; 10
-    elsif ::Puma::IS_JRUBY; 15
-    else                  ; 15 # TruffleRuby
+    if    ::Puma::IS_MRI ; 15
+    elsif ::Puma::IS_OSX ; 20  # non MRI has issues on macOS
+    else                 ; 15
     end
 
   BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -Ilib" :
@@ -185,7 +185,7 @@ class TestIntegration < Minitest::Test
           STDOUT.syswrite "\n------------------ Server Error log:\n#{err}\n"
         end
       end
-      raise e.message
+      raise e
     end
   end
 
