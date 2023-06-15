@@ -61,7 +61,7 @@ class TestIntegration < Minitest::Test
           end
         rescue RuntimeError, IOError
         end
-      elsif @server && @pid && !Puma::IS_WINDOWS
+      elsif @pid && !Puma::IS_WINDOWS
         stop_server @pid, signal: :INT
         begin
           Process.wait2 @pid
@@ -202,7 +202,7 @@ class TestIntegration < Minitest::Test
 
     begin
       loop do
-        if io.wait_readable 2
+        if !::Puma::IS_MRI || io.wait_readable(2)
           line = io&.gets
           @log_out << line if line
           if line&.include? str
@@ -483,7 +483,11 @@ class TestIntegration < Minitest::Test
     err_r, err_w = IO.pipe
     opts[:err] = err_w
 
-    pid = spawn(env, cmd, opts)
+    out_w.sync = true
+    out_r.sync = true
+
+    pid = spawn env, cmd, opts
+
     [out_w, err_w].each(&:close)
     [out_r, err_r, pid]
   end
