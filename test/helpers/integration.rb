@@ -63,16 +63,13 @@ class TestIntegration < Minitest::Test
         end
       elsif @server && @pid && !Puma::IS_WINDOWS
         stop_server @pid, signal: :INT
-      end
-      @server.close if @server.respond_to?(:close) && !@server.closed?
-      @server = nil
-
-      if @pid
         begin
           Process.wait2 @pid
         rescue Errno::ECHILD
         end
       end
+      @server.close if @server.respond_to?(:close) && !@server.closed?
+      @server = nil
     end
 
     if @bind_path
