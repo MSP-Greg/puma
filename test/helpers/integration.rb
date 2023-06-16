@@ -208,7 +208,10 @@ class TestIntegration < Minitest::Test
           if line&.include? str
             STDOUT.syswrite "\n#{@log_out}\n" if log
             return true
+          elsif t_end < Process.clock_gettime(Process::CLOCK_MONOTONIC)
+            raise "Waited too long for server log to include '#{str}'"
           end
+          sleep 0.001
         elsif t_end < Process.clock_gettime(Process::CLOCK_MONOTONIC)
           unless wait_readable_timeouts.zero?
             @log_out << "#{wait_readable_timeouts} io.wait_readable timeouts, 2 sec each\n"
