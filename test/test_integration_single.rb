@@ -222,6 +222,7 @@ class TestIntegrationSingle_2 < TestIntegration
   def workers ; 0 ; end
 
   def test_write_to_log
+    skip_if :windows # Errno::EACCES: Permission denied
     fn = tmp_path '.puma_log'
     cli_server "#{set_pumactl_args} test/rackup/hello.ru", config: <<~CONFIG
       log_requests
