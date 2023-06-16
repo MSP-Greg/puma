@@ -200,6 +200,9 @@ class TestIntegration < Minitest::Test
     sleep 0.05 until io.is_a?(IO) || Process.clock_gettime(Process::CLOCK_MONOTONIC) > t_end
     raise "Waited too long for server to init (must be an io)" unless io.is_a? IO
 
+    # reset time limit to average
+    t_end = (Process.clock_gettime(Process::CLOCK_MONOTONIC) + WAIT_SERVER_TIMEOUT + t_end)/2.0
+
     begin
       loop do
         if io.wait_readable(2)
