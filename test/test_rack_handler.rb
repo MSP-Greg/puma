@@ -321,8 +321,8 @@ module TestRackUp
           end
         end
       end
-      @out.close unless @out.closed?
-      @err.close unless @err.closed?
+      @out.close  if @out && !@out.closed?
+      @err&.close if @err && !@err.closed?
     end
 
     def test_bin
