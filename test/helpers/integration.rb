@@ -478,17 +478,22 @@ class TestIntegration < Minitest::Test
   end
 
   def spawn_cmd(env = {}, cmd)
-    opts = {}
+    if ::Puma::IS_MRI
+      opts = {}
 
-    out_r, out_w = IO.pipe
-    opts[:out] = out_w
+      out_r, out_w = IO.pipe
+      opts[:out] = out_w
 
-    err_r, err_w = IO.pipe
-    opts[:err] = err_w
+      err_r, err_w = IO.pipe
+      opts[:err] = err_w
 
-    pid = spawn env, cmd, opts
+      pid = spawn env, cmd, opts
 
-    [out_w, err_w].each(&:close)
-    [out_r, err_r, pid]
+      [out_w, err_w].each(&:close)
+      [out_r, err_r, pid]
+    else
+      svr = IO.popen env, cmd
+      [svr, nil, svr.pid]
+    end
   end
 end
