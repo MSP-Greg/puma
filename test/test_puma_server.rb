@@ -411,7 +411,7 @@ class TestPumaServer_P < TestPumaServer_Base
   def test_lowlevel_error_body_close
     app_body = ArrayClose.new(['lowlevel_error'])
 
-    server_run(log_writer: @log_writer, :force_shutdown_after => 2) do
+    server_run(:force_shutdown_after => 2) do
       [[0,1], {}, app_body]
     end
 
@@ -426,7 +426,7 @@ class TestPumaServer_P < TestPumaServer_Base
   end
 
   def test_lowlevel_error_message
-    server_run(log_writer: @log_writer, :force_shutdown_after => 2) do
+    server_run(:force_shutdown_after => 2) do
       raise NoMethodError, "Oh no an error"
     end
 
@@ -438,7 +438,7 @@ class TestPumaServer_P < TestPumaServer_Base
   end
 
   def test_lowlevel_error_message_without_backtrace
-    server_run(log_writer: @log_writer, :force_shutdown_after => 2) do
+    server_run(:force_shutdown_after => 2) do
       raise WithoutBacktraceError.new
     end
 
@@ -563,7 +563,7 @@ class TestPumaServer_P < TestPumaServer_Base
   end
 
   def test_no_timeout_after_data_received_no_queue
-    @server = Puma::Server.new @app, @events, {log_writer: @log_writer, queue_requests: false}
+    @server = server_run run: false, queue_requests: false
     test_no_timeout_after_data_received
   end
 
@@ -1575,7 +1575,7 @@ end
 # These tests intermittently freeze, run serial
 #
 class TestPumaServer_S < TestPumaServer_Base
-#  parallelize_me!
+  parallelize_me! if Puma::IS_MRI
 
   def test_timeout_in_data_phase(**options)
     server_run(first_data_timeout: 1, **options)
