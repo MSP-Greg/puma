@@ -168,6 +168,7 @@ jobs:
       PUMA_TEST_DEBUG: true
       TESTOPTS: -v
       PUMA_NO_RUBOCOP: true
+      MT_CPU: 4
 
     runs-on: ${{ matrix.os }}
     if: |
