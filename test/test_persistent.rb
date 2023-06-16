@@ -111,7 +111,7 @@ class TestPersistent < Minitest::Test
     expected = "HTTP/1.0 200 OK\r\nX-Header: Works\r\n\r\nHelloChunked"
 
     # may only receive the first element ('Hello')
-    Thread.pass if Puma::IS_JRUBY
+    Thread.pass unless Puma::IS_MRI
     sleep 0.01
 
     assert_equal expected, @client.read_response
@@ -161,7 +161,7 @@ class TestPersistent < Minitest::Test
     expected = "HTTP/1.1 200 OK\r\nX-Header: Works\r\nContent-Length: #{@cl}\r\n\r\n#{@body[0]}"
     assert_equal expected, @client.read_response
 
-    has_tcp_info = Socket.const_defined? :TCP_INFO
+    has_tcp_info = Puma::IS_MRI && Socket.const_defined?(:TCP_INFO)
 
     # socket is still open
     refute skt_closed_by_server(@client) if has_tcp_info
