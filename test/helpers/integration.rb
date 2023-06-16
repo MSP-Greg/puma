@@ -17,7 +17,7 @@ class TestIntegration < Minitest::Test
   WAIT_SERVER_TIMEOUT =
     if    ::Puma::IS_MRI ; 15
     elsif ::Puma::IS_OSX ; 20  # non MRI has issues on macOS
-    else                 ; 15
+    else                 ; 20
     end
 
   BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -Ilib" :
@@ -202,7 +202,7 @@ class TestIntegration < Minitest::Test
 
     begin
       loop do
-        if !::Puma::IS_MRI || io.wait_readable(2)
+        if io.wait_readable(2)
           line = io&.gets
           @log_out << line if line
           if line&.include? str
@@ -485,9 +485,6 @@ class TestIntegration < Minitest::Test
 
     err_r, err_w = IO.pipe
     opts[:err] = err_w
-
-    out_w.sync = true
-    out_r.sync = true
 
     pid = spawn env, cmd, opts
 
