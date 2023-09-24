@@ -2,6 +2,8 @@ require_relative "helper"
 require_relative "helpers/test_puma/puma_socket"
 
 class TestBusyWorker < Minitest::Test
+  parallelize_me! if ::Puma::IS_MRI
+
   include TestPuma::PumaSocket
 
   def setup
@@ -38,13 +40,14 @@ class TestBusyWorker < Minitest::Test
       end
     end
 
-    options[:min_threads] ||= 0
-    options[:max_threads] ||= 10
+    options[:min_threads] ||= 4
+    options[:max_threads] ||= 5
     options[:log_writer]  ||= Puma::LogWriter.strings
 
     @server = Puma::Server.new request_handler, nil, **options
     @bind_port = (@server.add_tcp_listener '127.0.0.1', 0).addr[1]
     @server.run
+    sleep 0.05 until @server.running == options[:min_threads]
   end
 
   # Multiple concurrent requests are not processed
@@ -56,13 +59,15 @@ class TestBusyWorker < Minitest::Test
       [200, {}, [""]]
     end
 
-    n = 2
+    send_http_read_response
+    sleep 0.1
+    n = 4
 
     Array.new(n) do
       Thread.new { send_http_read_response }
     end.each(&:join)
 
-    assert_equal n, @requests_count, "number of requests needs to match"
+    assert_equal n+1, @requests_count, "number of requests needs to match"
     assert_equal 0, @requests_running, "none of requests needs to be running"
     assert_equal 1, @requests_max_running, "maximum number of concurrent requests needs to be 1"
   end
@@ -76,13 +81,15 @@ class TestBusyWorker < Minitest::Test
       [200, {}, [""]]
     end
 
+    send_http_read_response
+    sleep 0.1
     n = 4
 
     Array.new(n) do
       Thread.new { send_http_read_response }
     end.each(&:join)
 
-    assert_equal n, @requests_count, "number of requests needs to match"
+    assert_equal n+1, @requests_count, "number of requests needs to match"
     assert_equal 0, @requests_running, "none of requests needs to be running"
     assert_equal n, @requests_max_running, "maximum number of concurrent requests needs to match"
   end
