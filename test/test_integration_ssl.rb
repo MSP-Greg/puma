@@ -16,7 +16,7 @@ end
 # the server process isn't affected by whatever is loaded in the CI process.
 
 class TestIntegrationSSL < TestIntegration
-  parallelize_me! if ::Puma.mri?
+  parallelize_me! if ::Puma::IS_MRI
 
   LOCALHOST = ENV.fetch 'PUMA_CI_DFLT_HOST', 'localhost'
 
