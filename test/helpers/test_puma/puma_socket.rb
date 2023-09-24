@@ -74,6 +74,10 @@ module TestPuma
 
     SET_TCP_NODELAY = Socket.const_defined?(:IPPROTO_TCP) && ::Socket.const_defined?(:TCP_NODELAY)
 
+    def before_setup
+      @ios_to_close ||= []
+    end
+
     # Closes all io's in `@ios_to_close`, also deletes them if they are files
     def after_teardown
       return if skipped?
