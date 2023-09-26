@@ -536,9 +536,9 @@ module Puma
       @workers.each do |w|
         if !w.term? && w.ping_timeout <= Time.now
           details = if w.booted?
-                      "(worker failed to check in within #{@options[:worker_timeout]} seconds)"
+                      "(worker #{w.index} failed to check in within #{@options[:worker_timeout]} seconds)"
                     else
-                      "(worker failed to boot within #{@options[:worker_boot_timeout]} seconds)"
+                      "(worker #{w.index} failed to boot within #{@options[:worker_boot_timeout]} seconds)"
                     end
           log "! Terminating timed out worker #{details}: #{w.pid}"
           w.kill
