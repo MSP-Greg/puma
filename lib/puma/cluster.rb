@@ -23,6 +23,7 @@ module Puma
       @next_check = Time.now
 
       @phased_restart = false
+      # @options[:worker_restart_stagger] = 3
     end
 
     # Returns the list of cluster worker handles.
@@ -62,7 +63,7 @@ module Puma
       @workers.each { |x| x.hup }
     end
 
-    def spawn_workers
+    def spawn_workers(in_phased_restart)
       diff = @options[:workers] - @workers.size
       return if diff < 1
 
@@ -83,6 +84,18 @@ module Puma
 
         debug "Spawned worker: #{pid}"
         @workers << WorkerHandle.new(idx, pid, @phase, @options)
+        if !in_phased_restart && @options[:worker_restart_stagger]
+        STDOUT.syswrite "MSP-Greg\n"
+            @master_read.wait_readable @options[:worker_restart_stagger]
+            until (t = @master_read.gets).start_with?('b') && t[/\d+$/].to_i == idx
+              @master_read.wait_readable @options[:worker_restart_stagger]
+            end
+            w = @workers.last
+            log "- MSP-Greg Worker #{w.index} (PID: #{pid}) booted in #{w.uptime.round(2)}s, phase: #{w.phase}"
+        #    @next_check = Time.now + @options[:worker_check_interval] + 5
+            w.boot!
+            sleep 0.5 until w.uptime > @options[:worker_restart_stagger]
+        end
       end
 
       if @options[:fork_worker] && all_workers_in_phase?
@@ -158,7 +171,7 @@ module Puma
       @workers.all? { |w| w.phase == @phase }
     end
 
-    def check_workers
+    def check_workers(in_phased_restart)
       return if @next_check >= Time.now
 
       @next_check = Time.now + @options[:worker_check_interval]
@@ -166,7 +179,7 @@ module Puma
       timeout_workers
       wait_workers
       cull_workers
-      spawn_workers
+      spawn_workers in_phased_restart
 
       if all_workers_booted?
         # If we're running at proper capacity, check to see if
@@ -419,7 +432,7 @@ module Puma
 
       @config.run_hooks(:before_fork, nil, @log_writer)
 
-      spawn_workers
+      spawn_workers false
 
       Signal.trap "SIGINT" do
         stop
@@ -439,7 +452,7 @@ module Puma
               workers_not_booted = @options[:workers]
             end
 
-            check_workers
+            check_workers in_phased_restart
 
             if read.wait_readable([0, @next_check - Time.now].max)
               req = read.read_nonblock(1)
@@ -449,7 +462,6 @@ module Puma
 
               result = read.gets
               pid = result.to_i
-
               if req == "b" || req == "f"
                 pid, idx = result.split(':').map(&:to_i)
                 w = worker_at idx
@@ -459,10 +471,12 @@ module Puma
               if w = @workers.find { |x| x.pid == pid }
                 case req
                 when "b"
-                  w.boot!
-                  log "- Worker #{w.index} (PID: #{pid}) booted in #{w.uptime.round(2)}s, phase: #{w.phase}"
-                  @next_check = Time.now
-                  workers_not_booted -= 1
+                  if in_phased_restart || !@options[:worker_restart_stagger]
+                    w.boot!
+                    log "- Worker #{w.index} (PID: #{pid}) booted in #{w.uptime.round(2)}s, phase: #{w.phase}"
+                    @next_check = Time.now
+                    workers_not_booted -= 1
+                  end
                 when "e"
                   # external term, see worker method, Signal.trap "SIGTERM"
                   w.term!
