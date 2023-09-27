@@ -478,11 +478,7 @@ class TestIntegrationCluster < TestIntegration
     re = /Terminating timed out worker \(Worker \d+ #{details}\): (\d+)/
 
     # below is messy code, for debugging
-    Timeout.timeout(iterations * timeout + 1) do
-      while (pids.size < workers * iterations)
-        pids << wait_for_server_to_match(re, 1).to_i
-      end
-    end
+    pids << wait_for_server_to_match(re, 1).to_i while (pids.size < workers * iterations)
 
     assert_equal pids, pids.uniq
   end
