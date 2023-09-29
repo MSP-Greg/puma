@@ -2,45 +2,35 @@
 
 require_relative "helper"
 require_relative "helpers/tmp_path"
+require_relative "helpers/test_puma/puma_socket"
 
 class TestPumaUnixSocket < Minitest::Test
   include TmpPath
+  include TestPuma::PumaSocket
 
-  App = lambda { |env| [200, {}, ["Works"]] }
+  EXPECTED_RESPONSE = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nWorks"
+
+  APP = lambda { |env| [200, {}, ["Works"]] }
 
   def teardown
-    return if skipped?
-    @server.stop(true)
+    @server.stop(true) unless skipped? || @server.nil?
   end
 
   def server_unix(type)
-    @tmp_socket_path = type == :unix ? tmp_path('.sock') : "@TestPumaUnixSocket"
-    @server = Puma::Server.new App
-    @server.add_unix_listener @tmp_socket_path
+    skip_unless type
+    @bind_path = type == :unix ? tmp_path('.sock') : "@TestPumaUnixSocket"
+    @server = Puma::Server.new APP
+    @server.add_unix_listener @bind_path
     @server.run
+
+    assert_equal EXPECTED_RESPONSE, send_http_read_response
   end
 
   def test_server_unix
-    skip_unless :unix
     server_unix :unix
-    sock = UNIXSocket.new @tmp_socket_path
-
-    sock << "GET / HTTP/1.0\r\nHost: blah.com\r\n\r\n"
-
-    expected = "HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nWorks"
-
-    assert_equal expected, sock.read(expected.size)
   end
 
   def test_server_aunix
-    skip_unless :aunix
     server_unix :aunix
-    sock = UNIXSocket.new @tmp_socket_path.sub(/\A@/, "\0")
-
-    sock << "GET / HTTP/1.0\r\nHost: blah.com\r\n\r\n"
-
-    expected = "HTTP/1.0 200 OK\r\nContent-Length: 5\r\n\r\nWorks"
-
-    assert_equal expected, sock.read(expected.size)
   end
 end
