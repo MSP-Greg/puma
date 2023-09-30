@@ -17,9 +17,10 @@ end
 class TestIntegrationSSL < TestIntegration
   parallelize_me! if ::Puma.mri?
 
-  LOCALHOST = ENV.fetch 'PUMA_CI_DFLT_HOST', 'localhost'
-
-  include TestPuma::PumaSocket
+  def setup
+    @bind_port = new_port
+    @control_port = new_port
+  end
 
   def teardown
     if @server
@@ -29,15 +30,6 @@ class TestIntegrationSSL < TestIntegration
 
     @server.close if @server && !@server.closed?
     @server = nil
-    super
-  end
-
-  def bind_port
-    @bind_port ||= UniquePort.call
-  end
-
-  def control_tcp_port
-    @control_tcp_port ||= UniquePort.call
   end
 
   def test_ssl_run
@@ -48,30 +40,30 @@ class TestIntegrationSSL < TestIntegration
         keystore =  '#{cert_path}/keystore.jks'
         keystore_pass = 'jruby_puma'
 
-        ssl_bind '#{HOST}', '#{bind_port}', {
+        ssl_bind '#{HOST}', '#{@bind_port}', {
           keystore: keystore,
-          keystore_pass:  keystore_pass,
+          keystore_pass: keystore_pass,
           verify_mode: 'none'
         }
       else
         key  = '#{cert_path}/puma_keypair.pem'
         cert = '#{cert_path}/cert_puma.pem'
 
-        ssl_bind '#{HOST}', '#{bind_port}', {
+        ssl_bind '#{HOST}', '#{@bind_port}', {
           cert: cert,
           key:  key,
           verify_mode: 'none'
         }
       end
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app '#{control_uri_str}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
       end
     CONFIG
 
-    cli_server set_pumactl_args, config: config, no_bind: true
+    cli_server config: config, no_bind: true
 
     assert_equal "https", send_http_read_resp_body(ctx: new_ctx)
   end
@@ -79,7 +71,6 @@ class TestIntegrationSSL < TestIntegration
   # should use TLSv1.3 with OpenSSL 1.1 or later
   def test_verify_client_cert_roundtrip(tls1_2 = nil)
     cert_path = File.expand_path '../examples/puma/client-certs', __dir__
-    bind_port
 
     config = <<~CONFIG
       if ::Puma::IS_JRUBY
@@ -107,7 +98,7 @@ class TestIntegrationSSL < TestIntegration
 
     client_cert = File.read "#{cert_path}/client.crt"
 
-    body = send_http_read_resp_body host: LOCALHOST, port: @bind_port, ctx: new_ctx { |c|
+    body = send_http_read_resp_body host: LOCALHOST, ctx: new_ctx { |c|
         ca   = "#{cert_path}/ca.crt"
         key  = "#{cert_path}/client.key"
         c.ca_file = ca
@@ -134,7 +125,6 @@ class TestIntegrationSSL < TestIntegration
     skip_if :windows
 
     cert_path = File.expand_path '../examples/puma/client-certs', __dir__
-    bind_port
 
     config = <<~CONFIG
       if ::Puma::IS_JRUBY
@@ -166,7 +156,7 @@ class TestIntegrationSSL < TestIntegration
     # NOTE: JRuby used to end up in a hang with TLS peer verification enabled
     # it's easier to reproduce using an external client such as CURL (using net/http client the bug isn't triggered)
     # also the "hang", being buffering related, seems to showcase better with TLS 1.2 than 1.3
-    body = curl_and_get_response "https://#{LOCALHOST}:#{bind_port}",
+    body = curl_and_get_response "https://#{LOCALHOST}:#{@bind_port}",
       args: "--cacert #{ca} --cert #{cert} --key #{key} --tlsv1.2 --tls-max 1.2"
 
     assert_equal 'HELLO THERE', body
@@ -181,20 +171,20 @@ class TestIntegrationSSL < TestIntegration
       key_path  = '#{cert_path}/puma_keypair.pem'
       cert_path = '#{cert_path}/cert_puma.pem'
 
-      ssl_bind '#{HOST}', '#{bind_port}', {
+      ssl_bind '#{HOST}', '#{@bind_port}', {
         cert_pem: File.read(cert_path),
         key_pem:  File.read(key_path),
         verify_mode: 'none'
       }
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app '#{control_uri_str}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
       end
     CONFIG
 
-    cli_server set_pumactl_args, config: config, no_bind: true
+    cli_server config: config, no_bind: true
 
     assert_equal "https", send_http_read_resp_body(ctx: new_ctx)
   end
@@ -204,16 +194,16 @@ class TestIntegrationSSL < TestIntegration
 
     config = <<~CONFIG
       require 'localhost'
-      ssl_bind '#{HOST}', '#{bind_port}'
+      ssl_bind '#{LOCALHOST}', '#{@bind_port}'
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app '#{control_uri_str}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
       end
     CONFIG
 
-    cli_server set_pumactl_args, config: config, no_bind: true
+    cli_server config: config, no_bind: true
 
     assert_equal "https", send_http_read_resp_body(ctx: new_ctx)
   end
@@ -229,21 +219,21 @@ class TestIntegrationSSL < TestIntegration
       key_command = ::Puma::IS_WINDOWS ? 'echo hello world' :
         '#{cert_path}/key_password_command.sh'
 
-      ssl_bind '#{HOST}', '#{bind_port}', {
+      ssl_bind '#{HOST}', '#{@bind_port}', {
         cert: cert_path,
         key: key_path,
         verify_mode: 'none',
         key_password_command: key_command
       }
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app '#{control_uri_str}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
       end
     CONFIG
 
-    cli_server set_pumactl_args, config: config, no_bind: true
+    cli_server config: config, no_bind: true
 
     assert_equal "https", send_http_read_resp_body(ctx: new_ctx)
   end
@@ -259,21 +249,21 @@ class TestIntegrationSSL < TestIntegration
       key_command = ::Puma::IS_WINDOWS ? 'echo hello world' :
         '#{cert_path}/key_password_command.sh'
 
-      ssl_bind '#{HOST}', '#{bind_port}', {
+      ssl_bind '#{HOST}', '#{@bind_port}', {
         cert_pem: File.read(cert_path),
         key_pem: File.read(key_path),
         verify_mode: 'none',
         key_password_command: key_command
       }
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app '#{control_uri_str}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
       end
     CONFIG
 
-    cli_server set_pumactl_args, config: config, no_bind: true
+    cli_server config: config, no_bind: true
 
     assert_equal "https", send_http_read_resp_body(ctx: new_ctx)
   end
