@@ -12,12 +12,6 @@ class TestIntegrationCluster < TestIntegration
 
   def setup
     skip_unless :fork
-    super
-  end
-
-  def teardown
-    return if skipped?
-    super
   end
 
   def test_hot_restart_does_not_drop_connections_threads
@@ -38,8 +32,8 @@ class TestIntegrationCluster < TestIntegration
     stop_server
 
     assert File.exist?(@bind_path)
-
   ensure
+    # pre-existing binds aren't deleted, errors in after_teardown
     if UNIX_SKT_EXIST
       File.unlink @bind_path if File.exist? @bind_path
     end
@@ -51,15 +45,15 @@ class TestIntegrationCluster < TestIntegration
     File.open(@bind_path, mode: 'wb') { |f| f.puts 'pre existing' }
 
     cli_server "-w #{workers} -q test/rackup/sleep_step.ru", unix: :unix
-    connection = connect(nil, unix: true)
-    restart_server connection
+    socket = send_http
+    restart_server socket
 
-    connect(nil, unix: true)
+    send_http
     stop_server
 
     assert File.exist?(@bind_path)
-
   ensure
+    # pre-existing binds aren't deleted, errors in after_teardown
     if UNIX_SKT_EXIST
       File.unlink @bind_path if File.exist? @bind_path
     end
@@ -184,10 +178,10 @@ class TestIntegrationCluster < TestIntegration
   def test_worker_check_interval
     # iso8601 2022-12-14T00:05:49Z
     re_8601 = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/
-    @control_tcp_port = UniquePort.call
+    @control_port = new_port
     worker_check_interval = 1
 
-    cli_server "-w 1 -t 1:1 --control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN} test/rackup/hello.ru", config: "worker_check_interval #{worker_check_interval}"
+    cli_server "-w 1 -t 1:1 #{set_pumactl_args} test/rackup/hello.ru", config: "worker_check_interval #{worker_check_interval}"
 
     sleep worker_check_interval + 1
     checkin_1 = get_stats["worker_status"].first["last_checkin"]
@@ -226,12 +220,12 @@ class TestIntegrationCluster < TestIntegration
 
     get_worker_pids # wait for workers to boot
 
-    connect
+    send_http
 
     sleep 1.15
 
     assert_raises Errno::ECONNREFUSED, "Connection refused" do
-      connect
+      send_http
     end
   end
 
@@ -273,16 +267,16 @@ class TestIntegrationCluster < TestIntegration
 
     socks = []
     until refork.read == 'Reforked'
-      socks << fast_connect
+      socks << send_http
       sleep 0.004
     end
 
     100.times {
-      socks << fast_connect
+      socks << send_http
       sleep 0.004
     }
 
-    socks.each { |s| read_body s }
+    socks.each { |s| s.read_body }
 
     refute_includes pids, get_worker_pids(1, wrkrs - 1)
   end
@@ -298,7 +292,7 @@ class TestIntegrationCluster < TestIntegration
         [200, {}, [exitstatus.to_s]]
       end
     RUBY
-    assert_equal '0', read_body(connect)
+    assert_equal '0', send_http_read_resp_body
   end
 
   def test_fork_worker_phased_restart_with_high_worker_count
@@ -327,9 +321,7 @@ class TestIntegrationCluster < TestIntegration
 
   def test_prune_bundler_with_multiple_workers
     cli_server "-C test/config/prune_bundler_with_multiple_workers.rb"
-    reply = read_body(connect)
-
-    assert reply, "embedded app"
+    assert_equal "embedded app", send_http_read_resp_body
   end
 
   def test_load_path_includes_extra_deps
@@ -374,9 +366,8 @@ class TestIntegrationCluster < TestIntegration
   end
 
   def test_nio4r_gem_not_required_in_master_process_when_using_control_server
-    @control_tcp_port = UniquePort.call
-    control_opts = "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN}"
-    cli_server "-w #{workers} #{control_opts} -C test/config/prune_bundler_print_nio_defined.rb test/rackup/hello.ru"
+    @control_port = new_port
+    cli_server "-w #{workers} #{set_pumactl_args} -C test/config/prune_bundler_print_nio_defined.rb test/rackup/hello.ru"
 
     line = @server.gets
     assert_match(/Starting control server/, line)
@@ -609,8 +600,7 @@ class TestIntegrationCluster < TestIntegration
     replies = []
     mutex = Mutex.new
 
-    s = connect "sleep1", unix: unix
-    replies << read_body(s)
+    replies << send_http_read_resp_body("GET /sleep1 HTTP/1.1\r\n\r\n")
 
     Process.kill :USR1, @pid
 
@@ -663,7 +653,7 @@ class TestIntegrationCluster < TestIntegration
     [35, 40].each do |sleep_time|
       threads << Thread.new do
         begin
-          connect "sleep#{sleep_time}"
+          send_http "GET /sleep#{sleep_time} HTTP/1.1\r\n\r\n"
           # stuck connections will raise IOError or Errno::ECONNRESET
           # when shutdown
         rescue IOError, Errno::ECONNRESET
@@ -717,8 +707,7 @@ class TestIntegrationCluster < TestIntegration
   def thread_run_pid(replies, delay, sleep_time, mutex, refused, unix: false)
     begin
       sleep delay
-      s = fast_connect "sleep#{sleep_time}", unix: unix
-      body = read_body(s, 20)
+      body = send_http_read_resp_body "GET /sleep#{sleep_time} HTTP/1.1\r\n\r\n"
       mutex.synchronize { replies << body }
     rescue Errno::ECONNRESET
       # connection was accepted but then closed
@@ -735,8 +724,7 @@ class TestIntegrationCluster < TestIntegration
   def thread_run_step(replies, delay, sleep_time, step, mutex, refused, unix: false)
     begin
       sleep delay
-      s = connect "sleep#{sleep_time}-#{step}", unix: unix
-      body = read_body(s, 20)
+      body = send_http_read_resp_body "GET /sleep#{sleep_time}-#{step} HTTP/1.1\r\n\r\n"
       if body[/\ASlept /]
         mutex.synchronize { replies[step] = :success }
       else
