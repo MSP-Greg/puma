@@ -3,17 +3,16 @@
 require "puma/control_cli"
 require "json"
 require "open3"
-require_relative 'tmp_path'
+require_relative "tmp_path"
+require_relative "test_puma"
+require_relative "test_puma/puma_socket"
 
 # Only single mode tests go here. Cluster and pumactl tests
 # have their own files, use those instead
 class TestIntegration < Minitest::Test
   include TmpPath
-  HOST  = "127.0.0.1"
-  TOKEN = "xxyyzz"
-  RESP_READ_LEN = 65_536
-  RESP_READ_TIMEOUT = 10
-  RESP_SPLIT = "\r\n\r\n"
+  include TestPuma
+  prepend TestPuma::PumaSocket
 
   # used in wait_for_server_to_* methods
   LOG_TIMEOUT   = Puma::IS_JRUBY ? 20 : 10
@@ -24,30 +23,20 @@ class TestIntegration < Minitest::Test
   BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -Ilib" :
     "#{Gem.ruby} -Ilib"
 
-  def setup
+  def before_setup
     @server = nil
     @server_log = +''
     @pid = nil
     @ios_to_close = []
-    @bind_path    = tmp_path('.sock')
+    @bind_path    = unique_path %w[bind_ .sock]
   end
 
-  def teardown
-    if @server && defined?(@control_tcp_port) && Puma.windows?
+  def after_teardown
+    if @server && @control_port && Puma.windows?
       cli_pumactl 'stop'
     elsif @server && @pid && !Puma.windows?
       stop_server @pid, signal: :INT
     end
-
-    @ios_to_close&.each do |io|
-      begin
-        io.close if io.respond_to?(:close) && !io.closed?
-      rescue
-      ensure
-        io = nil
-      end
-    end
-
     if @bind_path
       refute File.exist?(@bind_path), "Bind path must be removed after stop"
       File.unlink(@bind_path) rescue nil
@@ -70,7 +59,7 @@ class TestIntegration < Minitest::Test
     assert(system(*args, out: File::NULL, err: File::NULL))
   end
 
-  def cli_server(argv,  # rubocop:disable Metrics/ParameterLists
+  def cli_server(argv = nil, # rubocop:disable Metrics/ParameterLists
       unix: false,      # uses a UNIXSocket for the server listener when true
       config: nil,      # string to use for config file
       no_bind: nil,     # bind is defined by args passed or config file
@@ -81,10 +70,8 @@ class TestIntegration < Minitest::Test
       env: {})          # pass env setting to Puma process in IO.popen
 
     if config
-      config_file = Tempfile.new(%w(config .rb))
-      config_file.write config
-      config_file.close
-      config = "-C #{config_file.path}"
+      config_path = unique_path %w[config_ .rb], contents: config
+      config = "-C #{config_path}"
     end
 
     puma_path = File.expand_path '../../../bin/puma', __FILE__
@@ -95,8 +82,8 @@ class TestIntegration < Minitest::Test
       elsif unix
         "#{BASE} #{puma_path} #{config} -b unix://#{@bind_path} #{argv}"
       else
-        @tcp_port = UniquePort.call
-        "#{BASE} #{puma_path} #{config} -b tcp://#{HOST}:#{@tcp_port} #{argv}"
+        @bind_port = unique_port
+        "#{BASE} #{puma_path} #{config} -b tcp://#{HOST}:#{@bind_port} #{argv}"
       end
 
     env['PUMA_DEBUG'] = 'true' if puma_debug
@@ -129,16 +116,19 @@ class TestIntegration < Minitest::Test
 
   def restart_server_and_listen(argv, log: false)
     cli_server argv
-    connection = connect
-    initial_reply = read_body(connection)
-    restart_server connection, log: log
-    [initial_reply, read_body(connect)]
+    socket = send_http
+    initial_reply = socket.read_body
+    restart_server socket, log: log
+    socket.read_body
+    # above socket may be answered by original server
+    # below socket answered by restarted server
+    [initial_reply, send_http_read_resp_body]
   end
 
   # reuses an existing connection to make sure that works
-  def restart_server(connection, log: false)
+  def restart_server(socket, log: false)
     Process.kill :USR2, @pid
-    connection.write "GET / HTTP/1.1\r\n\r\n" # trigger it to start by sending a new request
+    socket << GET_11
     wait_for_server_to_boot log: log
   end
 
@@ -197,97 +187,6 @@ class TestIntegration < Minitest::Test
     line
   end
 
-  def connect(path = nil, unix: false)
-    s = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @tcp_port)
-    @ios_to_close << s
-    s << "GET /#{path} HTTP/1.1\r\n\r\n"
-    s
-  end
-
-  # use only if all socket writes are fast
-  # does not wait for a read
-  def fast_connect(path = nil, unix: false)
-    s = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @tcp_port)
-    @ios_to_close << s
-    fast_write s, "GET /#{path} HTTP/1.1\r\n\r\n"
-    s
-  end
-
-  def fast_write(io, str)
-    n = 0
-    while true
-      begin
-        n = io.syswrite str
-      rescue Errno::EAGAIN, Errno::EWOULDBLOCK => e
-        unless io.wait_writable 5
-          raise e
-        end
-
-        retry
-      rescue Errno::EPIPE, SystemCallError, IOError => e
-        raise e
-      end
-
-      return if n == str.bytesize
-      str = str.byteslice(n..-1)
-    end
-  end
-
-  def read_body(connection, timeout = nil)
-    read_response(connection, timeout).last
-  end
-
-  def read_response(connection, timeout = nil)
-    timeout ||= RESP_READ_TIMEOUT
-    content_length = nil
-    chunked = nil
-    response = +''
-    t_st = Process.clock_gettime Process::CLOCK_MONOTONIC
-    if connection.to_io.wait_readable timeout
-      loop do
-        begin
-          part = connection.read_nonblock(RESP_READ_LEN, exception: false)
-          case part
-          when String
-            unless content_length || chunked
-              chunked ||= part.include? "\r\nTransfer-Encoding: chunked\r\n"
-              content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
-            end
-
-            response << part
-            hdrs, body = response.split RESP_SPLIT, 2
-            unless body.nil?
-              # below could be simplified, but allows for debugging...
-              ret =
-                if content_length
-                  body.bytesize == content_length
-                elsif chunked
-                  body.end_with? "\r\n0\r\n\r\n"
-                elsif !hdrs.empty? && !body.empty?
-                  true
-                else
-                  false
-                end
-              if ret
-                return [hdrs, body]
-              end
-            end
-            sleep 0.000_1
-          when :wait_readable, :wait_writable # :wait_writable for ssl
-            sleep 0.000_2
-          when nil
-            raise EOFError
-          end
-          if timeout < Process.clock_gettime(Process::CLOCK_MONOTONIC) - t_st
-            raise Timeout::Error, 'Client Read Timeout'
-          end
-        end
-      end
-    else
-      raise Timeout::Error, 'Client Read Timeout'
-    end
-  end
-
   # gets worker pids from @server output
   def get_worker_pids(phase = 0, size = workers, log: false)
     pids = []
@@ -314,11 +213,12 @@ class TestIntegration < Minitest::Test
 
   def set_pumactl_args(unix: false)
     if unix
-      @control_path = tmp_path('.cntl_sock')
+      @control_path = unique_path %w[ctrl_ .sock]
       "--control-url unix://#{@control_path} --control-token #{TOKEN}"
     else
-      @control_tcp_port = UniquePort.call
-      "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN}"
+      @control_port = unique_port
+      # remove when updates are finished
+      "--control-url tcp://#{HOST}:#{@control_port} --control-token #{TOKEN}"
     end
   end
 
@@ -326,10 +226,10 @@ class TestIntegration < Minitest::Test
     arg =
       if no_bind
         argv.split(/ +/)
-      elsif unix
+      elsif unix || @control_path
         %W[-C unix://#{@control_path} -T #{TOKEN} #{argv}]
       else
-        %W[-C tcp://#{HOST}:#{@control_tcp_port} -T #{TOKEN} #{argv}]
+        %W[-C tcp://#{HOST}:#{@control_port} -T #{TOKEN} #{argv}]
       end
 
     r, w = IO.pipe
@@ -346,7 +246,7 @@ class TestIntegration < Minitest::Test
       elsif unix
         %Q[-C unix://#{@control_path} -T #{TOKEN} #{argv}]
       else
-        %Q[-C tcp://#{HOST}:#{@control_tcp_port} -T #{TOKEN} #{argv}]
+        %Q[-C tcp://#{HOST}:#{@control_port} -T #{TOKEN} #{argv}]
       end
 
     pumactl_path = File.expand_path '../../../bin/pumactl', __FILE__
@@ -372,8 +272,8 @@ class TestIntegration < Minitest::Test
 
     args = "-w #{workers} -t 5:5 -q test/rackup/hello_with_delay.ru"
     if Puma.windows?
-      @control_tcp_port = UniquePort.call
-      cli_server "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN} #{args}"
+      @control_port = unique_port
+      cli_server "--control-url tcp://#{HOST}:#{@control_port} --control-token #{TOKEN} #{args}"
     else
       cli_server args
     end
@@ -394,13 +294,12 @@ class TestIntegration < Minitest::Test
         num_requests.times do |req_num|
           begin
             begin
-              socket = TCPSocket.new HOST, @tcp_port
-              fast_write socket, "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
+              socket = send_http "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
             rescue => e
               replies[:write_error] += 1
               raise e
             end
-            body = read_body(socket, 10)
+            body = socket.read_body
             if body == "Hello World"
               mutex.synchronize {
                 replies[:success] += 1
