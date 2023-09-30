@@ -87,12 +87,12 @@ class TestPluginSystemd < TestIntegration
     assert_message 'READY=1'
 
     Process.kill signal, @pid
-    connect.write "GET / HTTP/1.1\r\n\r\n"
+    send_http
     assert_message 'RELOADING=1'
     assert_message 'READY=1'
 
     Process.kill signal, @pid
-    connect.write "GET / HTTP/1.1\r\n\r\n"
+    send_http
     assert_message 'RELOADING=1'
     assert_message 'READY=1'
 
