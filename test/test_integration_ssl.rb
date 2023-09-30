@@ -131,45 +131,43 @@ class TestIntegrationSSL < TestIntegration
   def test_ssl_run_with_curl_client
     skip_if :windows
 
-    require 'stringio'
+    cert_path = File.expand_path '../examples/puma/client-certs', __dir__
+    bind_port
 
-    app = lambda { |_| [200, { 'Content-Type' => 'text/plain' }, ["HELLO", ' ', "THERE"]] }
-    opts = {max_threads: 1}
-    server = Puma::Server.new app, nil, opts
-    if Puma.jruby?
-      ssl_params = {
-          'keystore'      => File.expand_path('../examples/puma/client-certs/keystore.jks', __dir__),
-          'keystore-pass' => 'jruby_puma', # keystore includes server.p12 as well as ca.crt
-      }
-    else
-      ssl_params = {
-          'cert' => File.expand_path('../examples/puma/client-certs/server.crt', __dir__),
-          'key'  => File.expand_path('../examples/puma/client-certs/server.key', __dir__),
-          'ca'   => File.expand_path('../examples/puma/client-certs/ca.crt', __dir__),
-      }
-    end
-    ssl_params['verify_mode'] = 'force_peer' # 'peer'
-    out_err = StringIO.new
-    ssl_context = Puma::MiniSSL::ContextBuilder.new(ssl_params, Puma::LogWriter.new(out_err, out_err)).context
-    server.add_ssl_listener(LOCALHOST, bind_port, ssl_context)
+    config = <<~CONFIG
+      if ::Puma::IS_JRUBY
+        ssl_bind '#{LOCALHOST}', '#{@bind_port}', {
+          keystore: '#{cert_path}/keystore.jks',
+          keystore_pass: 'jruby_puma',
+          verify_mode: 'force_peer'
+        }
+      else
+        ssl_bind '#{LOCALHOST}', '#{@bind_port}', {
+          cert: '#{cert_path}/server.crt',
+          key:  '#{cert_path}/server.key',
+          ca:   '#{cert_path}/ca.crt',
+          verify_mode: 'force_peer'
+        }
+      end
+      threads 1, 5
 
-    server.run(true)
-    begin
-      ca = File.expand_path('../examples/puma/client-certs/ca.crt', __dir__)
-      cert = File.expand_path('../examples/puma/client-certs/client.crt', __dir__)
-      key = File.expand_path('../examples/puma/client-certs/client.key', __dir__)
-      # NOTE: JRuby used to end up in a hang with TLS peer verification enabled
-      # it's easier to reproduce using an external client such as CURL (using net/http client the bug isn't triggered)
-      # also the "hang", being buffering related, seems to showcase better with TLS 1.2 than 1.3
-      body = curl_and_get_response "https://#{LOCALHOST}:#{bind_port}",
-        args: "--cacert #{ca} --cert #{cert} --key #{key} --tlsv1.2 --tls-max 1.2"
+      app do |env|
+        [200, { 'Content-Type' => 'text/plain' }, ["HELLO", ' ', "THERE"]]
+      end
+    CONFIG
 
-      warn out_err.string unless out_err.string.empty?
-      assert_equal 'HELLO THERE', body
-    ensure
-      server.stop(true)
-    end
-    assert_equal '', out_err.string
+    cli_server "#{set_pumactl_args}", config: config, no_bind: true
+
+    ca = File.expand_path('../examples/puma/client-certs/ca.crt', __dir__)
+    cert = File.expand_path('../examples/puma/client-certs/client.crt', __dir__)
+    key = File.expand_path('../examples/puma/client-certs/client.key', __dir__)
+    # NOTE: JRuby used to end up in a hang with TLS peer verification enabled
+    # it's easier to reproduce using an external client such as CURL (using net/http client the bug isn't triggered)
+    # also the "hang", being buffering related, seems to showcase better with TLS 1.2 than 1.3
+    body = curl_and_get_response "https://#{LOCALHOST}:#{bind_port}",
+      args: "--cacert #{ca} --cert #{cert} --key #{key} --tlsv1.2 --tls-max 1.2"
+
+    assert_equal 'HELLO THERE', body
   end
 
   def test_ssl_run_with_pem
