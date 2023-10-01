@@ -2,6 +2,7 @@
 
 require 'socket'
 require_relative '../test_puma'
+require_relative 'response'
 
 module TestPuma
 
@@ -9,17 +10,16 @@ module TestPuma
   #   @param req [String, GET_11] request path
 
   # @!macro [new] skt
-  # @param host: [String] tcp/ssl host
-  # @param port: [Integer/String] tcp/ssl port
-  # @param path: [String] unix socket, full path
-  # @param ctx: [OpenSSL::SSL::SSLContext] ssl context
-  # @param session: [OpenSSL::SSL::Session] ssl session
+  #   @param host: [String] tcp/ssl host
+  #   @param port: [Integer/String] tcp/ssl port
+  #   @param path: [String] unix socket, full path
+  #   @param ctx: [OpenSSL::SSL::SSLContext] ssl context
+  #   @param session: [OpenSSL::SSL::Session] ssl session
 
   # @!macro [new] resp
-  # @param timeout: [Float, nil] total socket read timeout, defaults to `RESP_READ_TIMEOUT`
-  # @param len: [ Integer, nil] the `read_nonblock` maxlen, defaults to `RESP_READ_LEN`
-  # @param decode_chunked: [true, nil] decodes the response body
-  # @param times: {Array,nil] if set to an array, includes times for each socket read
+  #   @param timeout: [Float, nil] total socket read timeout, defaults to `RESP_READ_TIMEOUT`
+  #   @param len: [ Integer, nil] the `read_nonblock` maxlen, defaults to `RESP_READ_LEN`
+  #   @param decode_chunked: [true, nil] decodes the response body
 
   # This module is included in CI test files, and provides methods to create
   # client sockets.  Normally, the socket parameters are defined by the code
@@ -52,7 +52,6 @@ module TestPuma
   # * `timeout:` - total socket read timeout, defaults to `RESP_READ_TIMEOUT` (`Float`)
   # * `len:` - the `read_nonblock` maxlen, defaults to `RESP_READ_LEN` (`Integer`)
   # * `decode_chunked:` - decodes the response body (`true`)
-  # * `times:` - if set to an array, times for each socket read are concated (`Array`)
   #
   # #### Methods added to socket instances:
   # * `read_response` - reads the response and returns it, uses `READ_RESPONSE`
@@ -68,9 +67,10 @@ module TestPuma
 
     RESP_READ_LEN = 65_536
     RESP_READ_TIMEOUT = 10
-    RESP_SPLIT = "\r\n\r\n"
     NO_ENTITY_BODY = Puma::STATUS_WITH_NO_ENTITY_BODY
     EMPTY_200 = [200, {}, ['']]
+
+    UTF8 = ::Encoding::UTF_8
 
     SET_TCP_NODELAY = Socket.const_defined?(:IPPROTO_TCP) && ::Socket.const_defined?(:TCP_NODELAY)
 
@@ -124,9 +124,9 @@ module TestPuma
     # @!macro resp
     # @return [Array<String>] array of header lines in the response
     def send_http_read_resp_headers(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
-        session: nil, len: nil, timeout: nil, decode_chunked: nil, times: nil)
+        session: nil, len: nil, timeout: nil, decode_chunked: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      resp = skt.read_response timeout: timeout, len: len, decode_chunked: decode_chunked, times: times
+      resp = skt.read_response timeout: timeout, len: len, decode_chunked: decode_chunked
       resp.split(RESP_SPLIT, 2).first.split "\r\n"
     end
 
@@ -134,22 +134,49 @@ module TestPuma
     # @!macro req
     # @!macro skt
     # @!macro resp
-    # @return [String] the body portion of the HTTP response
+    # @return [Response] the body portion of the HTTP response
     def send_http_read_resp_body(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
-        session: nil, len: nil, timeout: nil, decode_chunked: nil, times: nil)
+        session: nil, len: nil, timeout: nil, decode_chunked: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_body timeout: timeout, len: len, decode_chunked: decode_chunked, times: times
+      skt.read_body timeout: timeout, len: len, decode_chunked: decode_chunked
     end
 
-    # Sends a request and returns the HTTP response.
+    # Sends a request and returns whatever can be read.  Use when multiple
+    # responses are sent by the server
+    # @!macro req
+    # @!macro skt
+    # @return [String] socket read string
+    def send_http_read_all(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
+        session: nil, len: nil, timeout: nil)
+      skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
+      read = String.new # rubocop: disable Performance/UnfreezeString
+      counter = 0
+      prev_size = 0
+      loop do
+        raise(Timeout::Error, 'Client Read Timeout') if counter > 5
+        if skt.wait_readable 1
+          read << skt.sysread(RESP_READ_LEN)
+        end
+        ttl_read = read.bytesize
+        return read if prev_size == ttl_read && !ttl_read.zero?
+        prev_size = ttl_read
+        counter += 1
+      end
+    rescue EOFError
+      return read
+    rescue => e
+      raise e
+    end
+
+    # Sends a request and returns the HTTP response.  Assumes one response is sent
     # @!macro req
     # @!macro skt
     # @!macro resp
     # @return [String] the HTTP response
     def send_http_read_response(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
-        session: nil, len: nil, timeout: nil, decode_chunked: nil, times: nil)
+        session: nil, len: nil, timeout: nil, decode_chunked: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_response timeout: timeout, len: len, decode_chunked: decode_chunked, times: times
+      skt.read_response timeout: timeout, len: len, decode_chunked: decode_chunked
     end
 
     # Sends a request and returns the socket
@@ -184,12 +211,12 @@ module TestPuma
       end
     end
 
-    READ_BODY = -> (timeout: nil, len: nil, decode_chunked: nil, times: nil) {
-      self.read_response(timeout: nil, len: nil, decode_chunked: nil, times: nil)
+    READ_BODY = -> (timeout: nil, len: nil, decode_chunked: nil) {
+      self.read_response(timeout: nil, len: nil, decode_chunked: nil)
         .split(RESP_SPLIT, 2).last
     }
 
-    READ_RESPONSE = -> (timeout: nil, len: nil, decode_chunked: nil, times: nil) do
+    READ_RESPONSE = -> (timeout: nil, len: nil, decode_chunked: nil) do
       content_length = nil
       chunked = nil
       status = nil
@@ -200,19 +227,23 @@ module TestPuma
       timeout  ||= RESP_READ_TIMEOUT
       time_start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       time_end   = time_start + timeout
+      times = []
+      time_read = nil
 
       loop do
         begin
           self.to_io.wait_readable timeout
+          time_read ||= Process.clock_gettime(Process::CLOCK_MONOTONIC)
           part = self.read_nonblock(read_len, exception: false)
           case part
           when String
-            times << Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_start if times
+            times << (Process.clock_gettime(Process::CLOCK_MONOTONIC) - time_read).round(4)
             status ||= part[/\AHTTP\/1\.[01] (\d{3})/, 1]
             if status
               no_body ||= NO_ENTITY_BODY.key? status.to_i || status.to_i < 200
             end
             if no_body && part.end_with?(RESP_SPLIT)
+              response.times = times
               return response << part
             end
 
@@ -220,7 +251,6 @@ module TestPuma
               chunked ||= part.downcase.include? "\r\ntransfer-encoding: chunked\r\n"
               content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
             end
-
             response << part
             hdrs, body = response.split RESP_SPLIT, 2
             unless body.nil?
@@ -231,7 +261,7 @@ module TestPuma
                 elsif chunked
                   if body.end_with? "0\r\n\r\n"
                     if decode_chunked
-                      response = TestPuma::PumaSocket.chunked_body hdrs, body
+                      response = chunked_body hdrs, body
                     end
                     true
                   else
@@ -242,10 +272,12 @@ module TestPuma
                 else
                   false
                 end
+              response.times = times
               return response if ret
             end
             sleep 0.000_1
           when :wait_readable
+            # continue loop
           when :wait_writable # :wait_writable for ssl
             to = time_end - Process.clock_gettime(Process::CLOCK_MONOTONIC)
             self.to_io.wait_writable to
@@ -253,6 +285,7 @@ module TestPuma
             if response.empty?
               raise EOFError
             else
+              response.times = times
               return response
             end
           end
@@ -264,7 +297,8 @@ module TestPuma
       end
     end
 
-    REQ_WRITE = -> (str) { self.syswrite str }
+    # @todo verify whole string is written
+    REQ_WRITE = -> (str) { self.syswrite str; self }
 
     # Helper for creating an `OpenSSL::SSL::SSLContext`.
     # @param &blk [Block] Passed the SSLContext.
@@ -386,12 +420,13 @@ module TestPuma
       results
     end
 
+    private
     # Decodes a chunked body, does not modify the headers
     # @param hdrs [String] the header section of the response
     # @param body [String] the chunked encoded body
     # @return [String] the updated response
     #
-    def self.chunked_body(hdrs, body)
+    def chunked_body(hdrs, body)
       body = body.byteslice 0, body.bytesize - 5   # remove terminating bytes
       decoded = String.new  # rubocop: disable Performance/UnfreezeString
       loop do
