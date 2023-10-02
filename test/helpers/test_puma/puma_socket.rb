@@ -172,7 +172,7 @@ module TestPuma
     # @!macro req
     # @!macro skt
     # @!macro resp
-    # @return [String] the HTTP response
+    # @return [Response] the HTTP response
     def send_http_read_response(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: nil, timeout: nil, decode_chunked: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
@@ -221,7 +221,7 @@ module TestPuma
       chunked = nil
       status = nil
       no_body = nil
-      response = +''
+      response = Response.new
       read_len = len || RESP_READ_LEN
 
       timeout  ||= RESP_READ_TIMEOUT

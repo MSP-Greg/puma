@@ -1,0 +1,52 @@
+module TestPuma
+
+  # A subclass of String, allows processing the response returned by
+  # `PumaSocket#send_http_read_response` and the `read_response` method added
+  # to native socket instances (created with `PumaSocket#new_socket` and
+  # `PumaSocket#send_http`.
+  #
+  class Response < String
+
+    attr_accessor :times
+
+    # Returns response status line and all headers as an array of lines
+    # @return [Array<String>]
+    def headers
+      @headers ||= self.split(RESP_SPLIT, 2).first.split LINE_SPLIT
+    end
+
+    # Returns response headers as a hash. All keys and values are strings.
+    # @return [Hash]
+    def headers_hash
+      @status ||= headers.shift # remove status line
+      headers.map { |hdr| key, value = hdr.split ': ', 2 }.to_h
+    end
+
+    def status
+      @status ||= headers.first
+    end
+
+    def body
+      self.split(RESP_SPLIT, 2).last
+    end
+
+    # Decodes a chunked body
+    # @return [String] the decoded body
+    def decode_body
+      decoded = String.new  # rubocop: disable Performance/UnfreezeString
+
+      body = self.split(RESP_SPLIT, 2).last
+      body = body.byteslice 0, body.bytesize - 5 # remove terminating bytes
+
+      loop do
+        size, body = body.split LINE_SPLIT, 2
+        size = size.to_i 16
+
+        decoded << body.byteslice(0, size)
+        body = body.byteslice (size+2)..-1       # remove segment ending "\r\n"
+        break if body.empty? || body.nil?
+      end
+      decoded
+    end
+  end
+end
