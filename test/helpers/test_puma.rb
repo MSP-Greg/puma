@@ -4,6 +4,9 @@ require 'socket'
 
 module TestPuma
 
+  RESP_SPLIT = "\r\n\r\n"
+  LINE_SPLIT = "\r\n"
+
   RE_HOST_TO_IP = /\A\[|\]\z/o
 
   HOST4 = begin
