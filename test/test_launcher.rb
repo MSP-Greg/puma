@@ -7,6 +7,10 @@ require 'puma/log_writer'
 class TestLauncher < Minitest::Test
   include TmpPath
 
+  def setup
+    @launcher = nil
+  end
+
   def test_prints_thread_traces
     launcher.thread_status do |name, _backtrace|
       assert_match "Thread: TID", name
@@ -75,10 +79,9 @@ class TestLauncher < Minitest::Test
   def test_puma_stats
     conf = Puma::Configuration.new do |c|
       c.app -> {[200, {}, ['']]}
-      c.clear_binds!
     end
-    launcher = launcher(conf)
-    launcher.events.on_booted {
+
+    launcher(conf).events.on_booted {
       sleep 1.1 unless Puma.mri?
       launcher.stop
     }
@@ -95,9 +98,8 @@ class TestLauncher < Minitest::Test
     conf = Puma::Configuration.new do |c|
       c.app -> {[200, {}, ['']]}
       c.workers 1
-      c.clear_binds!
     end
-    launcher = launcher(conf)
+    launcher(conf)
     Thread.new do
       sleep Puma::Configuration::DEFAULTS[:worker_check_interval] + 1
       status = Puma.stats_hash[:worker_status].first[:last_status]
@@ -128,21 +130,17 @@ class TestLauncher < Minitest::Test
   def test_fire_on_stopped
     conf = Puma::Configuration.new do |c|
       c.app -> {[200, {}, ['']]}
-      c.port UniquePort.call
     end
 
-    launcher = launcher(conf)
-    launcher.events.on_booted {
+    launcher(conf).events.on_booted {
       sleep 1.1 unless Puma.mri?
       launcher.stop
     }
-    launcher.events.on_stopped { puts 'on_stopped called' }
+    launcher.events.on_stopped { log_writer.log 'on_stopped called' }
 
-    out, = capture_io do
-      launcher.run
-    end
+    launcher.run
     sleep 0.2 unless Puma.mri?
-    assert_equal 'on_stopped called', out.strip
+    assert_match(/^on_stopped called$/, @log_writer.stdout.string.strip)
   end
 
   private
@@ -152,6 +150,8 @@ class TestLauncher < Minitest::Test
   end
 
   def launcher(config = Puma::Configuration.new, lw = log_writer)
+    # don't used default port 9292
+    config.options[:binds] = ["tcp://0.0.0.0:0"]
     @launcher ||= Puma::Launcher.new(config, log_writer: lw)
   end
 end
