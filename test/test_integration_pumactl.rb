@@ -8,14 +8,10 @@ class TestIntegrationPumactl < TestIntegration
   def workers ; 2 ; end
 
   def setup
-    super
-    @control_path = nil
     @state_path = tmp_path('.state')
   end
 
   def teardown
-    super
-
     refute @control_path && File.exist?(@control_path), "Control path must be removed after stop"
   ensure
     [@state_path, @control_path].each { |p| File.unlink(p) rescue nil }
@@ -23,7 +19,6 @@ class TestIntegrationPumactl < TestIntegration
 
   def test_stop_tcp
     skip_if :jruby, :truffleruby # Undiagnose thread race. TODO fix
-    @control_tcp_port = UniquePort.call
     cli_server "-q test/rackup/sleep.ru #{set_pumactl_args} -S #{@state_path}"
 
     cli_pumactl "stop"
@@ -50,7 +45,7 @@ class TestIntegrationPumactl < TestIntegration
       config: "stdout_redirect nil, '#{stderr.path}'",
       unix: true
 
-    cli_pumactl signal, unix: true
+    cli_pumactl signal
 
     _, status = Process.wait2(@pid)
     assert_equal 0, status
@@ -64,16 +59,14 @@ class TestIntegrationPumactl < TestIntegration
 
     start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-    s = UNIXSocket.new @bind_path
-    @ios_to_close << s
-    s << "GET /sleep1 HTTP/1.0\r\n\r\n"
+    send_http "GET /sleep1 HTTP/1.0\r\n\r\n"
 
     # Get the PIDs of the phase 0 workers.
     phase0_worker_pids = get_worker_pids 0
     assert File.exist? @bind_path
 
     # Phased restart
-    cli_pumactl "phased-restart", unix: true
+    cli_pumactl "phased-restart"
 
     # Get the PIDs of the phase 1 workers.
     phase1_worker_pids = get_worker_pids 1
@@ -85,7 +78,7 @@ class TestIntegrationPumactl < TestIntegration
     assert_empty phase0_worker_pids & phase1_worker_pids, "#{msg}\nBoth workers should be replaced with new"
     assert File.exist?(@bind_path), "Bind path must exist after phased restart"
 
-    cli_pumactl "stop", unix: true
+    cli_pumactl "stop"
 
     _, status = Process.wait2(@pid)
     assert_equal 0, status
@@ -102,13 +95,13 @@ class TestIntegrationPumactl < TestIntegration
 
     start = Time.now
 
-    fast_connect("sleep1", unix: true)
+    send_http "GET /sleep1 HTTP/1.0\r\n\r\n"
 
     # Get the PIDs of the phase 0 workers.
     phase0_worker_pids = get_worker_pids 0, wrkrs
     assert File.exist? @bind_path
 
-    cli_pumactl "refork", unix: true
+    cli_pumactl "refork"
 
     # Get the PIDs of the phase 1 workers.
     phase1_worker_pids = get_worker_pids 1, wrkrs - 1
@@ -120,7 +113,7 @@ class TestIntegrationPumactl < TestIntegration
     assert_empty phase0_worker_pids & phase1_worker_pids, "#{msg}\nBoth workers should be replaced with new"
     assert File.exist?(@bind_path), "Bind path must exist after phased refork"
 
-    cli_pumactl "stop", unix: true
+    cli_pumactl "stop"
 
     _, status = Process.wait2(@pid)
     assert_equal 0, status
@@ -133,11 +126,10 @@ class TestIntegrationPumactl < TestIntegration
 
     cli_server "-q -C test/config/prune_bundler_with_multiple_workers.rb #{set_pumactl_args unix: true} -S #{@state_path}", unix: true
 
-    socket = fast_connect(unix: true)
-    headers, body = read_response(socket)
+    response = send_http_read_response
 
-    assert_includes headers, "200 OK"
-    assert_includes body, "embedded app"
+    assert_includes response.status, "200 OK"
+    assert_includes response.body, "embedded app"
 
     cli_pumactl "stop", unix: true
 
@@ -170,19 +162,19 @@ class TestIntegrationPumactl < TestIntegration
   def test_require_dependencies
     skip_if :jruby
     conf_path = tmp_path '.config.rb'
-    @tcp_port = UniquePort.call
-    @control_tcp_port = UniquePort.call
+    @bind_port = UniquePort.call
+    @control_port = UniquePort.call
 
     File.write conf_path , <<~CONF
       state_path "#{@state_path}"
-      bind "tcp://127.0.0.1:#{@tcp_port}"
+      bind "#{bind_uri_str}"
 
       workers 0
 
       before_fork do
       end
 
-      activate_control_app "tcp://127.0.0.1:#{@control_tcp_port}", auth_token: "#{TOKEN}"
+      activate_control_app #{control_config_str}
 
       app do |env|
         [200, {}, ["Hello World"]]
@@ -196,7 +188,7 @@ class TestIntegrationPumactl < TestIntegration
     assert_includes out.read, "Command restart sent success"
 
     sleep 0.5 # give some time to restart
-    read_response connect
+    send_http_read_response
 
     out = cli_pumactl_spawn "-S #{@state_path} status", no_bind: true
     assert_includes out.read, "Puma is started"
@@ -211,7 +203,7 @@ class TestIntegrationPumactl < TestIntegration
     before = JSON.parse resp_io.read.split("\n", 2).last
     gc_before = before[key].to_i
 
-    2.times { fast_connect }
+    2.times { send_http }
 
     resp_io = cli_pumactl "gc", unix: unix
     # below shows gc was called (200 reply)
@@ -227,6 +219,12 @@ class TestIntegrationPumactl < TestIntegration
     elsif !(Puma::IS_OSX && Puma::IS_JRUBY)
       refute_equal gc_before, gc_after, "make sure a gc has happened"
     end
+  ensure
+    return unless Puma::HAS_UNIX_SOCKET
+    cli_pumactl "stop", unix: unix
+    # below needed to delete control unix path
+    _, status = Process.wait2(@pid)
+    assert_equal 0, status
   end
 
   def test_control_gc_stats_tcp
