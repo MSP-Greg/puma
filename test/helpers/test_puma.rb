@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'socket'
+require 'tmpdir'
 
 module TestPuma
 
@@ -43,8 +44,28 @@ module TestPuma
   TOKEN = "xxyyzz"
 
   # Returns an available port by using `TCPServer.open(host, 0)`
-  def new_port(host = HOST)
+  def unique_port(host = HOST)
     TCPServer.open(host, 0) { |server| server.connect_address.ip_port }
+  end
+
+  alias_method :new_port, :unique_port
+
+  def bind_type(type)
+    case type
+    when :tcp
+      @bind_port = unique_port
+    when :unix
+      @bind_path = unique_path %w[bind_ .sock]
+    end
+  end
+
+  def control_type(type)
+    case type
+    when :tcp
+      @control_port = unique_port
+    when :unix
+      @control_path = unique_path %w[cntl_ .sock]
+    end
   end
 
   def bind_uri_str
@@ -59,7 +80,87 @@ module TestPuma
     if @control_port
       "tcp://#{HOST}:#{@control_port}"
     elsif @control_path
-      "unix://#{HOST}:#{@control_path}"
+      "unix://#{@control_path}"
+    end
+  end
+
+  def control_config_str
+    if @control_port
+      "'tcp://#{HOST}:#{@control_port}', auth_token: '#{TOKEN}'"
+    elsif @control_path
+      "'unix://#{@control_path}', auth_token: '#{TOKEN}'"
+    end
+  end
+
+  # With some macOS configurations, the following error may be raised when
+  # creating a UNIXSocket:
+  #
+  # too long unix socket path (106 bytes given but 104 bytes max) (ArgumentError)
+  #
+  PUMA_CI_TMPDIR =
+    begin
+      if RUBY_DESCRIPTION.include? 'darwin'
+        # adds subdirectory 'tmp/ci' in repository folder
+        dir_temp = File.absolute_path("#{__dir__}/../../tmp")
+        Dir.mkdir(dir_temp) unless Dir.exist? dir_temp
+        dir_temp += '/ci'
+        Dir.mkdir(dir_temp) unless Dir.exist? dir_temp
+        dir_temp
+      else
+        Dir.tmpdir()
+      end
+    end
+
+  UNUSABLE_CHARS = "^,-.0-9A-Z_a-z~"
+  private_constant :UNUSABLE_CHARS
+
+  # Dedicated random number generator
+  RANDOM = Object.new
+  class << RANDOM # :nodoc:
+    # Maximum random number
+    MAX = 36**6 # < 0x100000000
+
+    # Returns new random string upto 6 bytes
+    def next
+      rand(0x100000000).to_s(36)
+    end
+  end
+  RANDOM.freeze
+  private_constant :RANDOM
+
+  # Generates a unique file path.  Optionally, writes to the file
+  def unique_path(basename = '', dir: PUMA_CI_TMPDIR, contents: nil)
+    max_try = 10
+    n = nil
+    if basename.is_a? String
+      prefix, suffix = '', basename
+    else
+      prefix, suffix = basename
+    end
+    prefix = (String.try_convert(prefix) or
+              raise ArgumentError, "unexpected prefix: #{prefix.inspect}")
+    prefix = prefix.delete(UNUSABLE_CHARS)
+    suffix &&= (String.try_convert(suffix) or
+                raise ArgumentError, "unexpected suffix: #{suffix.inspect}")
+    suffix &&= suffix.delete(UNUSABLE_CHARS)
+
+    loop do
+      # 366235959999.to_s(36) => 4o8vfnb3, eight characters
+      # dddhhmmss ms
+      t = Time.now.strftime('%j%H%M%S%L').to_i.to_s(36).rjust 8, '0'
+      path = "#{prefix}#{t}-#{RANDOM.next}"\
+             "#{n ? %[-#{n}] : ''}#{suffix || ''}"
+      path = File.join(dir, path)
+      unless File.exist? path
+        File.write(path, contents, perm: 0600) if contents
+        (@tmp_paths ||= []) << path
+        return path
+      end
+      n ||= 0
+      n += 1
+      if n > max_try
+        raise "cannot generate temporary name using `#{basename}' under `#{dir}'"
+      end
     end
   end
 end
