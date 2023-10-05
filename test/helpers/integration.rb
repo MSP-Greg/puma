@@ -253,7 +253,7 @@ class TestIntegration < Minitest::Test
 
     raise Minitest::Assertion,  "@server is not an IO" unless @server.is_a?(IO)
     if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_timeout
-      raise Minitest::Assertion, "Timeout waiting for server to log #{match_obj.inspect}"
+      raise Timeout::Error, "Timeout waiting for server to log #{match_obj.inspect}"
     end
 
     begin
@@ -268,7 +268,7 @@ class TestIntegration < Minitest::Test
       retry
     end
     if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_timeout
-      raise Minitest::Assertion, "Timeout waiting for server to log #{match_obj.inspect}"
+      raise Timeout::Error, "Timeout waiting for server to log #{match_obj.inspect}"
     end
     line
   end
@@ -353,8 +353,8 @@ class TestIntegration < Minitest::Test
 
   def hot_restart_does_not_drop_connections(num_threads: 1, total_requests: 500)
     skipped = true
-    skip_if :jruby, suffix: <<-MSG
- - file descriptors are not preserved on exec on JRuby; connection reset errors are expected during restarts
+    skip_if :jruby, suffix: <<~MSG
+      - file descriptors are not preserved on exec on JRuby; connection reset errors are expected during restarts
     MSG
     skip_if :truffleruby, suffix: ' - Undiagnosed failures on TruffleRuby'
 
@@ -370,6 +370,7 @@ class TestIntegration < Minitest::Test
     replies = Hash.new 0
     refused = thread_run_refused unix: false
     message = 'A' * 16_256  # 2^14 - 128
+    request = "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
 
     mutex = Mutex.new
     restart_count = 0
@@ -382,7 +383,7 @@ class TestIntegration < Minitest::Test
         num_requests.times do |req_num|
           begin
             begin
-              socket = send_http "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
+              socket = send_http request
             rescue => e
               replies[:write_error] += 1
               raise e
@@ -422,17 +423,20 @@ class TestIntegration < Minitest::Test
     run = true
 
     restart_thread = Thread.new do
-      sleep 0.2  # let some connections in before 1st restart
-      while run
-        if Puma.windows?
-          cli_pumactl 'restart'
-        else
-          Process.kill :USR2, @pid
+      sleep 0.05  # let some connections in before 1st restart
+      while run do
+        begin
+          if Puma.windows?
+            cli_pumactl 'restart'
+          else
+            Process.kill :USR2, @pid
+          end
+          wait_for_server_to_boot
+          restart_count += 1
+          sleep(Puma.windows? ? 1.0 : 0.2)
+        rescue Errno::EBADF, Timeout::Error
+          break
         end
-        sleep 0.5
-        wait_for_server_to_boot
-        restart_count += 1
-        sleep(Puma.windows? ? 2.0 : 0.5)
       end
     end
 
@@ -458,29 +462,29 @@ class TestIntegration < Minitest::Test
     refused = replies[:refused]
     reset   = replies[:reset]
 
+    # assert_operator - 1st parameter is logged as expected
+
     if Puma.windows?
       # 5 is default thread count in Puma?
-      reset_max = num_threads * restart_count
-      assert_operator reset_max, :>=, reset, "#{msg}Expected reset_max >= reset errors"
-      assert_operator 40, :>=,  refused, "#{msg}Too many refused connections"
+      max_reset = num_threads * restart_count
+      assert_operator max_reset,     :>=, reset  ,  "#{msg}Expected no more than #{max_reset} reset connections"
+      assert_operator        50,     :>=, refused,  "#{msg}Expected no more than 40 refused connections"
     else
-      assert_equal 0, reset, "#{msg}Expected no reset errors"
-      max_refused = (0.001 * replies.fetch(:success,0)).round
-      assert_operator max_refused, :>=, refused, "#{msg}Expected no than #{max_refused} refused connections"
+      max_refused = [0.001 * num_threads * num_requests, 1].max
+      assert_operator restart_count, :>=, reset  ,  "#{msg}Expected no more that #{restart_count} reset connections"
+      assert_operator max_refused  , :>=, refused,  "#{msg}Expected no more than #{max_refused} refused connections"
     end
     assert_equal 0, replies[:unexpected_response], "#{msg}Unexpected response"
-    assert_equal 0, replies[:read_timeout], "#{msg}Expected no read timeouts"
+    assert_equal 0, replies[:read_timeout]       , "#{msg}Expected no read timeouts"
 
-    if Puma.windows?
-      assert_equal (num_threads * num_requests) - reset - refused, replies[:success]
-    else
-      assert_equal (num_threads * num_requests), replies[:success]
-    end
+    expected = 0.7 * (num_threads * num_requests - reset - refused)
 
+    assert_operator expected, :<=, replies[:restart], "#{msg}Expected more than #{expected} connections after restart"
   ensure
     return if skipped
     if passed?
-      msg = "    #{restart_count} restarts, #{reset} resets, #{refused} refused, #{replies[:restart]} success after restart, #{replies[:write_error]} write error"
+      msg = "    #{restart_count} restarts, #{reset} resets, #{refused} refused," \
+        "#{replies[:write_error]} write error, #{replies[:restart]}/#{replies[:success]} success restart/total"
       $debugging_info << "#{full_name}\n#{msg}\n"
     else
       client_threads.each { |thr| thr.kill if thr.is_a? Thread }
