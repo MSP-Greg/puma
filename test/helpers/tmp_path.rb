@@ -2,8 +2,11 @@
 
 module TmpPath
   def clean_tmp_paths
-    while path = tmp_paths.pop
-      delete_tmp_path(path)
+    tmp_paths&.each do |path|
+      begin
+        File.unlink(path)
+      rescue Errno::ENOENT
+      end
     end
   end
 
