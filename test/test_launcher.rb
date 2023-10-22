@@ -1,11 +1,13 @@
+# frozen_string_literal: true
+
 require_relative "helper"
-require_relative "helpers/tmp_path"
+require_relative "helpers/test_puma"
 
 require "puma/configuration"
-require 'puma/log_writer'
+require "puma/log_writer"
 
 class TestLauncher < Minitest::Test
-  include TmpPath
+  include TestPuma
 
   def test_prints_thread_traces
     launcher.thread_status do |name, _backtrace|
@@ -14,7 +16,7 @@ class TestLauncher < Minitest::Test
   end
 
   def test_pid_file
-    pid_path = tmp_path('.pid')
+    pid_path = unique_path('.pid')
 
     conf = Puma::Configuration.new do |c|
       c.pidfile pid_path
@@ -28,7 +30,7 @@ class TestLauncher < Minitest::Test
   end
 
   def test_state_permission_0640
-    state_path = tmp_path('.state')
+    state_path = unique_path('.state')
     state_permission = 0640
 
     conf = Puma::Configuration.new do |c|
@@ -44,7 +46,7 @@ class TestLauncher < Minitest::Test
   end
 
   def test_state_permission_nil
-    state_path = tmp_path('.state')
+    state_path = unique_path('.state')
 
     conf = Puma::Configuration.new do |c|
       c.state_path state_path
@@ -59,7 +61,7 @@ class TestLauncher < Minitest::Test
   end
 
   def test_no_state_permission
-    state_path = tmp_path('.state')
+    state_path = unique_path('.state')
 
     conf = Puma::Configuration.new do |c|
       c.state_path state_path
@@ -79,11 +81,11 @@ class TestLauncher < Minitest::Test
     end
     launcher = launcher(conf)
     launcher.events.on_booted {
-      sleep 1.1 unless Puma.mri?
+      sleep 1.1 unless Puma::IS_MRI
       launcher.stop
     }
     launcher.run
-    sleep 1 unless Puma.mri?
+    sleep 1 unless Puma::IS_MRI
     Puma::Server::STAT_METHODS.each do |stat|
       assert_includes Puma.stats_hash, stat
     end
@@ -128,21 +130,21 @@ class TestLauncher < Minitest::Test
   def test_fire_on_stopped
     conf = Puma::Configuration.new do |c|
       c.app -> {[200, {}, ['']]}
-      c.port UniquePort.call
+      c.port unique_port
     end
 
     launcher = launcher(conf)
     launcher.events.on_booted {
-      sleep 1.1 unless Puma.mri?
+      sleep 0.1 unless Puma::IS_MRI
       launcher.stop
     }
-    launcher.events.on_stopped { puts 'on_stopped called' }
+    msg = nil
+    launcher.events.on_stopped { msg = 'on_stopped called' }
 
-    out, = capture_io do
-      launcher.run
-    end
-    sleep 0.2 unless Puma.mri?
-    assert_equal 'on_stopped called', out.strip
+    launcher.run
+    sleep 0.1 unless Puma::IS_MRI
+
+    assert_equal 'on_stopped called', msg
   end
 
   private
