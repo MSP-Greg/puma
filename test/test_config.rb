@@ -1,13 +1,12 @@
 # frozen_string_literal: true
 
 require_relative "helper"
-require_relative "helpers/config_file"
+require_relative "helpers/test_puma"
 
 require "puma/configuration"
-require 'puma/log_writer'
-require 'rack'
+require "rack"
 
-class TestConfigFile < TestConfigFileBase
+class TestConfigFile < Minitest::Test
   parallelize_me!
 
   def test_default_max_threads
@@ -624,7 +623,7 @@ class TestConfigFile < TestConfigFileBase
 end
 
 # contains tests that cannot run parallel
-class TestConfigFileSingle < TestConfigFileBase
+class TestConfigFileSingle < Minitest::Test
   def test_custom_logger_from_DSL
     conf = Puma::Configuration.new { |c| c.load 'test/config/custom_logger.rb' }
 
@@ -636,7 +635,9 @@ class TestConfigFileSingle < TestConfigFileBase
 end
 
 # Thread unsafe modification of ENV
-class TestEnvModifificationConfig < TestConfigFileBase
+class TestEnvModifificationConfig < Minitest::Test
+  include TestPuma
+
   def test_double_bind_port
     port = (rand(10_000) + 30_000).to_s
     with_env("PORT" => port) do
@@ -651,7 +652,9 @@ class TestEnvModifificationConfig < TestConfigFileBase
   end
 end
 
-class TestConfigEnvVariables < TestConfigFileBase
+class TestConfigEnvVariables < Minitest::Test
+  include TestPuma
+
   def test_config_loads_correct_min_threads
     assert_equal 0, Puma::Configuration.new.options.default_options[:min_threads]
 
@@ -703,7 +706,9 @@ class TestConfigEnvVariables < TestConfigFileBase
   end
 end
 
-class TestConfigFileWithFakeEnv < TestConfigFileBase
+class TestConfigFileWithFakeEnv < Minitest::Test
+  include TestPuma
+
   def setup
     FileUtils.mkpath("config/puma")
     File.write("config/puma/fake-env.rb", "")
