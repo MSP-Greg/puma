@@ -2,6 +2,12 @@
 # Copyright (c) 2011 Evan Phoenix
 # Copyright (c) 2005 Zed A. Shaw
 
+require_relative "minitest/verbose"
+require "minitest/autorun"
+require "minitest/pride"
+require "minitest/proveit"
+require "minitest/stub_const"
+
 if RUBY_VERSION == '2.4.1'
   begin
     require 'stopgap_13632'
@@ -18,14 +24,6 @@ unless ::Puma::HAS_NATIVE_IO_WAIT
   require "io/wait"
 end
 
-# needs to be loaded before minitest for Ruby 2.7 and earlier
-require_relative "helpers/test_puma/assertions"
-
-require_relative "minitest/verbose"
-require "minitest/autorun"
-require "minitest/pride"
-require "minitest/proveit"
-require "minitest/stub_const"
 require "net/http"
 require_relative "helpers/apps"
 require_relative "helpers/tmp_path"
@@ -36,8 +34,6 @@ require "securerandom"
 Thread.abort_on_exception = true
 
 $debugging_hold = false   # needed for TestCLI#test_control_clustered
-
-STDOUT.syswrite "\n#{Process.pid}      Test Process\n"
 
 # used in various ssl test files, see test_puma_server_ssl.rb and
 # test_puma_localhost_authority.rb
@@ -236,8 +232,17 @@ end
 
 # shows skips summary instead of raw list
 module AggregatedResults
+  def start
+    TestPuma.log_ssl_info io
+    io.puts "Process.pid: #{Process.pid}\n"
+    if TestPuma::GITHUB_ACTIONS && !Puma::IS_WINDOWS
+      %x[echo 'PUMA_TEST_PID=#{Process.pid}' >> $GITHUB_ENV]
+    end
+    super
+  end
+
   def aggregated_results(io)
-    is_github_actions = ENV['GITHUB_ACTIONS'] == 'true'
+    is_github_actions = TestPuma::GITHUB_ACTIONS
     filtered_results = results.dup
     dash = "\u2500"
 
@@ -289,6 +294,10 @@ module AggregatedResults
     # get the final summary
     txt = super
 
+    # kill threads, only seems to be an issue with JRuby
+    TestPuma.thread_killer
+
+    # checks for defunct processes and tries to kill them, generates log data
     defunct = TestPuma.handle_defunct
     txt += defunct unless defunct.empty?
 
