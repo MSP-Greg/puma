@@ -44,7 +44,7 @@ module TestPuma
   #
   # #### Methods that process the response:
   # * `send_http_read_response` - sends a request and returns the whole response
-  # * `send_http_read_resp_body` - sends a request and returns the response body
+  # * `send_http_read_body` - sends a request and returns the response body
   # * `send_http_read_resp_headers` - sends a request and returns the response with the body removed as an array of lines
   #
   # All methods that process the response have the following optional keyword parameters:
@@ -84,7 +84,7 @@ module TestPuma
 
     def before_setup
       super
-      @ios_to_close ||= []
+      @skts_to_close = Queue.new
 
       @bind_host = nil
       @bind_path = nil
@@ -102,36 +102,36 @@ module TestPuma
       @ssl_socket_contexts = Queue.new
     end
 
-    # Closes all io's in `@ios_to_close`, also deletes them if they are files
-    def after_teardown
+    # Closes all client socket io's in `@skts_to_close`
+    def close_client_sockets
       # Errno::EBADF raised on macOS
-      @ios_to_close.each do |io|
+      until @skts_to_close.empty?
+        skt = @skts_to_close.pop
+        next unless skt
         begin
-          if io.respond_to? :sysclose # ssl connection
-            io.sync_close = true
-            io.sysclose unless io.closed?
+          if skt.respond_to? :sysclose # ssl connection
+            skt.sync_close = true
+            skt.sysclose unless skt.closed?
           else
-            io.close if io.respond_to?(:close) && !io.closed?
-            if io.is_a?(File) && (path = io&.path) && File.exist?(path)
-              File.unlink path
-            end
+            skt.close if skt.respond_to?(:close) && !skt.closed?
           end
         rescue Errno::EBADF, Errno::ENOENT, IOError
         ensure
-          io = nil
+          skt = nil
         end
       end
       # not sure about below, may help with gc...
-      @ios_to_close.clear
-      @ios_to_close = nil
+      @skts_to_close.close
+      @skts_to_close = nil
 
-      until @ssl_socket_contexts.empty?
-        ctx = @ssl_socket_contexts.pop
-        ctx = nil if ctx
+      if @ssl_socket_contexts
+        until @ssl_socket_contexts.empty?
+          ctx = @ssl_socket_contexts.pop
+          ctx = nil if ctx
+        end
+        @ssl_socket_contexts.close
+        @ssl_socket_contexts = nil
       end
-      @ssl_socket_contexts.close
-      @ssl_socket_contexts = nil
-      super
     end
 
     # rubocop: disable Metrics/ParameterLists
@@ -154,7 +154,7 @@ module TestPuma
     # @macro skt
     # @macro resp
     # @return [Response] the body portion of the HTTP response
-    def send_http_read_resp_body(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
+    def send_http_read_body(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: nil, timeout: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
       skt.read_body timeout: timeout, len: len
@@ -359,6 +359,7 @@ module TestPuma
         when :ssl, :tcp
           tcp = TCPSocket.new ip, port.to_i
           tcp.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1) if SET_TCP_NODELAY
+          @skts_to_close << tcp if bind_type == :ssl
           if ctx || bind_type == :ssl
             ctx ||= new_ctx
             @ssl_socket_contexts << ctx
@@ -375,9 +376,8 @@ module TestPuma
       skt.define_singleton_method :read_body, READ_BODY
       skt.define_singleton_method :<<, REQ_WRITE
 
-      @ios_to_close << skt
+      @skts_to_close << skt
       if ctx
-        @ios_to_close << tcp
         skt.session = session if session
         skt.sync_close = true
         skt.connect
