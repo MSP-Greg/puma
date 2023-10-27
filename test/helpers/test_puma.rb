@@ -12,7 +12,8 @@ module TestPuma
   DEBUGGING_INFO = Queue.new
   DEBUGGING_PIDS = {}
 
-  IS_GITHUB_ACTIONS = ENV['GITHUB_ACTIONS'] == 'true'
+  GITHUB_ACTIONS  = ENV['GITHUB_ACTIONS'] == 'true'
+  PUMA_TEST_DEBUG = ENV['PUMA_TEST_DEBUG'] == 'true'
 
   AFTER_RUN_OK = [false]
 
@@ -88,7 +89,7 @@ module TestPuma
         dir_temp += '/ci'
         Dir.mkdir(dir_temp) unless Dir.exist? dir_temp
         dir_temp
-      elsif ENV['GITHUB_ACTIONS'] && (rt_dir = ENV['RUNNER_TEMP'])
+      elsif GITHUB_ACTIONS && (rt_dir = ENV['RUNNER_TEMP'])
         # GitHub runners temp may be on a HD, rt_dir is always an SSD
         rt_dir
       else
@@ -174,20 +175,61 @@ module TestPuma
 
   def wait2_timeout(pid, timeout: 10)
     ary = nil
-    err_msg = "Timeout waiting Process.wait2 in after_teardown"
+    err_msg = "Waited #{timeout} seconds for Process.wait2"
 
-    th =  Thread.new do
+    th = Thread.new do
       begin
         ary = Process.wait2 pid
       rescue Errno::ECHILD
       end
-    end.join timeout
+    end
 
-    raise(Timeout::Error, err_msg) unless th
+    unless th.join(timeout)
+      th.kill
+      raise(Timeout::Error, err_msg)
+    end
+
     ary
   end
 
   module_function :kill_and_wait, :wait2_timeout
+
+  def self.log_ssl_info(io)
+    if ::Puma::HAS_SSL && PUMA_TEST_DEBUG
+      require "puma/minissl"
+
+      if PUMA_TEST_DEBUG
+        require "openssl" unless Object.const_defined? :OpenSSL
+        if Puma::IS_JRUBY
+          io.syswrite "\n#{RUBY_DESCRIPTION}\nRUBYOPT: #{ENV['RUBYOPT']}\n" \
+            "                         OpenSSL\n" \
+            "OPENSSL_LIBRARY_VERSION: #{OpenSSL::OPENSSL_LIBRARY_VERSION}\n" \
+            "        OPENSSL_VERSION: #{OpenSSL::OPENSSL_VERSION}\n\n"
+        else
+          io.syswrite "\n#{RUBY_DESCRIPTION}\nRUBYOPT: #{ENV['RUBYOPT']}\n" \
+            "                         Puma::MiniSSL                   Ruby OpenSSL\n" \
+            "OPENSSL_LIBRARY_VERSION: #{Puma::MiniSSL::OPENSSL_LIBRARY_VERSION.ljust 32}" \
+            "#{OpenSSL::OPENSSL_LIBRARY_VERSION}\n" \
+            "        OPENSSL_VERSION: #{Puma::MiniSSL::OPENSSL_VERSION.ljust 32}" \
+            "#{OpenSSL::OPENSSL_VERSION}\n\n"
+        end
+      end
+    end
+  end
+
+  # Only a problem with JRuby?
+  def self.thread_killer
+    return unless Puma::IS_JRUBY
+    puma_threads = Thread.list.select { |th| th.name&.start_with? 'puma' }
+
+    puma_threads.each do |th|
+      th.wakeup if th.alive?
+      th.join 1.0
+    end
+    puma_threads.each do |th|
+      Thread.kill th if th.alive?
+    end
+  end
 
   def self.handle_defunct
     defunct = {}
@@ -202,14 +244,12 @@ module TestPuma
       end
     end
 
-    if defunct.empty?
-      txt << format("\n\n%5d      Test Process\n", Process.pid)
-    else
+    unless defunct.empty?
       dash = "\u2500"
-      txt << (IS_GITHUB_ACTIONS ? "\n\n##[group]Child Processes:\n" :
+      txt << (GITHUB_ACTIONS ? "\n\n##[group]Child Processes:\n" :
         "\n\n#{dash * 40} Child Processes:\n")
 
-      txt << "#{Process.pid}      Test Process\n"
+      txt << format("%5d      Test Process\n", Process.pid)
 
       # list all children, kill test processes
       defunct.each do |pid, status|
@@ -228,23 +268,24 @@ module TestPuma
         end
       end
 
-      txt << (IS_GITHUB_ACTIONS ? "::[endgroup]\n\n" : "#{dash * 57}\n\n")
+      txt << (GITHUB_ACTIONS ? "::[endgroup]\n\n" : "#{dash * 57}\n\n")
     end
+
     TestPuma::AFTER_RUN_OK[0] = true
     txt
   end
 
   def self.debugging_info
     info = ''
-    if AFTER_RUN_OK[0] && ENV['PUMA_TEST_DEBUG'] && !DEBUGGING_INFO.empty?
+    if AFTER_RUN_OK[0] && PUMA_TEST_DEBUG && !DEBUGGING_INFO.empty?
       ary = Array.new(DEBUGGING_INFO.size) { DEBUGGING_INFO.pop }
       ary.sort!
       out = ary.join.strip
       unless out.empty?
         dash = "\u2500"
-        wid = IS_GITHUB_ACTIONS ? 88 : 90
+        wid = GITHUB_ACTIONS ? 88 : 90
         txt = " Debugging Info #{dash * 2}".rjust wid, dash
-        if IS_GITHUB_ACTIONS
+        if GITHUB_ACTIONS
           info = "\n\n##[group]#{txt}\n#{out}\n#{dash * wid}\n\n::[endgroup]\n\n"
         else
           info = "\n\n#{txt}\n#{out}\n#{dash * wid}\n\n"
