@@ -45,7 +45,7 @@ module TestPuma
   # #### Methods that process the response:
   # * `send_http_read_response` - sends a request and returns the whole response
   # * `send_http_read_body` - sends a request and returns the response body
-  # * `send_http_read_resp_headers` - sends a request and returns the response with the body removed as an array of lines
+  # * `send_http_read_headers` - sends a request and returns the response with the body removed as an array of lines
   #
   # All methods that process the response have the following optional keyword parameters:
   # * `timeout:` - total socket read timeout, defaults to `RESP_READ_TIMEOUT` (`Float`)
@@ -142,7 +142,7 @@ module TestPuma
     # @macro skt
     # @macro resp
     # @return [Array<String>] array of header lines in the response
-    def send_http_read_resp_headers(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
+    def send_http_read_headers(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: nil, timeout: nil)
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
       resp = skt.read_response timeout: timeout, len: len
