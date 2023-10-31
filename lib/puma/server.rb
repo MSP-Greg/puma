@@ -209,7 +209,7 @@ module Puma
 
     # @!attribute [r] backlog
     def backlog
-      @thread_pool&.backlog
+      @thread_pool&.backlog || 0
     end
 
     # @!attribute [r] running
@@ -389,7 +389,13 @@ module Puma
           @reactor.shutdown
         end
 
-        graceful_shutdown if @status == :stop || @status == :restart
+        if @status == :stop || @status == :restart
+          graceful_shutdown
+        elsif @status == :halt
+          @binder&.close
+          @thread_pool&.instance_variable_set :@shutdown_grace_time, 1
+          @thread_pool&.shutdown 0.2
+        end
       rescue Exception => e
         @log_writer.unknown_error e, nil, "Exception handling servers"
       ensure
@@ -638,7 +644,7 @@ module Puma
     end
 
     def shutting_down?
-      @status == :stop || @status == :restart
+      @status == :stop || @status == :halt || @status == :restart
     end
 
     # List of methods invoked by #stats.
