@@ -148,15 +148,15 @@ jobs:
       matrix:
         include:
           # tto - test timeout
-          - { tto: 8 , os: ubuntu-22.04 , ruby: jruby }
-          - { tto: 8 , os: ubuntu-22.04 , ruby: jruby, no-ssl: ' no SSL' }
-          - { tto: 8 , os: ubuntu-22.04 , ruby: jruby-head      , allow-failure: true }
-          - { tto: 8 , os: ubuntu-20.04 , ruby: truffleruby      }
-          - { tto: 8 , os: ubuntu-20.04 , ruby: truffleruby-head }
-          - { tto: 8 , os: ubuntu-22.04 , ruby: truffleruby      }
-          - { tto: 8 , os: ubuntu-22.04 , ruby: truffleruby-head }
-          - { tto: 9 , os: macos-13     , ruby: jruby           , allow-failure: true }
-          - { tto: 8 , os: macos-13     , ruby: truffleruby     , allow-failure: true }
+          - { tto: 7 , os: ubuntu-22.04 , ruby: jruby }
+          - { tto: 7 , os: ubuntu-22.04 , ruby: jruby, no-ssl: ' no SSL' }
+          - { tto: 7 , os: ubuntu-22.04 , ruby: jruby-head       }
+          - { tto: 7 , os: ubuntu-20.04 , ruby: truffleruby      }
+          - { tto: 7 , os: ubuntu-20.04 , ruby: truffleruby-head }
+          - { tto: 7 , os: ubuntu-22.04 , ruby: truffleruby      }
+          - { tto: 7 , os: ubuntu-22.04 , ruby: truffleruby-head }
+          - { tto: 7 , os: macos-13     , ruby: jruby            }
+          - { tto: 7 , os: macos-13     , ruby: truffleruby      }
 
     steps:
       - name: repo checkout
