@@ -36,7 +36,7 @@ module Puma
       @not_full = ConditionVariable.new
       @mutex = Mutex.new
 
-      @todo = []
+      @todo = Queue.new
 
       @spawned = 0
       @waiting = 0
@@ -88,7 +88,7 @@ module Puma
     # How many objects have yet to be processed by the pool?
     #
     def backlog
-      with_mutex { @todo.size }
+      @todo.size
     end
 
     # @!attribute [r] pool_capacity
@@ -99,7 +99,7 @@ module Puma
     # @!attribute [r] busy_threads
     # @version 5.0.0
     def busy_threads
-      with_mutex { @spawned - @waiting + @todo.size }
+      @todo.size + with_mutex { @spawned - @waiting }
     end
 
     # :nodoc:
@@ -143,9 +143,9 @@ module Puma
                 @waiting -= 1
               end
             end
-
-            work = todo.shift
           end
+
+          work = todo.pop
 
           if @clean_thread_locals
             ThreadPool.clean_thread_locals
@@ -214,9 +214,7 @@ module Puma
 
     # @version 5.0.0
     def with_mutex(&block)
-      @mutex.owned? ?
-        yield :
-        @mutex.synchronize(&block)
+      @mutex.owned? ? yield : @mutex.synchronize(&block)
     end
 
     # Add +work+ to the todo list for a Thread to pickup and process.
