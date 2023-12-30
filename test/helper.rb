@@ -123,6 +123,9 @@ if ENV['CI']
 
     GITHUB_STEP_SUMMARY_MUTEX = Mutex.new
 
+    GITHUB_WORKSPACE =  ENV['GITHUB_WORKSPACE']
+    RUNNER_TOOL_CACHE = ENV['RUNNER_TOOL_CACHE']
+
     Minitest::Retry.on_failure do |klass, test_name, result|
       full_method = "#{klass}##{test_name}"
       result_str = result.to_s.gsub(/#{full_method}:?\s*/, '').dup
@@ -130,13 +133,16 @@ if ENV['CI']
       issue = result_str[/\A[^\n]+/]
       result_str.gsub!(issue, '')
       # shorten directory lists
-      result_str.gsub! ENV['GITHUB_WORKSPACE'], 'puma'
-      result_str.gsub! ENV['RUNNER_TOOL_CACHE'], ''
+      result_str.gsub! GITHUB_WORKSPACE, 'puma'
+      result_str.gsub! RUNNER_TOOL_CACHE, ''
       # remove indent
       result_str.gsub!(/^ +/, '')
       str = "\n**#{full_method}**\n**#{issue}**\n```\n#{result_str.strip}\n```\n"
       GITHUB_STEP_SUMMARY_MUTEX.synchronize {
-        File.write SUMMARY_FILE, str, mode: 'a+'
+        begin
+          File.write SUMMARY_FILE, str, mode: 'a+'
+        rescue Errno::EBADF
+        end
       }
     end
   end
