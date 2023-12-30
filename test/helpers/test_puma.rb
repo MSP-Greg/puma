@@ -61,7 +61,7 @@ module TestPuma
   def after_teardown
     @files_to_unlink&.each do |path|
       begin
-        File&.unlink path
+        File.unlink path
       rescue Errno::ENOENT
       end
     end
