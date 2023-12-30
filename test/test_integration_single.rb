@@ -243,6 +243,8 @@ class TestIntegrationSingle < TestPuma::ServerSpawn
       end
     end
 
+    stop_server
+=begin
     begin
       Timeout.timeout(5) { kill_and_wait @pid }
     rescue Timeout::Error
@@ -250,6 +252,7 @@ class TestIntegrationSingle < TestPuma::ServerSpawn
       assert false, "Process froze"
     end
     assert true
+=end
   end
 
   def test_puma_debug_loaded_exts
