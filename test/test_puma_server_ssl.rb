@@ -133,7 +133,8 @@ class TestPumaServerSSL < TestPuma::ServerInProcess
     server_run
 
     tcp = Thread.new do
-      assert_raises(Errno::ECONNREFUSED, EOFError, Timeout::Error) do
+      # various errors are raised by various combinations of Ruby and OpenSSL
+      assert_raises(Errno::EBADF, Errno::ECONNREFUSED, Errno::EPIPE, EOFError, Timeout::Error) do
         socket = new_socket(bind_type: :tcp) << GET_11
         body_http = socket.read_body timeout: 4
       end
