@@ -109,7 +109,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
 
     server_spawn "-w#{workers} test/rackup/hello.ru"
 
-    _, status = stop_server
+    _, status = stop_server signal: :SIGTERM
 
     exit_code = Puma::IS_OSX ? status.to_i : status.exitstatus
 
@@ -265,6 +265,8 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
       send_http
     end
     assert wait_for_server_to_include('Gracefully shutting down workers')
+    @server = nil
+    @pid = nil
   end
 
   def test_worker_index_is_with_in_options_limit
@@ -382,7 +384,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
     # below is so all of @server_log isn't output for failure
     refute @server_log[/.*Terminating timed out worker.*/]
   ensure
-    stop_server timeout: 20
+    stop_server timeout: 20, signal: :SIGINT
   end
 
   def test_prune_bundler_with_multiple_workers
@@ -636,8 +638,8 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
 
   private
 
-  def worker_timeout(timeout, iterations, details, config)
-    server_spawn "-w#{workers} -t1:1 test/rackup/hello.ru", config: config
+  def worker_timeout(timeout, iterations, details, config, log: nil)
+    server_spawn "-w#{workers} -t1:1 test/rackup/hello.ru", config: config, log: log
 
     pids = []
     re = /Terminating timed out worker \(Worker \d+ #{details}\): (\d+)/
