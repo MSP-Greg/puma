@@ -9,7 +9,7 @@ class WithoutBacktraceError < StandardError
 end
 
 class TestPumaServer < TestPuma::ServerInProcess
-  parallelize_me! unless ::Puma::IS_JRUBY
+  parallelize_me! # unless ::Puma::IS_JRUBY
 
   STATUS_CODES = ::Puma::HTTP_STATUS_CODES
 
