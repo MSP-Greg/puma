@@ -316,6 +316,11 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
       sleep 0.004
     end
 
+    #sockets += send_http_array(req = GET_11, len, dly: 0.000_1, max_retries: 5)
+    sockets += send_http_array(100, dly: 0.004)
+
+    read_response_array sockets
+=begin
     100.times {
       sockets << send_http
       sleep 0.004
@@ -331,6 +336,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
     else
       sockets.each { |s| s.read_body }
     end
+=end
 
     refute_includes pids, get_worker_pids(1, wrkrs - 1)
   ensure
@@ -375,7 +381,8 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
 
     # below is so all of @server_log isn't output for failure
     refute @server_log[/.*Terminating timed out worker.*/]
-    stop_server timeout: 20, signal: :INT
+  ensure
+    stop_server timeout: 20
   end
 
   def test_prune_bundler_with_multiple_workers
