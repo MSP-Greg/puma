@@ -209,7 +209,7 @@ class TestIntegrationPumactl < TestPuma::ServerSpawn
 
   def control_gc_stats(type)
     set_control_type type
-    server_spawn "-t1:1 -q -S #{state_path} test/rackup/hello.ru"
+    server_spawn "-t1:4 -q -S #{state_path} test/rackup/hello.ru"
 
     key = Puma::IS_MRI || TRUFFLE_HEAD ? "count" : "used"
 
@@ -218,7 +218,10 @@ class TestIntegrationPumactl < TestPuma::ServerSpawn
     gc_before = before[key].to_i
 
     requests = Puma::IS_JRUBY ? 15 : 2 # JRuby needs to be coaxed to run GC?
-    requests.times { send_http_read_response GET_10 }
+
+    socket_array = send_http_array(GET_10, requests, dly: 0, max_retries: 5)
+
+    read_response_array socket_array
 
     resp_io = cli_pumactl "gc"
     # below shows gc was called (200 reply)
@@ -229,7 +232,7 @@ class TestIntegrationPumactl < TestPuma::ServerSpawn
     gc_after = after[key].to_i
 
     # Hitting the /gc route should increment the count by 1
-    if key == "count"
+    if key == "count" # MRI or TruffleRuby head
       assert_operator gc_before, :<, gc_after, "make sure a gc has happened"
     else
       refute_equal gc_before, gc_after, "make sure a gc has happened"
