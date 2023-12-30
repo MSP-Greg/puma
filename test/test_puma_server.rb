@@ -13,6 +13,8 @@ class TestPumaServer < TestPuma::ServerInProcess
 
   STATUS_CODES = ::Puma::HTTP_STATUS_CODES
 
+  HTTP_11_200_OK = 'HTTP/1.1 200 OK'
+
   def test_http10_req_to_http10_resp
     server_run app: ->(env) { [200, {}, [env["SERVER_PROTOCOL"]]] }
 
@@ -44,7 +46,7 @@ class TestPumaServer < TestPuma::ServerInProcess
     server_run app: ->(env) { [200, {}, [env["SERVER_PROTOCOL"]]] }
 
     response = send_http_read_response GET_11
-    assert_equal "HTTP/1.1 200 OK", response.status
+    assert_equal HTTP_11_200_OK, response.status
     assert_equal "HTTP/1.1"       , response.body
   end
 
@@ -572,7 +574,7 @@ class TestPumaServer < TestPuma::ServerInProcess
     sleep 0.5
     socket << "!"
 
-    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
+    assert_equal HTTP_11_200_OK, socket.read_response.status
   end
 
   # https://github.com/puma/puma/issues/2574
@@ -609,7 +611,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     socket << "hello world!"
 
-    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
+    assert_equal HTTP_11_200_OK, socket.read_response.status
   end
 
   def test_idle_timeout_between_first_request_data
@@ -623,7 +625,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     socket << " world!"
 
-    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
+    assert_equal HTTP_11_200_OK, socket.read_response.status
   end
 
   def test_idle_timeout_after_first_request
@@ -633,7 +635,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     socket << "hello world!"
 
-    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
+    assert_equal HTTP_11_200_OK, socket.read_response.status
 
     sleep 1.15
 
@@ -654,7 +656,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     socket << "hello world!"
 
-    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
+    assert_equal HTTP_11_200_OK, socket.read_response.status
 
     sleep 0.5
 
@@ -667,7 +669,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     socket << " world!"
 
-    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
+    assert_equal HTTP_11_200_OK, socket.read_response.status
 
     sleep 1.15
 
@@ -688,7 +690,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     socket << "hello world!"
 
-    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
+    assert_equal HTTP_11_200_OK, socket.read_response.status
 
     sleep 0.5
 
@@ -697,7 +699,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     socket << "hello world!"
 
-    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
+    assert_equal HTTP_11_200_OK, socket.read_response.status
 
     sleep 1.15
 
@@ -725,7 +727,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
 
-    assert_equal "HTTP/1.1 200 OK\r\nContent-Type: plain/text\r\nConnection: close\r\nContent-Length: 5\r\n\r\nhello", data
+    assert_equal "#{HTTP_11_200_OK}\r\nContent-Type: plain/text\r\nConnection: close\r\nContent-Length: 5\r\n\r\nhello", data
   end
 
   def test_http_11_keep_alive_without_body
@@ -796,7 +798,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nExpect: 100-continue\r\n\r\n"
 
-    assert_equal "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "HTTP/1.1 100 Continue\r\n\r\n#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
   end
 
   def test_chunked_request
@@ -812,7 +814,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     response = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: gzip,chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", response
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", response
     assert_equal "hello", body
     assert_equal "5", content_length
     assert_nil transfer_encoding
@@ -842,7 +844,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
       data = send_http_read_response request
 
-      assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+      assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
       assert_equal size, Integer(content_length)
       assert_equal request_body, body
     end
@@ -920,7 +922,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = socket.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
     assert_equal "5", content_length
   end
@@ -941,7 +943,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = socket.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
     assert_equal "5", content_length
   end
@@ -962,7 +964,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = socket.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
     assert_equal "5", content_length
   end
@@ -983,7 +985,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = socket.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
     assert_equal "5", content_length
   end
@@ -1004,7 +1006,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = socket.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
     assert_equal "5", content_length
   end
@@ -1034,7 +1036,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = socket.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal (part1 + 'b'), body
     assert_equal "4201", content_length
   end
@@ -1056,7 +1058,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = socket.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal 'hello', body
     assert_equal "5", content_length
   end
@@ -1078,7 +1080,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = socket.read_response
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal 'hello', body
     assert_equal "5", content_length
   end
@@ -1132,7 +1134,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\nTransfer-Encoding: Chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
     assert_equal "hello", body
     assert_equal "5", content_length
   end
@@ -1913,7 +1915,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     data = send_http_read_all smuggled_payload
 
-    resp = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n" * 2
+    resp = "#{HTTP_11_200_OK}\r\nContent-Length: 0\r\n\r\n" * 2
 
     assert_equal resp, data
   end
@@ -1949,6 +1951,6 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     assert_includes body, "GET /404 HTTP/1.1\r\n"
     assert_includes body, "Content-Length: 144\r\n"
-    assert_equal "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "#{HTTP_11_200_OK}\r\nContent-Length: 0\r\n\r\n", data
   end
 end
