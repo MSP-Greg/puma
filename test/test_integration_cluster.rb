@@ -284,11 +284,11 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
 
     worker_pid_was_present = File.file? "t3-worker-2-pid"
 
-    stop_server(Integer(File.read("t3-worker-2-pid")))
+    stop_server(Integer(File.read "t3-worker-2-pid"), signal: :SIGTERM)
 
     worker_index_within_number_of_workers = !File.file?("t3-worker-3-pid")
 
-    stop_server(Integer(File.read("t3-pid")))
+    stop_server(Integer(File.read "t3-pid"))
 
     assert(worker_pid_was_present)
     assert(worker_index_within_number_of_workers)
@@ -384,7 +384,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
     # below is so all of @server_log isn't output for failure
     refute @server_log[/.*Terminating timed out worker.*/]
   ensure
-    stop_server timeout: 20, signal: :SIGINT
+    stop_server timeout: 15, signal: :SIGINT
   end
 
   def test_prune_bundler_with_multiple_workers
@@ -653,7 +653,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
 
   # Sends 48 requests, 12 per second.  Send 12, then :TERM server, then send another 36.
   def term_closes_listeners
-    skip_unless_signal_exist? :TERM
+    skip_unless_signal_exist? :SIGTERM
     server_spawn "-w#{workers} -t5:5 -q test/rackup/sleep_pid.ru"
     replies = []
     mutex = Mutex.new
@@ -665,7 +665,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
     queue = Queue.new
 
     thread_requests = request_ary_thread(reqs, 1.0/div, 1, div, mutex, queue, replies) do
-      Process.kill :TERM, @pid
+      Process.kill :SIGTERM, @pid
       mutex.synchronize { replies[div] = :term_sent }
     end
 
