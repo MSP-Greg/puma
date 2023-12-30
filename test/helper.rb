@@ -124,7 +124,7 @@ if ENV['CI']
     GITHUB_STEP_SUMMARY_MUTEX = Mutex.new
 
     GITHUB_WORKSPACE =  ENV['GITHUB_WORKSPACE']
-    RUNNER_TOOL_CACHE = ENV['RUNNER_TOOL_CACHE']
+    RUNNER_TOOL_CACHE = "#{ENV['RUNNER_TOOL_CACHE']}/"
 
     Minitest::Retry.on_failure do |klass, test_name, result|
       full_method = "#{klass}##{test_name}"
@@ -133,6 +133,7 @@ if ENV['CI']
         .gsub(/\A(Failure:|Error:)\s/, '\1 ')
         .gsub(GITHUB_WORKSPACE, 'puma')
         .gsub(RUNNER_TOOL_CACHE, '')
+        .gsub('/home/runner/.rubies/', '')
         .gsub(/^ +/, '').strip
 
       issue, result_str = result_str.split "\n", 2
