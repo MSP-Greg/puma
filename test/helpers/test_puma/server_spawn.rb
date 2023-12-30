@@ -42,16 +42,16 @@ module TestPuma
             TestPuma::DEBUGGING_INFO << "ControlCLI system exit #{full_name}\n"
           end
         elsif @pid && !Puma::IS_WINDOWS
-          stop_server signal: :INT
+          stop_server signal: :SIGINT
         end
       end
 
       if @spawn_pid && @spawn_pid != @pid
-        stop_server @spawn_pid, signal: :INT
+        stop_server @spawn_pid, signal: :SIGINT
       end
 
       unless @cli_pumactl_spawn_pids.empty?
-        @cli_pumactl_spawn_pids.each { |pid| kill_and_wait pid, signal: :INT }
+        @cli_pumactl_spawn_pids.each { |pid| kill_and_wait pid, signal: :SIGINT }
       end
 
       if @bind_path
@@ -110,10 +110,7 @@ module TestPuma
       @server
     end
 
-    # rescue statements are just in case method is called with a server
-    # that is already stopped/killed, especially since Process.wait2 is
-    # blocking
-    def stop_server(pid = @pid, signal: :TERM,  timeout: 10)
+    def stop_server(pid = @pid, signal: :SIGINT,  timeout: 10, log: nil)
       ary = kill_and_wait pid, signal: signal
 
       if pid == @pid && @spawn_pid != @pid && ary.nil?
@@ -150,7 +147,7 @@ module TestPuma
     def restart_server(socket, log: false)
       Process.kill :USR2, @pid
       socket << GET_11
-      wait_for_server_to_include 'Ctrl-C', log: log
+      wait_for_server_to_include 'Ctrl-C', log: log, timeout: 15
     end
 
     # Returns true if and when server log includes str.  Will timeout otherwise.
@@ -159,8 +156,9 @@ module TestPuma
       timeout_time = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
       line = ''
 
-      puts "\n——— #{full_name} waiting for '#{str}'" if log
+      STDOUT.syswrite "\n——— #{full_name} waiting for '#{str}'" if log
       line = server_gets(str, timeout_time, timeout, log: log) until line&.include?(str)
+      STDOUT.syswrite "\n" if log
       true
     end
 
@@ -171,8 +169,9 @@ module TestPuma
       timeout_time = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
       line = ''
 
-      puts "\n——— #{full_name} waiting for '#{re.inspect}'" if log
+      STDOUT.syswrite "\n——— #{full_name} waiting for '#{re.inspect}'" if log
       line = server_gets(re, timeout_time, timeout, log: log) until line&.match?(re)
+      STDOUT.syswrite "\n" if log
       idx ? line[re, idx] : line
     end
 
@@ -192,7 +191,7 @@ module TestPuma
       begin
         if @server.wait_readable(LOG_WAIT_READ) and line = @server&.gets
           @server_log << line
-          puts "    #{line}" if log
+          STDOUT.syswrite "\n    #{line.rstrip}" if log
         end
       rescue StandardError => e
         error_retries += 1
