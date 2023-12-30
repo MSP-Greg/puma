@@ -45,7 +45,7 @@ class TestIntegrationSingle < TestPuma::ServerSpawn
 
     server_spawn "test/rackup/hello.ru"
 
-    _, status = stop_server
+    _, status = stop_server signal: :SIGTERM
 
     exit_code = ::Puma::IS_OSX ? status.to_i : status.exitstatus
 
@@ -73,7 +73,7 @@ class TestIntegrationSingle < TestPuma::ServerSpawn
     server_spawn "test/rackup/hello.ru",
       config: "\nraise_exception_on_sigterm false\n"
 
-    _, status = stop_server
+    _, status = stop_server signal: :SIGTERM
 
     exit_code = ::Puma::IS_OSX ? status&.to_i : status&.exitstatus
 
