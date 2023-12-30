@@ -128,16 +128,16 @@ if ENV['CI']
 
     Minitest::Retry.on_failure do |klass, test_name, result|
       full_method = "#{klass}##{test_name}"
-      result_str = result.to_s.gsub(/#{full_method}:?\s*/, '').dup
-      result_str.gsub!(/\A(Failure:|Error:)\s/, '\1 ')
-      issue = result_str[/\A[^\n]+/]
-      result_str.gsub!(issue, '')
-      # shorten directory lists
-      result_str.gsub! GITHUB_WORKSPACE, 'puma'
-      result_str.gsub! RUNNER_TOOL_CACHE, ''
-      # remove indent
-      result_str.gsub!(/^ +/, '')
-      str = "\n**#{full_method}**\n**#{issue}**\n```\n#{result_str.strip}\n```\n"
+      result_str = result.to_s
+        .gsub(/#{full_method}:?\s*/, '')
+        .gsub(/\A(Failure:|Error:)\s/, '\1 ')
+        .gsub(GITHUB_WORKSPACE, 'puma')
+        .gsub(RUNNER_TOOL_CACHE, '')
+        .gsub(/^ +/, '').strip
+
+      issue, result_str = result_str.split "\n", 2
+      str = "\n**#{full_method}**\n**#{issue}**\n```\n#{result_str}\n```\n"
+
       GITHUB_STEP_SUMMARY_MUTEX.synchronize {
         begin
           File.write SUMMARY_FILE, str, mode: 'a+'
