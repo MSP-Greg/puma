@@ -164,8 +164,8 @@ module TestPuma
   end
 
   def kill_and_wait(pid, signal: nil, timeout: 10)
-    signal ||= :TERM
-    signal = :KILL if Puma::IS_WINDOWS
+    signal ||= :SIGINT
+    signal = :SIGKILL if Puma::IS_WINDOWS
     begin
       Process.kill signal, pid
     rescue Errno::ESRCH
@@ -185,7 +185,7 @@ module TestPuma
     end
 
     unless th.join(timeout)
-      th.kill
+      Thread.kill th
       raise(Timeout::Error, err_msg)
     end
 
