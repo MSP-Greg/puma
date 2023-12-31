@@ -184,19 +184,6 @@ module TestPuma
       end
     end
 
-=begin
-    th = Thread.new do
-      begin
-        ary = Process.wait2 pid
-      rescue Errno::ECHILD
-      end
-    end
-
-    unless th.join(timeout)
-      Thread.kill th
-      raise Timeout::Error, err_msg
-    end
-=end
     ary
   end
 
