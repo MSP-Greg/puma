@@ -46,7 +46,7 @@ module TestPuma
           end
         elsif @pid && !Puma::IS_WINDOWS
           # Graceful shutdown/cleanup
-          signal = @server_stopped ? :SIGKILL : :SIGTERM
+          signal = @server_stopped ? :SIGKILL : :SIGINT
           stop_server signal: signal
         end
       end
