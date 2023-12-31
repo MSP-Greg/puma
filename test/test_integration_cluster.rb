@@ -322,24 +322,6 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
     sockets += send_http_array(100, dly: 0.004)
 
     read_response_array sockets
-=begin
-    100.times {
-      sockets << send_http
-      sleep 0.004
-    }
-
-    if ::Puma::IS_OSX # intermittently raises EOFError
-      sockets.each do |s|
-        begin
-          s.read_body
-        rescue EOFError
-        end
-      end
-    else
-      sockets.each { |s| s.read_body }
-    end
-=end
-
     refute_includes pids, get_worker_pids(1, wrkrs - 1)
   ensure
     refork_io&.close
@@ -632,8 +614,8 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
   def test_puma_debug_loaded_exts
     server_spawn "-w#{workers} test/rackup/hello.ru", puma_debug: true
 
-    assert wait_for_server_to_include('Loaded Extensions - worker 0:')
     assert wait_for_server_to_include('Loaded Extensions - master:')
+    assert_includes @server_log, 'Loaded Extensions - worker 0:'
   end
 
   private
