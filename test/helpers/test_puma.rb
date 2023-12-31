@@ -177,6 +177,14 @@ module TestPuma
     ary = nil
     err_msg = "Waited #{timeout} seconds for Process.wait2"
 
+    ::Timeout.timeout(timeout, Timeout::Error, err_msg) do
+      begin
+        ary = Process.wait2 pid
+      rescue Errno::ECHILD
+      end
+    end
+
+=begin
     th = Thread.new do
       begin
         ary = Process.wait2 pid
@@ -186,9 +194,9 @@ module TestPuma
 
     unless th.join(timeout)
       Thread.kill th
-      raise(Timeout::Error, err_msg)
+      raise Timeout::Error, err_msg
     end
-
+=end
     ary
   end
 
