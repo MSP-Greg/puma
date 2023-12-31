@@ -23,6 +23,8 @@ module TestPuma
 
     DFLT_RUBYOPT = ENV['RUBYOPT']
 
+    MASTER_PID_RE = /(?:Master|      ) PID: (\d+)$/
+
     def before_setup
       super
       @server_err = nil
@@ -45,9 +47,6 @@ module TestPuma
         elsif @pid && !Puma::IS_WINDOWS
           # Graceful shutdown/cleanup
           signal = @server_stopped ? :SIGKILL : :SIGTERM
-if @server_stopped
-STDOUT.syswrite "\n---------------------- Force shutdown\n"
-end
           stop_server signal: signal
         end
       end
@@ -109,8 +108,9 @@ end
 
       @server, @server_err, @spawn_pid = spawn_cmd env, cmd.strip
 
+      @pid = wait_for_server_to_match(MASTER_PID_RE, 1, timeout: timeout, log: log)&.to_i || @spawn_pid
       wait_for_server_to_include('Ctrl-C', timeout: timeout, log: log) unless no_wait
-      @pid = @server_log[/(?:Master|      ) PID: (\d+)$/, 1]&.to_i || @spawn_pid
+
       TestPuma::DEBUGGING_PIDS[@pid] = full_name
       TestPuma::DEBUGGING_PIDS[@spawn_pid] = "spawn #{full_name}" if @spawn_pid != @pid
       @server
