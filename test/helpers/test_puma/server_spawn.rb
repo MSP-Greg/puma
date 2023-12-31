@@ -30,6 +30,7 @@ module TestPuma
       @pid = nil
       @spawn_pid = nil
       @cli_pumactl_spawn_pids = []
+      @server_stopped = nil
     end
 
     def after_teardown
@@ -42,7 +43,12 @@ module TestPuma
             TestPuma::DEBUGGING_INFO << "ControlCLI system exit #{full_name}\n"
           end
         elsif @pid && !Puma::IS_WINDOWS
-          stop_server signal: :SIGINT
+          # Graceful shutdown/cleanup
+          signal = @server_stopped ? :SIGKILL : :SIGTERM
+if @server_stopped
+STDOUT.syswrite "\n---------------------- Force shutdown\n"
+end
+          stop_server signal: signal
         end
       end
 
@@ -111,6 +117,7 @@ module TestPuma
     end
 
     def stop_server(pid = @pid, signal: :SIGINT,  timeout: 10, log: nil)
+      @server_stopped = true
       ary = kill_and_wait pid, signal: signal
 
       if pid == @pid && @spawn_pid != @pid && ary.nil?
