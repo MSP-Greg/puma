@@ -233,13 +233,13 @@ module TestPuma
   def self.test_results_summary(summary_line, results, options)
     txt = summary_line.dup
 
-    failures = results.reject(&:skipped?)
+    failures = results.reject(&:skipped?).reject(&:passed?)
 
     unless failures.empty?
       txt << "Errors & Failures:\n"
 
       failures.each_with_index { |result, i|
-        result_str = result
+        result_str = result.to_s
           .gsub(GITHUB_WORKSPACE, 'puma')
           .gsub(RUNNER_TOOL_CACHE, '')
           .gsub('/home/runner/.rubies/', '')
