@@ -63,7 +63,7 @@ module TestPuma
   TOKEN = "xxyyzz"
 
   if GITHUB_ACTIONS
-    RETRY_LOGGING = Hash.new { |h, k| h[k] = ''.dup }
+    RETRY_LOGGING = Hash.new { |h, k| h[k] = +'' }
 
     SUMMARY_FILE = ENV['GITHUB_STEP_SUMMARY']
 
