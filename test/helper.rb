@@ -115,36 +115,11 @@ Minitest::Test.prepend TimeoutEveryTestCase
 if ENV['CI']
   require 'minitest/retry'
 
-  SUMMARY_FILE = ENV['GITHUB_STEP_SUMMARY']
+  Minitest::Retry.use! verbose: false
 
-  Minitest::Retry.use!
-
-  if SUMMARY_FILE && ENV['GITHUB_ACTIONS'] == 'true'
-
-    GITHUB_STEP_SUMMARY_MUTEX = Mutex.new
-
-    GITHUB_WORKSPACE =  ENV['GITHUB_WORKSPACE']
-    RUNNER_TOOL_CACHE = "#{ENV['RUNNER_TOOL_CACHE']}/"
-
+  if ENV['GITHUB_ACTIONS'] == 'true'
     Minitest::Retry.on_failure do |klass, test_name, result|
-      full_method = "#{klass}##{test_name}"
-      result_str = result.to_s
-        .gsub(/#{full_method}:?\s*/, '')
-        .gsub(/\A(Failure:|Error:)\s/, '\1 ')
-        .gsub(GITHUB_WORKSPACE, 'puma')
-        .gsub(RUNNER_TOOL_CACHE, '')
-        .gsub('/home/runner/.rubies/', '')
-        .gsub(/^ +/, '').strip
-
-      issue, result_str = result_str.split "\n", 2
-      str = "\n**#{full_method}**\n**#{issue}**\n```\n#{result_str}\n```\n"
-
-      GITHUB_STEP_SUMMARY_MUTEX.synchronize {
-        begin
-          File.write SUMMARY_FILE, str, mode: 'a+'
-        rescue Errno::EBADF
-        end
-      }
+      TestPuma.retry_on_failure(klass, test_name, result)
     end
   end
 end
@@ -241,78 +216,41 @@ end
 module AggregatedResults
   def start
     TestPuma.log_ssl_info io
-    io.write "Process.pid: #{Process.pid}\n"
+    io << "Minitest Parallel Threads: #{Minitest.parallel_executor.size}\n"
+    io << "Test Process.pid: #{Process.pid}\n\n"
     if TestPuma::GITHUB_ACTIONS
-      io.write "##[group]Test Results:\n"
+      io << "##[group]Test Results:\n"
       %x[echo 'PUMA_TEST_PID=#{Process.pid}' >> $GITHUB_ENV] unless Puma::IS_WINDOWS
     end
     super
   end
 
+  # override, since we write our own failure, error, and skip summary
   def aggregated_results(io)
-    is_github_actions = TestPuma::GITHUB_ACTIONS
-    filtered_results = results.dup
-    dash = "\u2500"
-
-    if options[:verbose]
-      skips = filtered_results.select(&:skipped?)
-      unless skips.empty?
-        if is_github_actions
-          io.write "::[endgroup]\n\n##[group]Skips:\n"
-        else
-          io.write "\nSkips:\n"
-        end
-        hsh = skips.group_by { |f| f.failures.first.error.message }
-        hsh_s = {}
-        hsh.each { |k, ary|
-          hsh_s[k] = ary.map { |s|
-            [s.source_location, s.klass, s.name]
-          }.sort_by(&:first)
-        }
-        num = 0
-        hsh_s = hsh_s.sort.to_h
-        hsh_s.each { |k,v|
-          io.write " #{k} #{dash * 2}\n".rjust 91, dash
-          hsh_1 = v.group_by { |i| i.first.first }
-          hsh_1.each { |k1,v1|
-            io.write "  #{k1[/\/test\/(.*)/,1]}\n"
-            v1.each { |item|
-              num += 1
-              io.write format("    %3s %-5s #{item[1]} #{item[2]}\n", "#{num})", ":#{item[0][1]}")
-            }
-            io.write "\n"
-          }
-        }
-        io.write "::[endgroup]\n" if is_github_actions
-      end
-    end
-
-    filtered_results.reject!(&:skipped?)
-
-    io.write "Errors & Failures:\n" unless filtered_results.empty?
-
-    filtered_results.each_with_index { |result, i|
-      io.write "\n%3d) %s\n" % [i+1, result]
-    }
-    io.write "\n"
     io
   end
 
+  # Writes test run timing, which is output after the last test
+  def report
+    io << "\n::[endgroup]\n\n" if TestPuma::GITHUB_ACTIONS
+    super
+  end
+
   def summary
-    # get the final summary
-    txt = super
+    # write failures, errors, and skip summaries
+    io << TestPuma.test_results_summary("\n#{super}\n\n", results.dup, options)
 
     # kill threads, only seems to be an issue with JRuby
     TestPuma.thread_killer
 
     # checks for defunct processes and tries to kill them, generates log data
     defunct = TestPuma.handle_defunct
-    txt += defunct unless defunct.empty?
+    io << defunct unless defunct.empty?
 
+    # writes info logged to TestPuma::DEBUGGING_INFO
     debug_info = TestPuma.debugging_info
-    txt += debug_info unless debug_info.empty?
-
-    txt
+    io << debug_info unless debug_info.empty?
+    ''
   end
 end
 Minitest::SummaryReporter.prepend AggregatedResults
