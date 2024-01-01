@@ -9,11 +9,19 @@ require 'tmpdir'
 
 module TestPuma
 
+  DASH = "\u2500"
+
   DEBUGGING_INFO = Queue.new
   DEBUGGING_PIDS = {}
 
-  GITHUB_ACTIONS  = ENV['GITHUB_ACTIONS'] == 'true'
+  GITHUB_ACTIONS    = ENV['GITHUB_ACTIONS'] == 'true'
+  GITHUB_WORKSPACE  = ENV['GITHUB_WORKSPACE'] || File.absolute_path("#{__dir__}/../..")
+
+  RUNNER_TOOL_CACHE = ENV['RUNNER_TOOL_CACHE'] ? "#{ENV['RUNNER_TOOL_CACHE']}/" :
+    "#{File.absolute_path "#{RbConfig::TOPDIR}/.."}/"
+
   PUMA_TEST_DEBUG = ENV['PUMA_TEST_DEBUG'] == 'true'
+  IS_CI = ENV['CI'] == 'true'
 
   AFTER_RUN_OK = [false]
 
@@ -53,6 +61,16 @@ module TestPuma
   DARWIN = RUBY_PLATFORM.include? 'darwin'
 
   TOKEN = "xxyyzz"
+
+  if GITHUB_ACTIONS
+    RETRY_LOGGING = Hash.new { |h, k| h[k] = ''.dup }
+
+    SUMMARY_FILE = ENV['GITHUB_STEP_SUMMARY']
+
+    if SUMMARY_FILE && GITHUB_ACTIONS
+      GITHUB_STEP_SUMMARY_MUTEX = Mutex.new
+    end
+  end
 
   def before_setup
     @files_to_unlink = nil
@@ -212,6 +230,87 @@ module TestPuma
     end
   end
 
+  def self.test_results_summary(summary_line, results, options)
+    txt = summary_line.dup
+
+    failures = results.reject(&:skipped?)
+
+    unless failures.empty?
+      txt << "Errors & Failures:\n"
+
+      failures.each_with_index { |result, i|
+        txt << "\n%3d) %s\n" % [i+1, result]
+      }
+      txt << "\n"
+    end
+
+    # logs skip summary
+    if options[:verbose]
+      skips = results.select(&:skipped?)
+      unless skips.empty?
+        txt << (GITHUB_ACTIONS ? "##[group]Skips:\n" : "\nSkips:\n")
+
+        hsh = skips.group_by { |f| f.failures.first.error.message }
+        hsh_s = {}
+        hsh.each { |k, ary|
+          hsh_s[k] = ary.map { |s|
+            [s.source_location, s.klass, s.name]
+          }.sort_by(&:first)
+        }
+        num = 0
+        hsh_s = hsh_s.sort.to_h
+        hsh_s.each { |k,v|
+          txt << " #{k} #{DASH * 2}\n".rjust(91, DASH)
+          hsh_1 = v.group_by { |i| i.first.first }
+          hsh_1.each { |k1,v1|
+            txt << "  #{k1[/\/test\/(.*)/,1]}\n"
+            v1.each { |item|
+              num += 1
+              txt << format("    %3s %-5s #{item[1]} #{item[2]}\n", "#{num})", ":#{item[0][1]}")
+            }
+            txt << "\n"
+          }
+        }
+        txt << "::[endgroup]\n" if GITHUB_ACTIONS
+      end
+    end
+
+    unless RETRY_LOGGING.empty?
+      ary = RETRY_LOGGING.sort
+      txt << (GITHUB_ACTIONS ? "\n##[group]Retries:\n" : "\nRetries:\n")
+      ary.each do |k,v|
+        txt << "#{k}\n  #{v.gsub("\n", "\n  ")}\n"
+      end
+      txt << (GITHUB_ACTIONS ? "##[endgroup]\n" : "\n")
+    end
+    txt
+  end
+
+  def self.retry_on_failure(klass, test_name, result)
+    full_method = "#{klass}##{test_name}"
+    result_str = result.to_s
+      .gsub(/#{full_method}:?\s*/, '')
+      .gsub(/\A(Failure:|Error:)\s*/, '\1 ')
+      .gsub(GITHUB_WORKSPACE, 'puma')
+      .gsub(RUNNER_TOOL_CACHE, '')
+      .gsub('/home/runner/.rubies/', '')
+      .gsub(/^ +/, '').strip
+
+    issue, result_str = result_str.split "\n", 2
+
+    RETRY_LOGGING[full_method] << "\n#{issue}\n#{result_str}\n"
+
+    if SUMMARY_FILE
+      str = "\n**#{full_method}**\n**#{issue}**\n```\n#{result_str}\n```\n"
+      GITHUB_STEP_SUMMARY_MUTEX.synchronize {
+        begin
+          File.write SUMMARY_FILE, str, mode: 'a+'
+        rescue Errno::EBADF
+        end
+      }
+    end
+  end
+
   # Only a problem with JRuby?
   def self.thread_killer
     return unless Puma::IS_JRUBY
@@ -240,9 +339,8 @@ module TestPuma
     end
 
     unless defunct.empty?
-      dash = "\u2500"
       txt << (GITHUB_ACTIONS ? "\n\n##[group]Child Processes:\n" :
-        "\n\n#{dash * 40} Child Processes:\n")
+        "\n\n#{DASH * 40} Child Processes:\n")
 
       txt << format("%5d      Test Process\n", Process.pid)
 
@@ -263,7 +361,7 @@ module TestPuma
         end
       end
 
-      txt << (GITHUB_ACTIONS ? "::[endgroup]" : "#{dash * 57}\n\n")
+      txt << (GITHUB_ACTIONS ? "::[endgroup]\n" : "#{DASH * 57}\n\n")
     end
 
     TestPuma::AFTER_RUN_OK[0] = true
@@ -277,13 +375,12 @@ module TestPuma
       ary.sort!
       out = ary.join.strip
       unless out.empty?
-        dash = "\u2500"
         wid = GITHUB_ACTIONS ? 90 : 90
-        txt = " Debugging Info #{dash * 2}".rjust wid, dash
+        txt = " Debugging Info:\n#{DASH * wid}\n"
         if GITHUB_ACTIONS
-          info = "\n##[group]#{txt}\n#{out}\n#{dash * wid}\n\n::[endgroup]\n"
+          info = "\n##[group]#{txt}\n#{out}\n#{DASH * wid}\n\n::[endgroup]\n"
         else
-          info = "\n\n#{txt}\n#{out}\n#{dash * wid}\n\n"
+          info = "\n\n#{txt}\n#{out}\n#{DASH * wid}\n\n"
         end
       end
     end
