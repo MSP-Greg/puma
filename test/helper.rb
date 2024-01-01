@@ -241,9 +241,10 @@ end
 module AggregatedResults
   def start
     TestPuma.log_ssl_info io
-    io.puts "Process.pid: #{Process.pid}\n"
-    if TestPuma::GITHUB_ACTIONS && !Puma::IS_WINDOWS
-      %x[echo 'PUMA_TEST_PID=#{Process.pid}' >> $GITHUB_ENV]
+    io.syswrite "Process.pid: #{Process.pid}\n"
+    if TestPuma::GITHUB_ACTIONS
+      io.syswrite "##[group]Test Results:\n"
+      %x[echo 'PUMA_TEST_PID=#{Process.pid}' >> $GITHUB_ENV] unless Puma::IS_WINDOWS
     end
     super
   end
@@ -257,9 +258,9 @@ module AggregatedResults
       skips = filtered_results.select(&:skipped?)
       unless skips.empty?
         if is_github_actions
-          io.puts "", "##[group]Skips:"
+          io.syswrite "::[endgroup]\n\n##[group]Skips:\n"
         else
-          io.puts '', 'Skips:'
+          io.syswrite "\nSkips:\n"
         end
         hsh = skips.group_by { |f| f.failures.first.error.message }
         hsh_s = {}
@@ -271,29 +272,29 @@ module AggregatedResults
         num = 0
         hsh_s = hsh_s.sort.to_h
         hsh_s.each { |k,v|
-          io.puts " #{k} #{dash * 2}".rjust 90, dash
+          io.syswrite " #{k} #{dash * 2}\n".rjust 91, dash
           hsh_1 = v.group_by { |i| i.first.first }
           hsh_1.each { |k1,v1|
-            io.puts "  #{k1[/\/test\/(.*)/,1]}"
+            io.syswrite "  #{k1[/\/test\/(.*)/,1]}\n"
             v1.each { |item|
               num += 1
-              io.puts format("    %3s %-5s #{item[1]} #{item[2]}", "#{num})", ":#{item[0][1]}")
+              io.syswrite format("    %3s %-5s #{item[1]} #{item[2]}\n", "#{num})", ":#{item[0][1]}")
             }
-            io.puts ''
+            io.syswrite "\n"
           }
         }
-        io.puts '::[endgroup]' if is_github_actions
+        io.syswrite "::[endgroup]\n" if is_github_actions
       end
     end
 
     filtered_results.reject!(&:skipped?)
 
-    io.puts "Errors & Failures:" unless filtered_results.empty?
+    io.syswrite "Errors & Failures:\n" unless filtered_results.empty?
 
     filtered_results.each_with_index { |result, i|
-      io.puts "\n%3d) %s" % [i+1, result]
+      io.syswrite "\n%3d) %s\n" % [i+1, result]
     }
-    io.puts
+    io.syswrite "\n"
     io
   end
 
