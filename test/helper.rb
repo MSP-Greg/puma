@@ -241,9 +241,9 @@ end
 module AggregatedResults
   def start
     TestPuma.log_ssl_info io
-    io.syswrite "Process.pid: #{Process.pid}\n"
+    io.write "Process.pid: #{Process.pid}\n"
     if TestPuma::GITHUB_ACTIONS
-      io.syswrite "##[group]Test Results:\n"
+      io.write "##[group]Test Results:\n"
       %x[echo 'PUMA_TEST_PID=#{Process.pid}' >> $GITHUB_ENV] unless Puma::IS_WINDOWS
     end
     super
@@ -258,9 +258,9 @@ module AggregatedResults
       skips = filtered_results.select(&:skipped?)
       unless skips.empty?
         if is_github_actions
-          io.syswrite "::[endgroup]\n\n##[group]Skips:\n"
+          io.write "::[endgroup]\n\n##[group]Skips:\n"
         else
-          io.syswrite "\nSkips:\n"
+          io.write "\nSkips:\n"
         end
         hsh = skips.group_by { |f| f.failures.first.error.message }
         hsh_s = {}
@@ -272,29 +272,29 @@ module AggregatedResults
         num = 0
         hsh_s = hsh_s.sort.to_h
         hsh_s.each { |k,v|
-          io.syswrite " #{k} #{dash * 2}\n".rjust 91, dash
+          io.write " #{k} #{dash * 2}\n".rjust 91, dash
           hsh_1 = v.group_by { |i| i.first.first }
           hsh_1.each { |k1,v1|
-            io.syswrite "  #{k1[/\/test\/(.*)/,1]}\n"
+            io.write "  #{k1[/\/test\/(.*)/,1]}\n"
             v1.each { |item|
               num += 1
-              io.syswrite format("    %3s %-5s #{item[1]} #{item[2]}\n", "#{num})", ":#{item[0][1]}")
+              io.write format("    %3s %-5s #{item[1]} #{item[2]}\n", "#{num})", ":#{item[0][1]}")
             }
-            io.syswrite "\n"
+            io.write "\n"
           }
         }
-        io.syswrite "::[endgroup]\n" if is_github_actions
+        io.write "::[endgroup]\n" if is_github_actions
       end
     end
 
     filtered_results.reject!(&:skipped?)
 
-    io.syswrite "Errors & Failures:\n" unless filtered_results.empty?
+    io.write "Errors & Failures:\n" unless filtered_results.empty?
 
     filtered_results.each_with_index { |result, i|
-      io.syswrite "\n%3d) %s\n" % [i+1, result]
+      io.write "\n%3d) %s\n" % [i+1, result]
     }
-    io.syswrite "\n"
+    io.write "\n"
     io
   end
 
