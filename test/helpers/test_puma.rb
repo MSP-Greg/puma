@@ -263,7 +263,7 @@ module TestPuma
         end
       end
 
-      txt << (GITHUB_ACTIONS ? "::[endgroup]\n\n" : "#{dash * 57}\n\n")
+      txt << (GITHUB_ACTIONS ? "::[endgroup]" : "#{dash * 57}\n\n")
     end
 
     TestPuma::AFTER_RUN_OK[0] = true
@@ -281,7 +281,7 @@ module TestPuma
         wid = GITHUB_ACTIONS ? 90 : 90
         txt = " Debugging Info #{dash * 2}".rjust wid, dash
         if GITHUB_ACTIONS
-          info = "\n\n##[group]#{txt}\n#{out}\n#{dash * wid}\n\n::[endgroup]\n\n"
+          info = "\n##[group]#{txt}\n#{out}\n#{dash * wid}\n\n::[endgroup]\n"
         else
           info = "\n\n#{txt}\n#{out}\n#{dash * wid}\n\n"
         end
