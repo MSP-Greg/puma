@@ -232,7 +232,7 @@ module AggregatedResults
 
   # Writes test run timing, which is output after the last test
   def report
-    io << "\n::[endgroup]\n\n" if TestPuma::GITHUB_ACTIONS
+    io << "\n::[endgroup]\n" if TestPuma::GITHUB_ACTIONS
     super
   end
 
