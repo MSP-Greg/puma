@@ -239,7 +239,11 @@ module TestPuma
       txt << "Errors & Failures:\n"
 
       failures.each_with_index { |result, i|
-        txt << "\n%3d) %s\n" % [i+1, result]
+        result_str = result
+          .gsub(GITHUB_WORKSPACE, 'puma')
+          .gsub(RUNNER_TOOL_CACHE, '')
+          .gsub('/home/runner/.rubies/', '')
+        txt << "\n%3d) %s\n" % [i+1, result_str]
       }
       txt << "\n"
     end
@@ -339,8 +343,8 @@ module TestPuma
     end
 
     unless defunct.empty?
-      txt << (GITHUB_ACTIONS ? "\n\n##[group]Child Processes:\n" :
-        "\n\n#{DASH * 40} Child Processes:\n")
+      txt << (GITHUB_ACTIONS ? "\n##[group]Child Processes:\n" :
+        "\n#{DASH * 40} Child Processes:\n")
 
       txt << format("%5d      Test Process\n", Process.pid)
 
