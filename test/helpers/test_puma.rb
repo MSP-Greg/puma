@@ -294,7 +294,7 @@ module TestPuma
     full_method = "#{klass}##{test_name}"
     result_str = result.to_s
       .gsub(/#{full_method}:?\s*/, '')
-      .gsub(/\A(Failure:|Error:)\s*/, '\1 ')
+      .gsub(/\A(Failure:|Error:)\s*/m, '\1 ')
       .gsub(GITHUB_WORKSPACE, 'puma')
       .gsub(RUNNER_TOOL_CACHE, '')
       .gsub('/home/runner/.rubies/', '')
