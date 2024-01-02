@@ -616,6 +616,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
     server_spawn "-w#{workers} test/rackup/hello.ru", puma_debug: true
 
     assert wait_for_server_to_include('Loaded Extensions - master:')
+    assert wait_for_server_to_include('puma_http11.')
     assert_includes @server_log, 'Loaded Extensions - worker 0:'
   end
 
