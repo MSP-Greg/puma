@@ -385,7 +385,7 @@ module TestPuma
       out = ary.join.strip
       unless out.empty?
         wid = GITHUB_ACTIONS ? 90 : 90
-        txt = " Debugging Info:\n#{DASH * wid}\n"
+        txt = "Debugging Info:\n#{DASH * wid}\n"
         if GITHUB_ACTIONS
           info = "\n##[group]#{txt}\n#{out}\n#{DASH * wid}\n\n::[endgroup]\n"
         else
