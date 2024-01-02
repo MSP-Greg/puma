@@ -115,7 +115,7 @@ Minitest::Test.prepend TimeoutEveryTestCase
 if ENV['CI']
   require 'minitest/retry'
 
-  Minitest::Retry.use! verbose: false
+  Minitest::Retry.use!
 
   if ENV['GITHUB_ACTIONS'] == 'true'
     Minitest::Retry.on_failure do |klass, test_name, result|
