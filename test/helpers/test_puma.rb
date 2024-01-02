@@ -11,6 +11,10 @@ module TestPuma
 
   DASH = "\u2500"
 
+  COLOR_RESET = "\e[0m"
+  COLOR_RED = "\e[38;2;223;16;16m"
+  COLOR_YEL = "\e[38;2;223;223;16m"
+
   DEBUGGING_INFO = Queue.new
   DEBUGGING_PIDS = {}
 
@@ -62,9 +66,9 @@ module TestPuma
 
   TOKEN = "xxyyzz"
 
-  if GITHUB_ACTIONS
-    RETRY_LOGGING = Hash.new { |h, k| h[k] = +'' }
+  RETRY_LOGGING = Hash.new { |h, k| h[k] = +'' }
 
+  if GITHUB_ACTIONS
     SUMMARY_FILE = ENV['GITHUB_STEP_SUMMARY']
 
     if SUMMARY_FILE && GITHUB_ACTIONS
@@ -236,7 +240,7 @@ module TestPuma
     failures = results.reject(&:skipped?).reject(&:passed?)
 
     unless failures.empty?
-      txt << "Errors & Failures:\n"
+      txt << "#{COLOR_RED}Errors & Failures:#{COLOR_RESET}\n"
 
       failures.each_with_index { |result, i|
         result_str = result.to_s
@@ -281,7 +285,8 @@ module TestPuma
 
     unless RETRY_LOGGING.empty?
       ary = RETRY_LOGGING.sort
-      txt << (GITHUB_ACTIONS ? "\n##[group]Retries:\n" : "\nRetries:\n")
+      txt << (GITHUB_ACTIONS ? "\n##[group]#{COLOR_YEL}Retries:#{COLOR_RESET}\n" :
+        "\n#{COLOR_YEL}Retries:#{COLOR_RESET}\n")
       ary.each do |k,v|
         txt << "#{k}\n  #{v.gsub("\n", "\n  ")}\n"
       end
@@ -343,8 +348,8 @@ module TestPuma
     end
 
     unless defunct.empty?
-      txt << (GITHUB_ACTIONS ? "\n##[group]Child Processes:\n" :
-        "\n#{DASH * 40} Child Processes:\n")
+      txt << (GITHUB_ACTIONS ? "\n##[group]#{COLOR_YEL}Child Processes:#{COLOR_RESET}\n" :
+        "\n#{COLOR_YEL}#{DASH * 40} Child Processes:#{COLOR_RESET}\n")
 
       txt << format("%5d      Test Process\n", Process.pid)
 
