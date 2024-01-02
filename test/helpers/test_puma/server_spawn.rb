@@ -109,10 +109,10 @@ module TestPuma
       @server, @server_err, @spawn_pid = spawn_cmd env, cmd.strip
 
       @pid = wait_for_server_to_match(MASTER_PID_RE, 1, timeout: timeout, log: log)&.to_i || @spawn_pid
-      wait_for_server_to_include('Ctrl-C', timeout: timeout, log: log) unless no_wait
-
       TestPuma::DEBUGGING_PIDS[@pid] = full_name
       TestPuma::DEBUGGING_PIDS[@spawn_pid] = "spawn #{full_name}" if @spawn_pid != @pid
+
+      wait_for_server_to_include('Ctrl-C', timeout: timeout, log: log) unless no_wait
       @server
     end
 
