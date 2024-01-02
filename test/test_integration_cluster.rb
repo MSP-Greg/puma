@@ -254,16 +254,17 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
 
     get_worker_pids # wait for workers to boot
 
-    10.times {
-      fast_connect
-      sleep 0.5
-    }
+    skts = send_http_array 10, dly: 0.5, max_retries: 5
 
     sleep 1.15
 
     assert_raises Errno::ECONNREFUSED, "Connection refused" do
       send_http
     end
+
+    results = read_response_array skts, body_only: true
+    assert_equal ['Hello World'], results.uniq
+
     assert wait_for_server_to_include('Gracefully shutting down workers')
     @server = nil
     @pid = nil
