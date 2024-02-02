@@ -96,7 +96,7 @@ jobs:
           apt-get: ragel
           brew: ragel
           # below is only needed for Ruby 2.4
-          mingw: openssl
+          mingw: openssl clang
           rubygems: latest
           bundler-cache: true
         timeout-minutes: 10
