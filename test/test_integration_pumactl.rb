@@ -96,13 +96,13 @@ class TestIntegrationPumactl < TestIntegration
   def test_refork_cluster
     skip_unless :fork
     wrkrs = 3
-    cli_server "-q -w #{wrkrs} test/rackup/sleep.ru #{set_pumactl_args unix: true} -S #{@state_path}",
+    cli_server "-q -w #{wrkrs} -t1:5 test/rackup/sleep.ru #{set_pumactl_args unix: true} -S #{@state_path}",
       config: 'fork_worker 50',
       unix: true
 
-    start = Time.now
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-    fast_connect("sleep1", unix: true)
+    wrkrs.times { fast_connect "sleep1", unix: true }
 
     # Get the PIDs of the phase 0 workers.
     phase0_worker_pids = get_worker_pids 0, wrkrs
@@ -124,7 +124,7 @@ class TestIntegrationPumactl < TestIntegration
 
     _, status = Process.wait2(@pid)
     assert_equal 0, status
-    assert_operator Time.now - start, :<, (DARWIN ? 8 : 6)
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - start, :<, (DARWIN ? 8 : 6)
     @server = nil
   end
 
