@@ -443,9 +443,15 @@ class TestIntegration < Minitest::Test
           Process.kill :USR2, @pid
         end
         sleep 0.5
-        wait_for_server_to_boot
-        restart_count += 1
-        sleep(Puma.windows? ? 2.0 : 0.5)
+        begin
+          wait_for_server_to_boot
+        # raised in wait_for_server_to_boot on timeout or io error
+        rescue Minitest::Assertion
+          # ignore
+        ensure
+          restart_count += 1
+          sleep(Puma.windows? ? 2.0 : 0.5)
+        end
       end
     end
 
