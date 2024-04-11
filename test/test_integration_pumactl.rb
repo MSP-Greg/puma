@@ -216,7 +216,7 @@ class TestIntegrationPumactl < TestIntegration
     before = JSON.parse resp_io.read.split("\n", 2).last
     gc_before = before[key].to_i
 
-    2.times { fast_connect }
+    (Puma::IS_JRUBY ? 15 : 2).times { fast_connect }
 
     resp_io = cli_pumactl "gc", unix: unix
     # below shows gc was called (200 reply)
