@@ -120,7 +120,12 @@ class TestIntegrationPumactl < TestIntegration
     assert_empty phase0_worker_pids & phase1_worker_pids, "#{msg}\nBoth workers should be replaced with new"
     assert File.exist?(@bind_path), "Bind path must exist after phased refork"
 
-    cli_pumactl "stop", unix: true
+    if Puma::IS_MRI && Puma::IS_OSX
+      # otherwise, intermittent6 timeout failures on Process.wait2(@pid)
+      cli_pumactl_spawn "stop", unix: true
+    else
+      cli_pumactl_spawn "stop", unix: true
+    end
 
     _, status = Process.wait2(@pid)
     assert_equal 0, status
