@@ -121,10 +121,10 @@ class TestIntegrationPumactl < TestIntegration
     assert File.exist?(@bind_path), "Bind path must exist after phased refork"
 
     if Puma::IS_MRI && Puma::IS_OSX
-      # otherwise, intermittent6 timeout failures on Process.wait2(@pid)
+      # otherwise, intermittent timeout failures on Process.wait2(@pid)
       cli_pumactl_spawn "stop", unix: true
     else
-      cli_pumactl_spawn "stop", unix: true
+      cli_pumactl "stop", unix: true
     end
 
     _, status = Process.wait2(@pid)
