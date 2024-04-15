@@ -1847,6 +1847,9 @@ class TestPumaServer < Minitest::Test
   end
 
   def test_form_data_encoding_windows_bom
+    # MSYS2 curl can cause issues...
+    curl = Puma::IS_WINDOWS ? 'C:/Windows/System32/curl.exe' : 'curl'
+
     req_body = nil
 
     str = "──── Hello,World,From,Puma ────\r\n"
@@ -1869,7 +1872,7 @@ class TestPumaServer < Minitest::Test
       [200, {}, [req_body]]
     end
 
-    cmd = "curl -H 'transfer-encoding: chunked' --form data=@#{temp_file_path} http://127.0.0.1:#{@port}/"
+    cmd = "#{curl} -H 'transfer-encoding: chunked' --form data=@#{temp_file_path} http://127.0.0.1:#{@port}/"
 
     out_r, _, _ = spawn_cmd cmd
 
@@ -1882,6 +1885,9 @@ class TestPumaServer < Minitest::Test
   end
 
   def test_form_data_encoding_windows
+    # MSYS2 curl can cause issues...
+    curl = Puma::IS_WINDOWS ? 'C:/Windows/System32/curl.exe' : 'curl'
+
     req_body = nil
 
     str = "──── Hello,World,From,Puma ────\r\n"
@@ -1900,7 +1906,7 @@ class TestPumaServer < Minitest::Test
       [200, {}, [req_body]]
     end
 
-    cmd = "curl -H 'transfer-encoding: chunked' --form data=@#{temp_file_path} http://127.0.0.1:#{@port}/"
+    cmd = "#{curl} -H 'transfer-encoding: chunked' --form data=@#{temp_file_path} http://127.0.0.1:#{@port}/"
 
     out_r, _, _ = spawn_cmd cmd
 
