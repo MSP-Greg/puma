@@ -345,12 +345,12 @@ class TestPumaServerSSL < TestPuma::ServerInProcess
     def test_ssl_ciphersuites
       skip('Requires TLSv1.3') unless Puma::MiniSSL::HAS_TLS1_3
 
-      start_server
+      server_run
       default_cipher = send_http(ctx: new_ctx).cipher[0]
       @server&.stop true
 
       cipher_suite = 'TLS_CHACHA20_POLY1305_SHA256'
-      start_server { |ctx| ctx.ssl_ciphersuites = cipher_suite}
+      server_run ctx: ->(ctx) { ctx.ssl_ciphersuites = cipher_suite }
 
       cipher = send_http(ctx: new_ctx).cipher
 
