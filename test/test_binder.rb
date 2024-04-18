@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "helper"
+require_relative "helpers/ssl_helper" if ::Puma::HAS_SSL
 require_relative "helpers/test_puma/server_base"
 
 require "puma/binder"
@@ -559,6 +560,8 @@ class TestBinderJRuby < TestBinderBase
 end if ::Puma::IS_JRUBY
 
 class TestBinderMRI < TestBinderBase
+  include SSLHelper if ::Puma::HAS_SSL
+
   def test_binder_parses_ssl_cipher_filter
     set_bind_type :ssl
 
