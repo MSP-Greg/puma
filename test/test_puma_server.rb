@@ -256,27 +256,35 @@ class TestPumaServer < TestPuma::ServerInProcess
 
   def test_immediate_pipeline_not_confused_for_body
     bodies = []
-    server_run { |e|
-      bodies << e['rack.input'].read
+    server_run app: ->(env) do
+      bodies << env['rack.input'].read
       [200, {}, ["ok #{bodies.size}"]]
-    }
+    end
 
-    data = send_http_and_read "GET / HTTP/1.1\r\nHost: a\r\nContent-Length: 0\r\n\r\nGET / HTTP/1.1\r\nConnection: close\r\n\r\n"
+    socket = send_http "GET / HTTP/1.1\r\nHost: a\r\nContent-Length: 0\r\n\r\n" \
+                       "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
 
-    assert_equal "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 1HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nok 2", data
+    response = +''
+    response << socket.sysread(1_024) if socket.wait_readable(1.0)
+
+    assert_equal "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 1HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nok 2", response
     assert_equal ["", ""], bodies
   end
 
   def test_immediate_pipeline_terminates_last_request
     bodies = []
-    server_run { |e|
-      bodies << e['rack.input'].read
+    server_run app: ->(env) do
+      bodies << env['rack.input'].read
       [200, {}, ["ok #{bodies.size}"]]
-    }
+    end
 
-    data = send_http_and_read_1s "GET / HTTP/1.1\r\nHost: a\r\nContent-Length: 1\r\n\r\naGET / HTTP/1.1\r\nContent-Length: 0\r\n\r\n"
+    socket = send_http "GET / HTTP/1.1\r\nHost: a\r\nContent-Length: 1\r\n\r\na" \
+                       "GET / HTTP/1.1\r\nContent-Length: 0\r\n\r\n"
 
-    assert_equal "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 1HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 2", data
+    response = +''
+    response << socket.sysread(1_024) if socket.wait_readable(1.0)
+
+    assert_equal "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 1HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 2", response
     assert_equal ["a", ""], bodies
   end
 
@@ -328,16 +336,16 @@ class TestPumaServer < TestPuma::ServerInProcess
      [200, { "X-Hello" => "World" }, ["Hello world!"]]
     end
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    response = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    expected_data = <<~EOF.gsub("\n", "\r\n") + "\r\n"
+    expected = <<~EOF.gsub("\n", "\r\n") + "\r\n"
       HTTP/1.0 200 OK
       X-Hello: World
       Content-Length: 12
     EOF
 
     assert_nil @server.early_hints
-    assert_equal expected_data, data
+    assert_equal expected, response
   end
 
   def test_request_payload_too_large
@@ -368,19 +376,19 @@ class TestPumaServer < TestPuma::ServerInProcess
   def test_GET_with_no_body_has_sane_chunking
     server_run app: ->(env) { [200, {}, []] }
 
-    data = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
+    response = send_http_read_response "HEAD / HTTP/1.0\r\n\r\n"
 
-    assert_equal "HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n", response
   end
 
   def test_doesnt_print_backtrace_in_production
     server_run environment: :production,
       app: ->(env) { raise "don't leak me bro" }
 
-    data = send_http_read_response GET_10
+    response = send_http_read_response GET_10
 
-    refute_match(/don't leak me bro/, data)
-    assert_start_with data, 'HTTP/1.0 500 Internal Server Error'
+    refute_match(/don't leak me bro/, response)
+    assert_start_with response, 'HTTP/1.0 500 Internal Server Error'
   end
 
   def test_eof_on_connection_close_is_not_logged_as_an_error
@@ -401,11 +409,11 @@ class TestPumaServer < TestPuma::ServerInProcess
       sleep 5
     end
 
-    data = send_http_read_response GET_10
+    response = send_http_read_response GET_10
 
-    assert_start_with(data, 'HTTP/1.0 500 Internal Server Error')
-    assert_match(/Content-Type: application\/json/, data)
-    assert_match(/{}\n$/, data)
+    assert_start_with response, 'HTTP/1.0 500 Internal Server Error'
+    assert_match(/Content-Type: application\/json/, response)
+    assert_match(/{}\n$/, response)
   end
 
   class ArrayClose < Array
@@ -423,15 +431,16 @@ class TestPumaServer < TestPuma::ServerInProcess
   def test_lowlevel_error_body_close
     app_body = ArrayClose.new(['lowlevel_error'])
 
-    server_run log_writer: @log_writer, :force_shutdown_after => 2,
+    server_run log_writer: @log_writer, force_shutdown_after: 2,
       app: ->(env) { [[0,1], {}, app_body] }
 
     response = send_http_read_response GET_10
 
     assert_equal 'HTTP/1.0 500 Internal Server Error', response.status
-    assert_includes response.body, "Puma caught this error: undefined method `to_i' for"
-    assert_includes response.body, "Array"
-    refute_includes response.body, 'lowlevel_error'
+    body = response.body
+    assert_match(/Puma caught this error: undefined method [`']to_i' for/, body)
+    assert_includes body, "Array"
+    refute_includes body, 'lowlevel_error'
     sleep 0.1 unless ::Puma::IS_MRI
     assert app_body.closed?
   end
@@ -440,11 +449,11 @@ class TestPumaServer < TestPuma::ServerInProcess
     server_run log_writer: @log_writer, force_shutdown_after: 2,
     app: ->(env) { raise NoMethodError, "Oh no an error" }
 
-    data = send_http_read_response GET_10
+    response = send_http_read_response GET_10
 
     # Internal Server Error
-    assert_includes data, "HTTP/1.0 500 #{STATUS_CODES[500]}"
-    assert_match(/Puma caught this error: Oh no an error.*\(NoMethodError\).*test\/test_puma_server.rb/m, data)
+    assert_includes response, "HTTP/1.0 500 #{STATUS_CODES[500]}"
+    assert_match(/Puma caught this error: Oh no an error.*\(NoMethodError\).*test\/test_puma_server.rb/m, response)
   end
 
   def test_lowlevel_error_message_without_backtrace
@@ -466,8 +475,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     response = send_http_read_response GET_10
 
-    assert_start_with data, 'HTTP/1.0 503 Service Unavailable'
-    assert_equal 'HTTP/1.0 503 Service Unavailable', response
+    assert_start_with response, 'HTTP/1.0 503 Service Unavailable'
     assert_match(/Puma caught this error.+Puma::ThreadPool::ForceShutdown/, response.body)
   end
 
@@ -477,7 +485,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     response = send_http_read_response GET_10
 
-    assert_start_with data, 'HTTP/1.0 302 Found'
+    assert_start_with response, 'HTTP/1.0 302 Found'
   end
 
   def test_leh_gets_env_as_well
@@ -490,7 +498,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     response = send_http_read_response GET_10
 
-    assert_start_with data, 'HTTP/1.0 302 Found'
+    assert_start_with response, 'HTTP/1.0 302 Found'
   end
 
   def test_leh_has_status
@@ -503,23 +511,23 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     response = send_http_read_response GET_10
 
-    assert_start_with data, 'HTTP/1.0 302 Found'
+    assert_start_with response, 'HTTP/1.0 302 Found'
   end
 
   def test_custom_http_codes_10
     server_run app: ->(env) { [449, {}, [""]] }
 
-    data = send_http_read_response GET_10
+    response = send_http_read_response GET_10
 
-    assert_equal "HTTP/1.0 449 CUSTOM\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "HTTP/1.0 449 CUSTOM\r\nContent-Length: 0\r\n\r\n", response
   end
 
   def test_custom_http_codes_11
     server_run app: ->(env) { [449, {}, [""]] }
 
-    data = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
+    response = send_http_read_response "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
 
-    assert_equal "HTTP/1.1 449 CUSTOM\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", data
+    assert_equal "HTTP/1.1 449 CUSTOM\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", response
   end
 
   def test_HEAD_returns_content_headers
@@ -1090,11 +1098,11 @@ class TestPumaServer < TestPuma::ServerInProcess
   def test_chunked_body_pause_within_chunk_size_hex
     body = nil
     content_length = nil
-    server_run { |env|
+    server_run app: ->(env) do
       body = env['rack.input'].read
       content_length = env['CONTENT_LENGTH']
       [200, {}, [""]]
-    }
+    end
 
     req_body = +''
     9.times do |i|
@@ -1109,15 +1117,12 @@ class TestPumaServer < TestPuma::ServerInProcess
     data1 = req_body[0..7218]  # Number here is arbitrary, so that the first chunk of data ends with `40`
     data2 = req_body[7219..-1] # remaining data
 
-    socket = new_connection
-
-    socket.syswrite "#{header}#{data1}"
+    socket = send_http "#{header}#{data1}"
     sleep 0.1 # This makes it easier to reproduce the issue, might need to be adjusted
-    socket.syswrite data2
+    socket << data2
 
-    socket.wait_readable 5
-    resp = socket.sysread 2_048
-    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", resp
+    response = socket.read_response
+    assert_equal "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n", response
     assert_equal 9*1_024, body.bytesize
     assert_equal 9*1_024, content_length.to_i
     assert_equal '012345678', body.delete('x')
