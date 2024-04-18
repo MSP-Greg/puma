@@ -2,6 +2,8 @@
 # Copyright (c) 2011 Evan Phoenix
 # Copyright (c) 2005 Zed A. Shaw
 
+# needs to be loaded before minitest for Ruby 2.7 and earlier
+require_relative "helpers/test_puma/assertions"
 require_relative "minitest/verbose"
 require "minitest/autorun"
 require "minitest/pride"
