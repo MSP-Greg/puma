@@ -233,7 +233,8 @@ module TestPuma
 
     pid = spawn(env, cmd, opts)
     @spawn_ext_pids << pid
-    [out_w, err_w].each(&:close)
+    out_w.close
+    err_w.close
     @ios_to_close << out_r << err_r
     [out_r, err_r, pid]
   end
