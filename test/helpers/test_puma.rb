@@ -197,7 +197,7 @@ module TestPuma
 
   def wait2_timeout(pid, timeout: 10)
     ary = nil
-    err_msg = "Waited #{timeout} seconds for Process.wait2"
+    err_msg = "Waited #{timeout} seconds for Process.wait2(#{pid})"
 
     ::Timeout.timeout(timeout, Timeout::Error, err_msg) do
       begin
@@ -205,8 +205,14 @@ module TestPuma
       rescue Errno::ECHILD
       end
     end
-
     ary
+  rescue Timeout::Error
+    if @server.wait_readable 1
+      STDOUT.syswrite "\n──────────────────────────────\n#{@server.read}\n"
+    else
+      STDOUT.syswrite "\n──────────────────────────────\nCan't read @server\n"
+    end
+    raise Timeout::Error, err_msg
   end
 
   module_function :kill_and_wait, :wait2_timeout
