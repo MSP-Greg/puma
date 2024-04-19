@@ -66,7 +66,7 @@ module TestPuma
         retries = 0
         loop do
           log = @log_writer.stdout.string
-          break if log.include? 'Goodbye!'
+          break if log.include? GOODBYE
           sleep 0.01
           Thread.pass
           retries += 1
