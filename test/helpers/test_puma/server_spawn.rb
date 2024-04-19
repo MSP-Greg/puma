@@ -120,15 +120,16 @@ module TestPuma
       @server_stopped = true
       ary = kill_and_wait pid, signal: signal
 
-      if pid == @pid && @spawn_pid != @pid && ary.nil?
-        ary = wait2_timeout @spawn_pid,  timeout: timeout
-      end
-
       if pid == @pid
+        if ary.nil? && @spawn_pid != pid
+          ary = wait2_timeout @spawn_pid, timeout: timeout
+        end
+
         @server = nil
         @spawn_pid = nil if @spawn_pid == @pid
         @pid = nil
       end
+
       ary
     end
 
