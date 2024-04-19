@@ -22,6 +22,8 @@ module TestPuma
     include TestPuma
     include TestPuma::PumaSocket
 
+    GOODBYE = 'Goodbye!'
+
     HELLO_RU = "test/rackup/hello.ru"
 
     #————————————————————————————————————————————————————————————— SSL constants
