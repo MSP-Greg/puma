@@ -266,6 +266,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     response = +''
     response << socket.sysread(1_024) if socket.wait_readable(1.0)
+    response << socket.sysread(1_024) if !socket.eof? && socket.wait_readable(1.0)
 
     assert_equal "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 1HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nok 2", response
     assert_equal ["", ""], bodies
@@ -283,6 +284,7 @@ class TestPumaServer < TestPuma::ServerInProcess
 
     response = +''
     response << socket.sysread(1_024) if socket.wait_readable(1.0)
+    response << socket.sysread(1_024) if !socket.eof? && socket.wait_readable(1.0)
 
     assert_equal "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 1HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 2", response
     assert_equal ["a", ""], bodies
