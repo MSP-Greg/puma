@@ -37,7 +37,7 @@ module TestPuma
 
     def after_teardown
       close_client_sockets
-      if @server
+      if @server.is_a? IO
         if @control_port && Puma::IS_WINDOWS
           begin
             cli_pumactl 'stop'
