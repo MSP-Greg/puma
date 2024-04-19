@@ -330,6 +330,18 @@ module TestPuma
     # @todo verify whole string is written
     REQ_WRITE = -> (str) { self.syswrite str; self }
 
+    # used for multiple responses
+    TIMED_SYSREAD = -> (timeout: nil, initial: 3) do
+      data = +''
+      self.wait_readable initial
+      data << self.sysread(10_240)
+      begin
+        data << self.sysread(10_240) while self.wait_readable(timeout)
+      rescue EOFError
+      end
+      data
+    end
+
     # Helper for creating an `OpenSSL::SSL::SSLContext`.
     # @param &blk [Block] Passed the SSLContext.
     # @yield [OpenSSL::SSL::SSLContext]
@@ -371,10 +383,11 @@ module TestPuma
           raise 'port or path must be set!'
         end
 
-      skt.define_singleton_method :send_request, SEND_REQUEST
+      skt.define_singleton_method :send_request,  SEND_REQUEST
       skt.define_singleton_method :read_response, READ_RESPONSE
-      skt.define_singleton_method :read_body, READ_BODY
-      skt.define_singleton_method :<<, REQ_WRITE
+      skt.define_singleton_method :read_body,     READ_BODY
+      skt.define_singleton_method :<<,            REQ_WRITE
+      skt.define_singleton_method :timed_sysread, TIMED_SYSREAD
 
       @skts_to_close << skt
       if ctx
