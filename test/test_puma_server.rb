@@ -264,9 +264,10 @@ class TestPumaServer < TestPuma::ServerInProcess
     socket = send_http "GET / HTTP/1.1\r\nHost: a\r\nContent-Length: 0\r\n\r\n" \
                        "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
 
+    socket.wait_readable 3.0
     response = +''
+    response << socket.sysread(1_024)
     response << socket.sysread(1_024) if socket.wait_readable(1.0)
-    response << socket.sysread(1_024) if !socket.eof? && socket.wait_readable(1.0)
 
     assert_equal "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 1HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 4\r\n\r\nok 2", response
     assert_equal ["", ""], bodies
@@ -282,9 +283,10 @@ class TestPumaServer < TestPuma::ServerInProcess
     socket = send_http "GET / HTTP/1.1\r\nHost: a\r\nContent-Length: 1\r\n\r\na" \
                        "GET / HTTP/1.1\r\nContent-Length: 0\r\n\r\n"
 
+    socket.wait_readable 3.0
     response = +''
+    response << socket.sysread(1_024)
     response << socket.sysread(1_024) if socket.wait_readable(1.0)
-    response << socket.sysread(1_024) if !socket.eof? && socket.wait_readable(1.0)
 
     assert_equal "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 1HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nok 2", response
     assert_equal ["a", ""], bodies
