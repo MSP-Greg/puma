@@ -91,7 +91,7 @@ class TestIntegrationPumactl < TestPuma::ServerSpawn
     # Get the PIDs of the phase 0 workers.
     phase0_worker_pids = get_worker_pids 0, wrkrs
 
-    start = Time.now
+    start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
     assert File.exist? bind_path
 
@@ -107,11 +107,12 @@ class TestIntegrationPumactl < TestPuma::ServerSpawn
     assert_empty phase0_worker_pids & phase1_worker_pids, "#{msg}\nBoth workers should be replaced with new"
     assert File.exist?(bind_path), "Bind path must exist after phased refork"
 
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - start, :<, (DARWIN ? 8 : 6)
+
     cli_pumactl "stop"
 
     _, status = Process.wait2 @spawn_pid
     assert_equal 0, status
-    assert_operator Time.now - start, :<, (DARWIN ? 8 : 6)
   ensure
     @pid = nil
     @spawn_pid = nil
