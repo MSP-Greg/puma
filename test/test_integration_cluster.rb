@@ -772,7 +772,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
       end
     end
 
-    @start_time = Time.now.to_f
+    start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
     # below should 'cancel' the phase 0 workers, either via phased_restart or
     # externally TERM'ing them
@@ -786,7 +786,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
 
     # Since 35 is the shorter of the two requests, server should restart
     # and cancel both requests
-    assert_operator (Time.now.to_f - @start_time).round(2), :<, 35
+    assert_operator (Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time).round(2), :<, 35
 
     msg = "phase0_worker_pids #{phase0_worker_pids.inspect}  phase1_worker_pids #{phase1_worker_pids.inspect}  phase0_exited #{phase0_exited.inspect}"
     assert_equal workers, phase0_worker_pids.length, msg
