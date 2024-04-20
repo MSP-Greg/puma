@@ -547,11 +547,11 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
 
     get_worker_pids # to consume server logs
 
-    Process.kill :TTIN, @pid
+    Process.kill :TTIN, @pid # increment the worker count by 1
 
     assert wait_for_server_to_match(/Worker 2 \(PID: \d+\) booted in/)
 
-    Process.kill :TTOU, @pid
+    Process.kill :TTOU, @pid # decrement the worker count by 1
 
     assert wait_for_server_to_match(/Worker 1 \(PID: \d+\) terminating/)
   end
@@ -706,8 +706,6 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
     mutex = Mutex.new
     reqs  = 40
 
-    refused = thread_run_refused
-
     queue = Queue.new
 
     thread_requests = request_ary_thread(reqs, 0.25, 1, 4, mutex, queue, replies) do
@@ -715,7 +713,7 @@ class TestIntegrationCluster < TestPuma::ServerSpawn
     end
 
     thread_responses = Thread.new do
-      collect_response_ary_data(replies, mutex, queue, refused)
+      collect_response_ary_data(replies, mutex, queue, thread_run_refused)
     end
 
     thread_requests.join
