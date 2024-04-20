@@ -379,9 +379,13 @@ module TestPuma
             end
           end
         end
-        client_threads.each do |th|
+        client_threads.each do |thread|
           begin
-            th&.join
+            if thread
+              unless thread.join 5
+                Thread.kill thread
+              end
+            end
           rescue StandardError
           end
         end
