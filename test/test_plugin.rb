@@ -9,7 +9,7 @@ class TestPlugin < TestIntegration
     Dir.mkdir("tmp") unless Dir.exist?("tmp")
 
     cli_server "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN} test/rackup/hello.ru",
-      config: "plugin 'tmp_restart'"
+      config: "plugin 'tmp_restart'", log: true
 
     File.open('tmp/restart.txt', mode: 'wb') { |f| f.puts "Restart #{Time.now}" }
 
