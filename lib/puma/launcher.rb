@@ -283,12 +283,12 @@ module Puma
       @events.fire_on_restart!
       @config.run_hooks :on_restart, self, @log_writer
 
-      if false
+      if Puma.jruby?
         close_binder_listeners
 
         require_relative 'jruby_restart'
         JRubyRestart.chdir_exec(@restart_dir, restart_args)
-      elsif Puma.windows? || Puma.jruby?
+      elsif Puma.windows?
         close_binder_listeners
 
         argv = restart_args
