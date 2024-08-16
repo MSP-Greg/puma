@@ -11,7 +11,7 @@ if ::Puma::HAS_SSL
   if ENV['PUMA_TEST_DEBUG']
     require "openssl" unless Object.const_defined? :OpenSSL
     if Puma::IS_JRUBY
-      puts "", RUBY_DESCRIPTION, " RUBYOPT: #{ENV['RUBYOPT']}", "Gem.ruby: #{Gem.ruby}" 
+      puts "", RUBY_DESCRIPTION, " RUBYOPT: #{ENV['RUBYOPT']}", "Gem.ruby: #{Gem.ruby}",
         "                         OpenSSL",
         "OPENSSL_LIBRARY_VERSION: #{OpenSSL::OPENSSL_LIBRARY_VERSION}",
         "        OPENSSL_VERSION: #{OpenSSL::OPENSSL_VERSION}", ""
