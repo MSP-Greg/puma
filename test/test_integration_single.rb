@@ -21,7 +21,7 @@ class TestIntegrationSingle < TestIntegration
 
   def test_usr2_restart
     skip_unless_signal_exist? :USR2
-    _, new_reply = restart_server_and_listen("-q test/rackup/hello.ru")
+    _, new_reply = restart_server_and_listen("-t1:1 -q test/rackup/hello.ru")
     assert_equal "Hello World", new_reply
   end
 
