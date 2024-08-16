@@ -21,8 +21,7 @@ class TestIntegration < Minitest::Test
   LOG_ERROR_SLEEP = 0.2
   LOG_ERROR_QTY   = 5
 
-  BASE = defined?(Bundler) ? "bundle exec #{Gem.ruby} -Ilib" :
-    "#{Gem.ruby} -Ilib"
+  BASE = "#{Gem.ruby} -Ilib"
 
   def setup
     @server = nil
