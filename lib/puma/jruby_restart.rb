@@ -20,6 +20,7 @@ module Puma
       argv.flatten!
       argv << :string
       argv << nil
+puts 'JRubyRestart', cmd, argv
       execlp(cmd, *argv)
       raise SystemCallError.new(FFI.errno)
     end
