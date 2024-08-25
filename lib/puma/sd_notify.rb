@@ -139,7 +139,7 @@ module Puma
       begin
         Addrinfo.unix(sock, :DGRAM).connect do |s|
           s.close_on_exec = true
-          s.write(state)
+          s.syswrite(state)
         end
       rescue StandardError => e
         raise NotifyError, "#{e.class}: #{e.message}", e.backtrace
