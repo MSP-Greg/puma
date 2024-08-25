@@ -84,15 +84,18 @@ class TestPluginSystemd < TestIntegration
   def assert_restarts_with_systemd(signal, workers: 2)
     skip_unless(:fork) unless workers.zero?
     cli_server "-w#{workers} test/rackup/hello.ru", env: @env
+    get_worker_pids(0, workers) if workers == 2
     assert_message 'READY=1'
 
+    phase_ary = signal == :USR1 ? [1,2] : [0,0]
+
     Process.kill signal, @pid
-    connect.write "GET / HTTP/1.1\r\n\r\n"
+    get_worker_pids(phase_ary[0], workers) if workers == 2
     assert_message 'RELOADING=1'
     assert_message 'READY=1'
 
     Process.kill signal, @pid
-    connect.write "GET / HTTP/1.1\r\n\r\n"
+    get_worker_pids(phase_ary[1], workers) if workers == 2
     assert_message 'RELOADING=1'
     assert_message 'READY=1'
 
@@ -102,6 +105,12 @@ class TestPluginSystemd < TestIntegration
 
   def assert_message(msg)
     @socket.wait_readable 1
-    assert_equal msg, @socket.recvfrom(msg.bytesize)[0]
+    read = @socket.sysread(msg.bytesize)
+    if read.start_with?('STATUS=P') && !msg.start_with?('STATUS=P')
+      read << @socket.sysread(1_000) while @socket.wait_readable(1) && !read.end_with?(msg)
+      assert_operator read, :end_with?, msg
+    else
+      assert_equal msg, read
+    end
   end
 end
