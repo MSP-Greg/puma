@@ -158,13 +158,12 @@ class TestIntegration < Minitest::Test
     socket = send_http
     initial_reply = socket.read_body
     restart_server socket, log: log
-    [initial_reply, socket.read_body]
+    [initial_reply, send_http_read_resp_body]
   end
 
   # reuses an existing connection to make sure that works
   def restart_server(socket, log: false)
     Process.kill :USR2, @pid
-    socket << GET_11
     wait_for_server_to_boot log: log
   end
 
