@@ -2,9 +2,12 @@
 
 require_relative "helper"
 require_relative "helpers/integration"
+require_relative "helpers/test_puma/puma_socket"
 
 class TestPluginSystemd < TestIntegration
   parallelize_me! if ::Puma.mri?
+
+  include TestPuma::PumaSocket
 
   THREAD_LOG = TRUFFLE ? "{ 0/16 threads, 16 available, 0 backlog }" :
     "{ 0/5 threads, 5 available, 0 backlog }"
@@ -29,6 +32,7 @@ class TestPluginSystemd < TestIntegration
   def teardown
     return if skipped?
     @socket&.close
+    super
     File.unlink(@sockaddr) if @sockaddr
     @socket = nil
     @sockaddr = nil
@@ -85,18 +89,21 @@ class TestPluginSystemd < TestIntegration
 
   def assert_restarts_with_systemd(signal, workers: 2)
     skip_unless(:fork) unless workers.zero?
-    cli_server "-w#{workers} test/rackup/hello.ru", env: @env
+    cli_server "-w#{workers} -t1:1 test/rackup/hello.ru", env: @env
+    send_http_read_response
     get_worker_pids(0, workers) if workers == 2
     assert_message 'READY=1'
 
     phase_ary = signal == :USR1 ? [1,2] : [0,0]
 
     Process.kill signal, @pid
+    send_http_read_response
     get_worker_pids(phase_ary[0], workers) if workers == 2
     assert_message 'RELOADING=1'
     assert_message 'READY=1'
 
     Process.kill signal, @pid
+    send_http_read_response
     get_worker_pids(phase_ary[1], workers) if workers == 2
     assert_message 'RELOADING=1'
     assert_message 'READY=1'
