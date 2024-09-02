@@ -105,9 +105,11 @@ class TestIntegrationSingle < TestIntegration
     skip_unless_signal_exist? :TERM
     skip_if :jruby
 
+    sleep_time = 8
+
     cli_server '-t1:1 test/rackup/sleep.ru'
 
-    socket = send_http "GET /sleep8 HTTP/1.1\r\n\r\n"
+    socket = send_http "GET /sleep#{sleep_time} HTTP/1.1\r\n\r\n"
     body = nil
     read_error = nil
 
@@ -118,6 +120,9 @@ class TestIntegrationSingle < TestIntegration
         read_error = e
       end
     end
+
+    # Ruby 2.7 consistent failure, both CI & locally
+    sleep 0.05
 
     Process.kill :TERM, @pid
     Thread.pass
@@ -132,11 +137,11 @@ class TestIntegrationSingle < TestIntegration
       send_http
     }
 
+    refute_nil Process.getpgid(@pid) # ensure server is still running
+
     th.join
     refute read_error
-    assert_equal 'Slept 8', body
-
-    refute_nil Process.getpgid(@server.pid) # ensure server is still running
+    assert_equal "Slept #{sleep_time}", body
 
     wait_server 15
   end
