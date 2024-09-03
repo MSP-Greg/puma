@@ -15,10 +15,10 @@ class TestURLMap < TestIntegration
     Dir.chdir("#{__dir__}/url_map_test") do
       cli_server set_pumactl_args, env: env
     end
-    connection = connect("/ok")
+
     # Puma 6.2.2 and below will time out here with Ruby v3.3
     # see https://github.com/puma/puma/pull/3165
-    body = read_body(connection, 1)
+    body = send_http_read_resp_body "GET /ok HTTP/1.0\r\n\r\n"
     assert_equal("OK", body)
   end
 end
