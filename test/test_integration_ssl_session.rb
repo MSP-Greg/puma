@@ -34,10 +34,6 @@ class TestIntegrationSSLSession < TestIntegration
     @bind_port ||= UniquePort.call
   end
 
-  def control_port
-    @control_port ||= UniquePort.call
-  end
-
   def set_reuse(reuse)
     <<~RUBY
       key  = "#{CERT_PATH}/server.key"
@@ -52,7 +48,7 @@ class TestIntegrationSSLSession < TestIntegration
         reuse: #{reuse}
       }
 
-      activate_control_app 'tcp://#{HOST}:#{control_port}', { auth_token: '#{TOKEN}' }
+      #{set_pumactl_config}
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
