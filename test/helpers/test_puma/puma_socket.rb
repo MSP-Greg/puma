@@ -145,23 +145,7 @@ module TestPuma
         session: nil, len: RESP_READ_LEN, timeout: 15)
       end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      read = String.new # rubocop: disable Performance/UnfreezeString
-      counter = 0
-      prev_size = 0
-      loop do
-        raise(Timeout::Error, 'Client Read Timeout') if Process.clock_gettime(Process::CLOCK_MONOTONIC) > end_time
-        if skt.wait_readable 1
-          read << skt.sysread(len)
-        end
-        ttl_read = read.bytesize
-        return read if prev_size == ttl_read && !ttl_read.zero?
-        prev_size = ttl_read
-        counter += 1
-      end
-    rescue EOFError
-      return read
-    rescue => e
-      raise e
+      skt.read_all
     end
 
     # Sends a request and returns the HTTP response.  Assumes one response is sent
@@ -290,8 +274,29 @@ module TestPuma
       self
     end
 
+    READ_ALL = -> do
+      read = String.new # rubocop: disable Performance/UnfreezeString
+      counter = 0
+      prev_size = 0
+      begin
+        loop do
+          raise(Timeout::Error, 'Client Read Timeout') if counter > 5
+          if self.wait_readable 1
+            read << self.sysread(RESP_READ_LEN)
+          end
+          ttl_read = read.bytesize
+          return read if prev_size == ttl_read && !ttl_read.zero?
+          prev_size = ttl_read
+          counter += 1
+        end
+      rescue EOFError
+        return read
+      rescue => e
+        raise e
+      end
+    end
 
-    REQ_WAIT_READ = -> (len, timeout: 5) do
+    WAIT_READ = -> (len, timeout: 5) do
       Thread.pass
       self.wait_readable timeout
       Thread.pass
@@ -336,12 +341,16 @@ module TestPuma
           raise 'port or path must be set!'
         end
 
-      skt.define_singleton_method :read_response, READ_RESPONSE
-      skt.define_singleton_method :read_body, READ_BODY
-      skt.define_singleton_method :<<, REQ_WRITE
+      skt.define_singleton_method :<<       , REQ_WRITE
       skt.define_singleton_method :req_write, REQ_WRITE # used for chaining
-      skt.define_singleton_method :wait_read, REQ_WAIT_READ
+
+      skt.define_singleton_method :read_response, READ_RESPONSE
+      skt.define_singleton_method :read_body    , READ_BODY
+      skt.define_singleton_method :read_all     , READ_ALL
+      skt.define_singleton_method :wait_read    , WAIT_READ
+
       @ios_to_close << skt
+
       if ctx
         @ios_to_close << tcp
         skt.session = session if session
