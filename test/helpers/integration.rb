@@ -27,17 +27,19 @@ class TestIntegration < Minitest::Test
   # rubyopt requires bundler/setup, so we don't need it here
   BASE = "#{Gem.ruby} -Ilib"
 
-  def setup
+  def before_setup
+    super # call PumaSocket
     @server = nil
     @server_running = nil # set to true in cli_server, set to false in `stop_server`
     @config_file = nil
     @server_log = +''
     @pid = nil
-    @ios_to_close = []
-    @bind_path    = tmp_path('.sock')
+    @bind_path = tmp_path('.sock')
   end
 
-  def teardown
+  def after_teardown
+    super # call PumaSocket
+
     if @server_running
       if @server && defined?(@control_port) && Puma.windows?
         cli_pumactl 'stop'
