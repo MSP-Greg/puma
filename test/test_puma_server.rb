@@ -41,7 +41,15 @@ class TestPumaServer < Minitest::Test
     options[:min_threads] ||= 1
     @server = Puma::Server.new block || @app, @events, options
     @bind_port = (@server.add_tcp_listener @host, 0).addr[1]
-    @server.run
+    th = @server.run
+
+    min_threads = options[:min_threads]
+    until @server.running >= min_threads
+      Thread.pass
+      sleep 0.005
+    end
+
+    th
   end
 
   def test_normalize_host_header_missing
@@ -1720,6 +1728,7 @@ class TestPumaServer < Minitest::Test
       wait.pop
       [200, {}, ["DONE"]]
     end
+
     sockets = send_http_array GET_10, num_connections, dly: nil
 
     @server.stop
