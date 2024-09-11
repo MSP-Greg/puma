@@ -110,15 +110,15 @@ class TestLauncher < Minitest::Test
   end
 
   def test_log_config_enabled
-    ENV['PUMA_LOG_CONFIG'] = "1"
+    env = {}
+    env['PUMA_LOG_CONFIG'] = "1"
 
-    assert_match(/Configuration:/, launcher.log_writer.stdout.string)
+    assert_match(/Configuration:/, launcher(env: env).log_writer.stdout.string)
 
     launcher.config.final_options.each do |config_key, _value|
       assert_match(/#{config_key}/, launcher.log_writer.stdout.string)
     end
 
-    ENV.delete('PUMA_LOG_CONFIG')
   end
 
   def test_log_config_disabled
@@ -147,11 +147,11 @@ class TestLauncher < Minitest::Test
 
   private
 
-  def log_writer
-    @log_writer ||= Puma::LogWriter.strings
+  def log_writer(env = ENV)
+    @log_writer ||= Puma::LogWriter.strings(env: env)
   end
 
-  def launcher(config = Puma::Configuration.new, lw = log_writer)
-    @launcher ||= Puma::Launcher.new(config, log_writer: lw)
+  def launcher(config = Puma::Configuration.new, lw = log_writer, env: ENV)
+    @launcher ||= Puma::Launcher.new(config, log_writer: lw, env: env)
   end
 end
