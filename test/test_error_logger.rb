@@ -58,38 +58,25 @@ class TestErrorLogger < Minitest::Test
   end
 
   def test_debug_with_debug_mode
-    with_debug_mode do
-      _, err = capture_io do
-        Puma::ErrorLogger.stdio.debug(text: 'non-blank')
-      end
-
-      assert_match %r!non-blank!, err
+    _, err = capture_io do
+      Puma::ErrorLogger.stdio(env: {"PUMA_DEBUG" => "1"}).debug(text: 'non-blank')
     end
+
+    assert_match %r!non-blank!, err
   end
 
   def test_debug_backtrace_logging
-    with_debug_mode do
-      def dummy_error
-        raise StandardError.new('non-blank')
-      rescue => e
-        Puma::ErrorLogger.stdio.debug(error: e)
-      end
-
-      _, err = capture_io do
-        dummy_error
-      end
-
-      assert_match %r!non-blank!, err
-      assert_match %r!:in [`'](TestErrorLogger#)?dummy_error'!, err
+    def dummy_error
+      raise StandardError.new('non-blank')
+    rescue => e
+      Puma::ErrorLogger.stdio(env: {"PUMA_DEBUG" => "1"}).debug(error: e)
     end
-  end
 
-  private
+    _, err = capture_io do
+      dummy_error
+    end
 
-  def with_debug_mode
-    original_debug, ENV["PUMA_DEBUG"] = ENV["PUMA_DEBUG"], "1"
-    yield
-  ensure
-    ENV["PUMA_DEBUG"] = original_debug
+    assert_match %r!non-blank!, err
+    assert_match %r!:in [`'](TestErrorLogger#)?dummy_error'!, err
   end
 end
