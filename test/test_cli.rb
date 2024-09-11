@@ -302,38 +302,37 @@ class TestCLI < Minitest::Test
   end
 
   def test_environment_app_env
-    ENV['RACK_ENV'] = @environment
-    ENV['RAILS_ENV'] = @environment
-    ENV['APP_ENV'] = 'test'
+    env = {}
+    env['RACK_ENV'] = @environment
+    env['RAILS_ENV'] = @environment
+    env['APP_ENV'] = 'test'
 
-    cli = Puma::CLI.new []
+    cli = Puma::CLI.new [], env: env
     cli.send(:setup_options)
 
     assert_equal 'test', cli.instance_variable_get(:@conf).environment
-  ensure
-    ENV.delete 'APP_ENV'
-    ENV.delete 'RAILS_ENV'
   end
 
   def test_environment_rack_env
-    ENV['RACK_ENV'] = @environment
+    env = {}
+    env['RACK_ENV'] = @environment
 
-    cli = Puma::CLI.new []
+    cli = Puma::CLI.new [], env: env
     cli.send(:setup_options)
 
     assert_equal @environment, cli.instance_variable_get(:@conf).environment
   end
 
   def test_environment_rails_env
-    ENV.delete 'RACK_ENV'
-    ENV['RAILS_ENV'] = @environment
+    env = {}
 
-    cli = Puma::CLI.new []
+    env.delete 'RACK_ENV'
+    env['RAILS_ENV'] = @environment
+
+    cli = Puma::CLI.new [], env: env
     cli.send(:setup_options)
 
     assert_equal @environment, cli.instance_variable_get(:@conf).environment
-  ensure
-    ENV.delete 'RAILS_ENV'
   end
 
   def test_silent
