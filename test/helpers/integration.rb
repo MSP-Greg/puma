@@ -352,6 +352,16 @@ class TestIntegration < Minitest::Test
     end
   end
 
+  def set_pumactl_config(unix: false)
+    if unix
+      @control_path = tmp_path('.cntl_sock')
+      "activate_control_app 'unix://#{@control_path}' --control-token '#{TOKEN}'"
+    else
+      @control_port = UniquePort.call
+      "activate_control_app 'tcp://#{HOST}:#{@control_port}', { auth_token: '#{TOKEN}' }"
+    end
+  end
+
   def cli_pumactl(argv, unix: false, no_bind: nil)
     arg =
       if no_bind
