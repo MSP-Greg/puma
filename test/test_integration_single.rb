@@ -260,6 +260,7 @@ class TestIntegrationSingle < TestIntegration
     assert_raises Errno::ECONNREFUSED, "Connection refused" do
       connect
     end
+    wait_server
   end
 
   def test_pre_existing_unix_after_idle_timeout
@@ -285,4 +286,5 @@ class TestIntegrationSingle < TestIntegration
       File.unlink @bind_path if File.exist? @bind_path
     end
   end
+
 end
