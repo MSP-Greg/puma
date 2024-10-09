@@ -98,6 +98,7 @@ module Puma
       @queue_requests            = @options[:queue_requests]
       @max_fast_inline           = @options[:max_fast_inline]
       @enable_keep_alives        = @options[:enable_keep_alives]
+      @enable_keep_alives      &&= @queue_requests
       @io_selector_backend       = @options[:io_selector_backend]
       @http_content_length_limit = @options[:http_content_length_limit]
 
@@ -365,7 +366,7 @@ module Puma
                 # uncommenting this may cause 'long tail' response times when all
                 # workers are busy
                 # pool.wait_until_not_full if @clustered
-                sleep 0.001 while pool.out_of_band_running
+#                sleep 0.001 while pool.out_of_band_running
                 pool.wait_for_less_busy_worker(options[:wait_for_less_busy_worker])
 
                 io = begin
