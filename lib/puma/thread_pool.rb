@@ -39,6 +39,7 @@ module Puma
       @mutex = Mutex.new
       @todo = Queue.new
 
+      @backlog_max = 0
       @spawned = 0
       @waiting = 0
 
@@ -91,10 +92,13 @@ module Puma
     # @return [Hash] hash containing stat info from ThreadPool
     def stats
       with_mutex do
+        temp = @backlog_max
+        @backlog_max = 0
         { backlog: @todo.size,
           running: @spawned,
           pool_capacity: @waiting + (@max - @spawned),
-          busy_threads: @spawned - @waiting + @todo.size
+          busy_threads: @spawned - @waiting + @todo.size,
+          backlog_max: temp
         }
       end
     end
@@ -103,6 +107,12 @@ module Puma
     #
     def backlog
       with_mutex { @todo.size }
+    end
+
+    # The maximum size of the backlog
+    #
+    def backlog_max
+      with_mutex { @backlog_max }
     end
 
     # @!attribute [r] pool_capacity
@@ -243,6 +253,8 @@ module Puma
         end
 
         @todo << work
+        t = @todo.size
+        @backlog_max = t if t > @backlog_max
 
         if @waiting < @todo.size and @spawned < @max
           spawn_thread
