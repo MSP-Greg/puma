@@ -397,7 +397,9 @@ module Puma
         end
 
         graceful_shutdown if @status == :stop || @status == :restart
-STDOUT.syswrite "\n********* @closed_conections #{@closed_conections}  reactor #{@reactor&.selector_size_max}  tp #{pool&.backlog_max}\n"
+unless ENV['GITHUB_RUN_NUMBER']
+  STDOUT.syswrite "\n********* @closed_conections #{@closed_conections}  reactor #{@reactor&.selector_size_max}  tp #{pool&.backlog_max}\n"
+end
       rescue Exception => e
         @log_writer.unknown_error e, nil, "Exception handling servers"
       ensure
