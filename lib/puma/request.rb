@@ -56,6 +56,7 @@ module Puma
       return false if closed_socket?(socket)
 
       if client.http_content_length_limit_exceeded
+        client.env[HTTP_CONNECTION] = 'close'
         return prepare_response(413, {}, ["Payload Too Large"], requests, client)
       end
 
