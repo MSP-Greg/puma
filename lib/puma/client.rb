@@ -95,6 +95,8 @@ module Puma
 
       @http_content_length_limit = nil
       @http_content_length_limit_exceeded = false
+      @header_content_length_limit_exceeded = false
+      @body_length_limit_exceeded = false
 
       @peerip = nil
       @peer_family = nil
@@ -166,6 +168,8 @@ module Puma
       @peerip = nil if @remote_addr_header
       @in_last_chunk = false
       @http_content_length_limit_exceeded = false
+      @header_content_length_limit_exceeded = false
+      @body_length_limit_exceeded = false
 
       if @buffer
         return false unless try_to_parse_proxy_protocol
@@ -234,22 +238,17 @@ module Puma
     end
 
     def try_to_finish
-      if env[CONTENT_LENGTH] && above_http_content_limit(env[CONTENT_LENGTH].to_i)
-        @http_content_length_limit_exceeded = true
-      end
-
-      if @http_content_length_limit_exceeded
+      if @body_length_limit_exceeded
         @buffer = nil
         @body = EmptyBody
         set_ready
-        return true
       end
-
       return read_body if in_data_phase
 
       data = nil
       begin
         data = @io.read_nonblock(CHUNK_SIZE)
+        STDOUT.syswrite "\n         #{data.bytesize} data.bytesize\n"
       rescue IO::WaitReadable
         return false
       rescue EOFError
@@ -275,18 +274,21 @@ module Puma
 
       @parsed_bytes = @parser.execute(@env, @buffer, @parsed_bytes)
 
-      if @parser.finished? && above_http_content_limit(@parser.body.bytesize)
-        @http_content_length_limit_exceeded = true
-      end
-
       if @parser.finished?
+        @body_length_limit_exceeded = above_http_content_limit(@parser.body.bytesize)
+        @header_content_length_limit_exceeded = above_http_content_limit(@env[CONTENT_LENGTH]&.to_i)
+
+        if @header_content_length_limit_exceeded
+          @ready = true
+          return true
+        end
+
         return setup_body
       elsif @parsed_bytes >= MAX_HEADER
         raise HttpParserError,
           "HEADER is longer than allowed, aborting client early."
       end
-
-      false
+      true
     end
 
     def eagerly_finish
@@ -470,6 +472,7 @@ module Puma
 
       begin
         chunk = @io.read_nonblock(want, @read_buffer)
+        STDOUT.syswrite "\n         #{chunk.bytesize} body_part.bytesize\n"
       rescue IO::WaitReadable
         return false
       rescue SystemCallError, IOError
@@ -500,8 +503,10 @@ module Puma
 
     def read_chunked_body
       while true
+        return true if @body_length_limit_exceeded
         begin
-          chunk = @io.read_nonblock(4096, @read_buffer)
+          chunk = @io.read_nonblock(CHUNK_SIZE, @read_buffer)
+          STDOUT.syswrite "\n         #{chunk.bytesize} chunk.bytesize\n"
         rescue IO::WaitReadable
           return false
         rescue SystemCallError, IOError
@@ -544,6 +549,7 @@ module Puma
     # @version 5.0.0
     def write_chunk(str)
       @chunked_content_length += @body.write(str)
+      @body_length_limit_exceeded = above_http_content_limit(@chunked_content_length)
     end
 
     def decode_chunk(chunk)
@@ -676,7 +682,10 @@ module Puma
     end
 
     def above_http_content_limit(value)
-      @http_content_length_limit&.< value
+      value ||= 0
+      t = @http_content_length_limit&.< value
+      @http_content_length_limit_exceeded ||= t
+      t
     end
   end
 end
