@@ -110,6 +110,8 @@ module Puma
 
       # need unfrozen ASCII-8BIT, +'' is UTF-8
       @read_buffer = String.new # rubocop: disable Performance/UnfreezeString
+      
+      @debug_read = ENV['PUMA_DEBUG_CLIENT_READ'] == 'true'
     end
 
     attr_reader :env, :to_io, :body, :io, :timeout_at, :ready, :hijacked,
@@ -248,7 +250,7 @@ module Puma
       data = nil
       begin
         data = @io.read_nonblock(CHUNK_SIZE)
-        STDOUT.syswrite "\n         #{data.bytesize} data.bytesize\n"
+        printf "%6d  try_to_finish\n", data.bytesize if @debug_read
       rescue IO::WaitReadable
         return false
       rescue EOFError
@@ -472,7 +474,7 @@ module Puma
 
       begin
         chunk = @io.read_nonblock(want, @read_buffer)
-        STDOUT.syswrite "\n         #{chunk.bytesize} body_part.bytesize\n"
+        printf "%6d  read_body\n", chunk.bytesize if @debug_read
       rescue IO::WaitReadable
         return false
       rescue SystemCallError, IOError
@@ -506,7 +508,7 @@ module Puma
         return true if @body_length_limit_exceeded
         begin
           chunk = @io.read_nonblock(CHUNK_SIZE, @read_buffer)
-          STDOUT.syswrite "\n         #{chunk.bytesize} chunk.bytesize\n"
+          printf "%6d  read_chunked_body\n", chunk.bytesize if @debug_read
         rescue IO::WaitReadable
           return false
         rescue SystemCallError, IOError
