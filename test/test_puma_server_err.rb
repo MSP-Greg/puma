@@ -10,7 +10,7 @@ class WithoutBacktraceError < StandardError
   def message; "no backtrace error"; end
 end
 
-class TestPumaServer < Minitest::Test
+class TestPumaServerErr < Minitest::Test
 #  parallelize_me!
 
   include TestPuma
@@ -26,6 +26,7 @@ class TestPumaServer < Minitest::Test
   HOST = HOST4
 
   def setup
+    STDOUT.syswrite "\n" if ENV['PUMA_DEBUG_CLIENT_READ'] == 'true'
     @host = HOST
     @app = ->(env) { [200, {}, [env['rack.url_scheme']]] }
 
@@ -36,6 +37,7 @@ class TestPumaServer < Minitest::Test
 
   def teardown
     @server.stop(true)
+    STDOUT.syswrite "\n" if ENV['PUMA_DEBUG_CLIENT_READ'] == 'true'
     # Errno::EBADF raised on macOS
   end
 
