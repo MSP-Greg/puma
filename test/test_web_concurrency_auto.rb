@@ -40,7 +40,7 @@ class TestWebConcurrencyAuto < TestIntegration
     workers = actual.to_i == 1 ? 1 : 2
     get_worker_pids 0, workers # make sure at least one or more workers booted
 
-    expected = send_http_read_resp_body GET_11
+    expected = send_http_read_body GET_11
 
     assert_equal expected, actual
   end
