@@ -43,10 +43,10 @@ module TestPuma
   # * `ctx:` - ssl context (`OpenSSL::SSL::SSLContext`)
   # * `session:` - ssl session (`OpenSSL::SSL::Session`)
   #
-  # #### Methods that process the response:
+  # #### Methods that create a socket, send a request, and process the response:
   # * `send_http_read_response` - sends a request and returns the whole response
-  # * `send_http_read_resp_body` - sends a request and returns the response body
-  # * `send_http_read_resp_headers` - sends a request and returns the response with the body removed as an array of lines
+  # * `send_http_read_body` - sends a request and returns the response body
+  # * `send_http_read_headers` - sends a request and returns the response with the body removed as an array of lines
   #
   # All methods that process the response have the following optional keyword parameters:
   # * `timeout:` - total socket read timeout, defaults to `RESP_READ_TIMEOUT` (`Float`)
@@ -120,28 +120,13 @@ module TestPuma
 
     # rubocop: disable Metrics/ParameterLists
 
-    # Sends a request and returns the response header lines as an array of strings.
-    # Includes the status line.
+    # Sends a request and returns the socket
     # @!macro req
     # @!macro skt
-    # @!macro resp
-    # @return [Array<String>] array of header lines in the response
-    def send_http_read_resp_headers(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
-        session: nil, len: nil, timeout: nil)
-      skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      resp = skt.read_response timeout: timeout, len: len
-      resp.split(RESP_SPLIT, 2).first.split "\r\n"
-    end
-
-    # Sends a request and returns the HTTP response body.
-    # @!macro req
-    # @!macro skt
-    # @!macro resp
-    # @return [Response] the body portion of the HTTP response
-    def send_http_read_resp_body(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
-        session: nil, len: nil, timeout: nil)
-      skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_body timeout: timeout, len: len
+    # @return [PumaSSLSocket, PumaTCPSocket, PumaUNIXSocket] the created socket
+    def send_http(req = GET_11, host: nil, port: nil, path: nil, ctx: nil, session: nil)
+      new_socket(host: host, port: port, path: path, ctx: ctx, session: session)
+        .send_http req
     end
 
     # Sends a request and returns whatever can be read.  Use when multiple
@@ -151,10 +136,33 @@ module TestPuma
     # @!macro resp
     # @return [String] socket read string
     def send_http_read_all(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
-        session: nil, len: RESP_READ_LEN, timeout: 15)
-      end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
-      skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_all
+        session: nil, len: nil, timeout: nil)
+      send_http(req, host: host, port: port, path: path, ctx: ctx, session: session)
+        .read_all(timeout: timeout)
+    end
+
+    # Sends a request and returns the HTTP response body.
+    # @!macro req
+    # @!macro skt
+    # @!macro resp
+    # @return [Response] the body portion of the HTTP response
+    def send_http_read_body(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
+        session: nil, len: nil, timeout: nil)
+      send_http(req, host: host, port: port, path: path, ctx: ctx, session: session)
+        .read_body timeout: timeout, len: len
+    end
+
+    # Sends a request and returns the response header lines as an array of strings.
+    # Includes the status line.
+    # @!macro req
+    # @!macro skt
+    # @!macro resp
+    # @return [Array<String>] array of header lines in the response
+    def send_http_read_headers(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
+        session: nil, len: nil, timeout: nil)
+      send_http(req, host: host, port: port, path: path, ctx: ctx, session: session)
+        .read_response(timeout: timeout, len: len)
+        .split(RESP_SPLIT, 2).first.split "\r\n"
     end
 
     # Sends a request and returns the HTTP response.  Assumes one response is sent
@@ -164,17 +172,8 @@ module TestPuma
     # @return [Response] the HTTP response
     def send_http_read_response(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: nil, timeout: nil)
-      skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
-      skt.read_response timeout: timeout, len: len
-    end
-
-    # Sends a request and returns the socket
-    # @!macro req
-    # @!macro skt
-    # @return [PumaSSLSocket, PumaTCPSocket, PumaUNIXSocket] the created socket
-    def send_http(req = GET_11, host: nil, port: nil, path: nil, ctx: nil, session: nil)
-      skt = new_socket host: host, port: port, path: path, ctx: ctx, session: session
-      skt << req
+      send_http(req, host: host, port: port, path: path, ctx: ctx, session: session)
+        .read_response timeout: timeout, len: len
     end
 
     # Determines whether the socket has been closed by the server.  Only works when
