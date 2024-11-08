@@ -62,7 +62,7 @@ class TestPersistent < PumaTest
 
     assert_equal @valid_response, response
 
-    response = socket.req_write(@valid_request).read_response
+    response = socket.send_http_read_response @valid_request
 
     assert_equal @valid_response, response
   end
@@ -81,7 +81,7 @@ class TestPersistent < PumaTest
 
     assert_equal expected, response
 
-    response = socket.req_write(@valid_request).read_response
+    response = socket.send_http_read_response @valid_request
 
     assert_equal @valid_response, response
   end
@@ -91,7 +91,7 @@ class TestPersistent < PumaTest
     response = socket.read_response
     assert_equal "HTTP/1.1 204 No Content\r\nx-header: Works\r\n\r\n", response
 
-    response = socket.req_write(@valid_request).read_response
+    response = socket.send_http_read_response @valid_request
 
     assert_equal @valid_response, response
   end
