@@ -59,7 +59,7 @@ class TestCLI < Minitest::Test
 
     wait_booted
 
-    body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", port: control_port
+    body = send_http_read_body "GET /stats HTTP/1.0\r\n\r\n", port: control_port
 
     assert_equal Puma.stats_hash, JSON.parse(Puma.stats, symbolize_names: true)
 
@@ -89,7 +89,7 @@ class TestCLI < Minitest::Test
 
     wait_booted
 
-    body = send_http_read_resp_body "GET /stats?token=#{token} HTTP/1.0\r\n\r\n",
+    body = send_http_read_body "GET /stats?token=#{token} HTTP/1.0\r\n\r\n",
       port: control_port, ctx: new_ctx
 
     dmt = Puma::Configuration::DEFAULTS[:max_threads]
@@ -114,7 +114,7 @@ class TestCLI < Minitest::Test
 
     wait_booted
 
-    body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", path: @tmp_path
+    body = send_http_read_body "GET /stats HTTP/1.0\r\n\r\n", path: @tmp_path
 
     dmt = Puma::Configuration::DEFAULTS[:max_threads]
     expected_stats = /{"started_at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z","backlog":0,"running":0,"pool_capacity":#{dmt},"max_threads":#{dmt},"requests_count":0,"versions":\{"puma":"#{@puma_version_pattern}","ruby":\{"engine":"\w+","version":"\d+.\d+.\d+","patchlevel":-?\d+\}\}\}/
@@ -139,7 +139,7 @@ class TestCLI < Minitest::Test
 
     wait_booted
 
-    body = send_http_read_resp_body "GET /stop HTTP/1.0\r\n\r\n", path: @tmp_path
+    body = send_http_read_body "GET /stop HTTP/1.0\r\n\r\n", path: @tmp_path
 
     assert_equal '{ "status": "ok" }', body
   ensure
@@ -160,14 +160,14 @@ class TestCLI < Minitest::Test
 
     wait_booted
 
-    body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", port: control_port
+    body = send_http_read_body "GET /stats HTTP/1.0\r\n\r\n", port: control_port
 
     assert_equal 0, JSON.parse(body)['requests_count']
 
     # send real requests to server
-    3.times { send_http_read_resp_body GET_10 }
+    3.times { send_http_read_body GET_10 }
 
-    body = send_http_read_resp_body "GET /stats HTTP/1.0\r\n\r\n", port: control_port
+    body = send_http_read_body "GET /stats HTTP/1.0\r\n\r\n", port: control_port
 
     assert_equal 3, JSON.parse(body)['requests_count']
   ensure
