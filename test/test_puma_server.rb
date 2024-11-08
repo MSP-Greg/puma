@@ -69,7 +69,7 @@ class TestPumaServer < PumaTest
       [200, {}, [env["SERVER_NAME"], "\n", env["SERVER_PORT"]]]
     end
 
-    body = send_http_read_resp_body GET_10
+    body = send_http_read_body GET_10
     assert_equal "localhost\n80", body
   end
 
@@ -78,10 +78,10 @@ class TestPumaServer < PumaTest
       [200, {}, [env["SERVER_NAME"], "\n", env["SERVER_PORT"]]]
     end
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nHost: example.com:456\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.0\r\nHost: example.com:456\r\n\r\n"
     assert_equal "example.com\n456", body
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n"
     assert_equal "example.com\n80", body
   end
 
@@ -90,10 +90,10 @@ class TestPumaServer < PumaTest
       [200, {}, [env["SERVER_NAME"], "\n", env["SERVER_PORT"]]]
     end
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nHost: 123.123.123.123:456\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.0\r\nHost: 123.123.123.123:456\r\n\r\n"
     assert_equal "123.123.123.123\n456", body
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nHost: 123.123.123.123\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.0\r\nHost: 123.123.123.123\r\n\r\n"
     assert_equal "123.123.123.123\n80", body
   end
 
@@ -102,13 +102,13 @@ class TestPumaServer < PumaTest
       [200, {}, [env["SERVER_NAME"], "\n", env["SERVER_PORT"]]]
     end
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nHost: [::ffff:127.0.0.1]:9292\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.0\r\nHost: [::ffff:127.0.0.1]:9292\r\n\r\n"
     assert_equal "[::ffff:127.0.0.1]\n9292", body
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nHost: [::1]:9292\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.0\r\nHost: [::1]:9292\r\n\r\n"
     assert_equal "[::1]\n9292", body
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nHost: [::1]\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.0\r\nHost: [::1]\r\n\r\n"
     assert_equal "[::1]\n80", body
   end
 
@@ -122,7 +122,7 @@ class TestPumaServer < PumaTest
       [200, {}, body]
     end
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
 
     assert_equal "Hello World", body
   end
@@ -134,7 +134,7 @@ class TestPumaServer < PumaTest
 
     server_run { |env| [200, {}, tf] }
 
-    body = send_http_read_resp_body "GET / HTTP/1.1\r\nHost: [::ffff:127.0.0.1]:#{@bind_port}\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.1\r\nHost: [::ffff:127.0.0.1]:#{@bind_port}\r\n\r\n"
 
     assert_equal random_bytes.bytesize, body.bytesize
     assert_equal random_bytes, body
@@ -154,7 +154,7 @@ class TestPumaServer < PumaTest
 
     server_run { |env| [200, {}, obj] }
 
-    body = send_http_read_resp_body
+    body = send_http_read_body
 
     assert_equal random_bytes.bytesize, body.bytesize
     assert_equal random_bytes, body
@@ -293,7 +293,7 @@ class TestPumaServer < PumaTest
       [200, {}, [giant]]
     end
 
-    body = send_http_read_resp_body GET_10
+    body = send_http_read_body GET_10
 
     assert_equal giant.bytesize, body.bytesize
   end
@@ -329,7 +329,7 @@ class TestPumaServer < PumaTest
 
     req = "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n"
 
-    body = send_http_read_resp_body req
+    body = send_http_read_body req
 
     assert_equal "80", body
   end
@@ -341,7 +341,7 @@ class TestPumaServer < PumaTest
 
     req = "GET / HTTP/1.0\r\nHost: example.com\r\nx-forwarded-proto: https,http\r\n\r\n"
 
-    body = send_http_read_resp_body req
+    body = send_http_read_body req
 
     assert_equal "443", body
   end
@@ -1943,12 +1943,12 @@ class TestPumaServer < PumaTest
       [200, {}, [env['REMOTE_ADDR']]]
     end
 
-    body = send_http_read_resp_body "GET / HTTP/1.1\r\nX-Remote-IP: 1.2.3.4\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.1\r\nX-Remote-IP: 1.2.3.4\r\n\r\n"
     assert_equal '1.2.3.4', body
 
     # TODO: it would be great to test a connection from a non-localhost IP, but we can't really do that. For
     # now, at least test that it doesn't return garbage.
-    body = send_http_read_resp_body "GET / HTTP/1.1\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.1\r\n\r\n"
     assert_equal @host, body
   end
 
@@ -2108,7 +2108,7 @@ class TestPumaServer < PumaTest
       body = [env['REQUEST_METHOD']]
       [200, {}, body]
     end
-    body = send_http_read_resp_body "PROPFIND / HTTP/1.0\r\n\r\n"
+    body = send_http_read_body "PROPFIND / HTTP/1.0\r\n\r\n"
     assert_equal 'PROPFIND', body
   end
 
@@ -2126,7 +2126,7 @@ class TestPumaServer < PumaTest
       body = [env['REQUEST_METHOD']]
       [200, {}, body]
     end
-    body = send_http_read_resp_body "YOUR_SPECIAL_METHOD / HTTP/1.0\r\n\r\n"
+    body = send_http_read_body "YOUR_SPECIAL_METHOD / HTTP/1.0\r\n\r\n"
     assert_match 'YOUR_SPECIAL_METHOD', body
   end
 
@@ -2167,7 +2167,7 @@ class TestPumaServer < PumaTest
 
     server_run(**options, &broken_app)
 
-    body = send_http_read_resp_body "GET / HTTP/1.1\r\n\r\n"
+    body = send_http_read_body "GET / HTTP/1.1\r\n\r\n"
 
     assert_equal "something wrong happened", body
   end
