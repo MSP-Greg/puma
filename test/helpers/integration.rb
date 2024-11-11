@@ -36,10 +36,9 @@ class TestIntegration < PumaTest
   end
 
   def teardown
-    if @server && @control_tcp_port && Puma.windows?
-      cli_pumactl 'stop'
-    # don't close if we've already done so
-    elsif @server && @pid && !@server_stopped && !Puma.windows?
+    if @server && defined?(@control_port) && Puma.windows?
+      cli_pumactl 'halt'
+    elsif @server && @pid && !Puma.windows?
       stop_server @pid, signal: :INT
     end
 
