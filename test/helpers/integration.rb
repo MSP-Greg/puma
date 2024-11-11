@@ -24,7 +24,7 @@ class TestIntegration < PumaTest
   # rubyopt requires bundler/setup, so we don't need it here
   BASE = "#{Gem.ruby} -Ilib"
 
-  def setup
+  def before_setup
     @server = nil
     @server_log = +''
     @server_stopped = false
@@ -35,7 +35,8 @@ class TestIntegration < PumaTest
     @bind_path = tmp_path('.sock')
   end
 
-  def teardown
+  def after_teardown
+
     if @server && defined?(@control_port) && Puma.windows?
       cli_pumactl 'halt'
     elsif @server && @pid && !@server_stopped && !Puma.windows?
@@ -59,10 +60,7 @@ class TestIntegration < PumaTest
       end
     end
 
-    if @config_file
-      File.unlink(@config_file.path) rescue nil
-      @config_file = nil
-    end
+    [@state_path, @control_path].each { |p| File.unlink(p) rescue nil }
   end
 
   private
@@ -86,8 +84,6 @@ class TestIntegration < PumaTest
         io = nil
       end
     end
-    # not sure about below, may help with gc...
-    @ios_to_close.clear
     @ios_to_close = nil
   end
 
