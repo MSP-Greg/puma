@@ -10,12 +10,6 @@ class TestPluginSystemdJruby < TestIntegration
   def setup
     skip_unless :linux
     skip_unless :jruby
-
-    super
-  end
-
-  def teardown
-    super unless skipped?
   end
 
   def test_systemd_plugin_not_loaded
