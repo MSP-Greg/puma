@@ -10,12 +10,6 @@ class TestSkipSystemd < TestIntegration
   def setup
     skip_unless :linux
     skip_if :jruby
-
-    super
-  end
-
-  def teardown
-    super unless skipped?
   end
 
   def test_systemd_plugin_not_loaded
