@@ -77,6 +77,7 @@ module TestPuma
       @control_path = nil
       @ssl_socket_contexts = Queue.new
       @ios_to_close ||= Queue.new
+      super
     end
 
     # Closes all io's in `@ios_to_close`, also deletes them if they are files
@@ -84,6 +85,7 @@ module TestPuma
       return if skipped?
 
       close_ios if @ios_to_close
+      super
 
       until @ssl_socket_contexts.empty?
         ctx = @ssl_socket_contexts.pop
