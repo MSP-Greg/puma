@@ -185,6 +185,8 @@ module Puma
           if fast_check && @to_io.wait_readable(FAST_TRACK_KA_TIMEOUT)
             return try_to_finish
           end
+        rescue Puma::HttpParserError => e
+          raise e
         rescue IOError
           # swallow it
         end
