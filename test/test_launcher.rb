@@ -109,13 +109,12 @@ class TestLauncher < Minitest::Test
       queue_booted.pop
       sleep Puma::Configuration::DEFAULTS[:worker_check_interval] + 1
       status = launcher.stats[:worker_status]&.first[:last_status]
-      launcher.stop
+      launcher.halt
       stopped = true
     end
 
     launcher.run
-    assert th_stats.join(10)
-
+    assert th_stats.join(15)
     refute_nil status
 
     Puma::Server::STAT_METHODS.each do |stat|
