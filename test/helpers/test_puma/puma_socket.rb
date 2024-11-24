@@ -141,13 +141,14 @@ module TestPuma
     # @!macro skt
     # @return [String] socket read string
     def send_http_read_all(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
-        session: nil, len: nil, timeout: nil)
+        session: nil, len: nil, timeout: 15)
+      end_time = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
       skt = send_http req, host: host, port: port, path: path, ctx: ctx, session: session
       read = String.new # rubocop: disable Performance/UnfreezeString
       counter = 0
       prev_size = 0
       loop do
-        raise(Timeout::Error, 'Client Read Timeout') if counter > 5
+        raise(Timeout::Error, 'Client Read Timeout') if Process.clock_gettime(Process::CLOCK_MONOTONIC) > end_time
         if skt.wait_readable 1
           read << skt.sysread(RESP_READ_LEN)
         end
