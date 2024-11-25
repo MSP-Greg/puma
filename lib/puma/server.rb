@@ -77,6 +77,8 @@ module Puma
 
       @thread = nil
       @thread_pool = nil
+      @response_times = Queue.new
+      @response_times_sum = 0.0
 
       @options = if options.is_a?(UserFileDefaultOptions)
         options
@@ -324,6 +326,7 @@ module Puma
         pool = @thread_pool
         queue_requests = @queue_requests
         drain = options[:drain_on_shutdown] ? 0 : nil
+        max_flt = @max_threads.to_f
 
         addr_send_name, addr_value = case options[:remote_address]
         when :value
@@ -367,7 +370,13 @@ module Puma
                 # if ThreadPool out_of_band code is running, we don't want to add
                 # clients until the code is finished.
                 sleep 0.001 while pool.out_of_band_running
-                pool.wait_for_less_busy_worker(options[:wait_for_less_busy_worker]) if @clustered
+
+                unless @requests_count.zero?
+                  @response_times_sum += @response_times.pop until @response_times.empty?
+                  @resp_avg = @response_times_sum/@requests_count
+                  delay = (((@reactor&.reactor_size || 0) + pool.busy_threads * 1.5)/max_flt) * @resp_avg/50
+                  sleep delay
+                end
 
                 io = begin
                   sock.accept_nonblock
