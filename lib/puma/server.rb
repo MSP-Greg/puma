@@ -368,7 +368,8 @@ module Puma
                 # if ThreadPool out_of_band code is running, we don't want to add
                 # clients until the code is finished.
                 sleep 0.001 while pool.out_of_band_running
-                pool.wait_for_less_busy_worker(options[:wait_for_less_busy_worker]) if @clustered
+                pool.wait_until_not_full
+#                pool.wait_for_less_busy_worker(options[:wait_for_less_busy_worker]) if @clustered
 
                 io = begin
                   sock.accept_nonblock
