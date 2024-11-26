@@ -37,8 +37,7 @@ module Puma
       @not_empty = ConditionVariable.new
       @not_full = ConditionVariable.new
       @mutex = Mutex.new
-
-      @todo = []
+      @todo = Queue.new
 
       @spawned = 0
       @waiting = 0
@@ -280,19 +279,8 @@ module Puma
     # by the server. This would continue until a fully buffered request
     # makes it through the reactor and can then be processed by the thread pool.
     def wait_until_not_full
-      with_mutex do
-        while true
-          return if @shutdown
-
-          # If we can still spin up new threads and there
-          # is work queued that cannot be handled by waiting
-          # threads, then accept more work until we would
-          # spin up the max number of threads.
-          return if busy_threads < @max
-
-          @not_full.wait @mutex
-        end
-      end
+      return if @shutdown
+      sleep 0.005 * busy_threads/@max.to_f
     end
 
     # @version 5.0.0
