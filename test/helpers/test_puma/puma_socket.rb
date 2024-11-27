@@ -84,8 +84,9 @@ module TestPuma
     def after_teardown
       return if skipped?
 
-      close_ios if @ios_to_close
       super
+
+      close_ios if @ios_to_close
 
       until @ssl_socket_contexts.empty?
         ctx = @ssl_socket_contexts.pop
