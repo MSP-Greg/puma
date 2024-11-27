@@ -268,6 +268,7 @@ class TestIntegrationPumactl < TestIntegration
     assert_hash expected_version_ruby_hash, stats_hash['versions']['ruby']
 
   ensure
+    return unless @server
     cli_pumactl "stop", unix: true
     wait_server
   end
