@@ -220,7 +220,6 @@ module Puma
       @thread_pool&.spawned
     end
 
-
     # This number represents the number of requests that
     # the server is capable of taking right now.
     #
@@ -660,7 +659,14 @@ module Puma
       stats = @thread_pool&.stats || {}
       stats[:max_threads]    = @max_threads
       stats[:requests_count] = @requests_count
+      stats[:reactor_max] = @reactor.reactor_max
+      reset_max
       stats
+    end
+
+    def reset_max
+      @reactor.reactor_max = 0
+      @thread_pool.reset_max
     end
 
     # below are 'delegations' to binder
