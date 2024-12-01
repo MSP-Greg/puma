@@ -168,11 +168,11 @@ module TestPuma
           str << format("   %7.2f  #{percents_str}\n", Math.sqrt(var))
         end
       else
-        str << "\n#{@ka.ljust 23}  ────── Max ─────\n"
-        str << "#{@hey_info_line.ljust 23}  Reactor  Backlog\n"
+        str << "\n#{@ka.ljust 23           }  ── Reactor ──   ── Backlog ──\n"
+        str <<   "#{@hey_info_line.ljust 23}     Min/Max        Min/Max\n"
         CONNECTION_REQ.each do |k|
           hsh = @stats_data[k]
-          str << format("#{@hey_run_data[k]}   %6d         %3d      %3d\n", hsh[:requests], hsh[:reactor_max], hsh[:backlog_max])
+          str << format("#{@hey_run_data[k]}   %6d            %3d            %3d\n", hsh[:requests], hsh[:reactor_max], hsh[:backlog_max])
         end
       end
       str << "\n\n"
