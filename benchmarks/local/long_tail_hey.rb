@@ -149,23 +149,23 @@ module TestPuma
           str << format("#{@hey_run_data[k]}   %6d       %4d   %5d   %5d   %5d",
             requests.sum, reactor_max.min, reactor_max.max, backlog_max.min, backlog_max.max)
 
+          # convert requests array into sorted percent array
+          div = k * @req_per_connection/@workers.to_f
+          percents = requests.sort.map { |r| percent = 100.0 * (r - div)/div }
+
           # std dev calc
           n = requests.length.to_f
           sq_sum = 0
           sum = 0
-          requests.each do |i|
+          percents.each do |i|
             sq_sum += i**2
             sum += i
           end
           var = (sq_sum - sum**2/n)/n
 
-          div = k * @req_per_connection/@workers.to_f
-          percents = requests.sort.map do |r|
-            percent = 100.0 * (r - div)/div
-            format ' %5.1f', percent
-          end.join
+          percents_str = percents.map { |r| format ' %5.1f', r }.join
 
-          str << format("   %7.2f  #{percents}\n", Math.sqrt(var))
+          str << format("   %7.2f  #{percents_str}\n", Math.sqrt(var))
         end
       else
         str << "\n#{@ka.ljust 23}  ────── Max ─────\n"
