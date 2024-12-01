@@ -128,7 +128,7 @@ module Puma
 
             while true
               begin
-                payload = base_payload
+                payload = base_payload.dup
 
                 hsh = server.stats
                 hsh.each do |k, v|
