@@ -32,8 +32,7 @@ module TestPuma
 
     HEY = ENV.fetch('HEY', 'hey')
 
-    # CONNECTION_MULT = [1.0, 1.5, 2.0, 3.0, 4.0]
-    CONNECTION_MULT = [1.0, 1.5, 2.0, 3.0, 4.0].reverse
+    CONNECTION_MULT = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0]
     CONNECTION_REQ = []
 
     def run
@@ -58,7 +57,7 @@ module TestPuma
         workers = @workers || 1
         connections = (mult * @threads * workers).round
 
-      CONNECTION_REQ << connections
+        CONNECTION_REQ << connections
 
         hey_cmd = %Q[#{HEY} -c #{format '%3d', connections} -n #{format '%5d', connections * @req_per_connection} #{hey_cpus}#{@ka} #{@wrk_bind_str}/sleep#{@dly_app}]
 
