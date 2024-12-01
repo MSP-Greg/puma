@@ -134,7 +134,7 @@ module Puma
                 hsh.each do |k, v|
                   payload << %Q! "#{k}":#{v || 0},!
                 end
-                # sub call properly adds 'closing' string 
+                # sub call properly adds 'closing' string
                 io << payload.sub(/,\z/, " }\n")
                 server.reset_max
               rescue IOError
