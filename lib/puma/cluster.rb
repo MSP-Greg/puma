@@ -22,6 +22,7 @@ module Puma
       @workers = []
       @next_check = Time.now
 
+      @worker_max = [] # keeps track of 'max' stat values
       @phased_restart = false
     end
 
@@ -258,11 +259,14 @@ module Puma
     end
 
     # Inside of a child process, this will return all zeroes, as @workers is only populated in
-    # the master process.
+    # the master process.  Calling this also resets stat 'max' values to zero.
     # @!attribute [r] stats
+    # @return [Hash]
+
     def stats
       old_worker_count = @workers.count { |w| w.phase != @phase }
       worker_status = @workers.map do |w|
+        w.reset_max
         {
           started_at: utc_iso8601(w.started_at),
           pid: w.pid,
