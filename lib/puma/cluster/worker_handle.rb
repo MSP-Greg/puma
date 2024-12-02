@@ -57,9 +57,10 @@ module Puma
       def ping!(status)
         hsh = {}
         k, v = nil, nil
-        status.tr('}{"', '').strip.split(", ") do |kv|
+        # @todo remove each once Ruby 2.5 is no longer supported
+        status.tr('}{"', '').strip.split(", ").each do |kv|
           cntr = 0
-          ary = kv.split(':') do |t|
+          ary = kv.split(':').each do |t|
             if cntr == 0
               k = t
               cntr = 1
@@ -72,14 +73,13 @@ module Puma
 
         # check stat max values, we can't signal workers to reset the max values,
         # so we do so here
-        WORKER_MAX_KEYS.each_with_index do |key,idx|
+        WORKER_MAX_KEYS.each_with_index do |key, idx|
           if hsh[key] < @worker_max[idx]
             hsh[key] = @worker_max[idx]
           else
             @worker_max[idx] = hsh[key]
           end
         end
-        # STDOUT.syswrite "#{@index}   TP #{hsh[:backlog_max]}  Reactor #{hsh[:reactor_max]}\n"
         @last_checkin = Time.now
         @last_status = hsh
       end
