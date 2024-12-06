@@ -209,9 +209,9 @@ module TestPuma
         temp = job[:latency] = {}
         latency.lines.each do |l|
           per_cent = l[/\A\d+/].to_i
-          temp[per_cent] = per_cent.zero? ? '  na' : l.rstrip[/[\d.]+\z/]
+          temp[per_cent] = per_cent.zero? ? 0.0 : l.rstrip[/[\d.]+\z/].to_f
         end
-        temp[100] = hey_output[/^\s+Slowest\:\s+([\d.]+)/, 1]
+        temp[100] = hey_output[/^\s+Slowest\:\s+([\d.]+)/, 1].to_f
       end
       job
     end
