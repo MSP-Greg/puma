@@ -96,7 +96,10 @@ module Puma
       begin
         if @supported_http_methods == :any || @supported_http_methods.key?(env[REQUEST_METHOD])
           status, headers, app_body = @thread_pool.with_force_shutdown do
-            @app.call(env)
+            start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+            t = @app.call(env)
+            @response_times << (Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time)
+            t
           end
         else
           @log_writer.log "Unsupported HTTP method used: #{env[REQUEST_METHOD]}"
