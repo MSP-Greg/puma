@@ -95,8 +95,11 @@ module Puma
 
       begin
         if @supported_http_methods == :any || @supported_http_methods.key?(env[REQUEST_METHOD])
-          status, headers, app_body = @thread_pool.with_force_shutdown do
-            @app.call(env)
+          status, headers, app_body = nil, nil, nil
+          @thread_pool.with_force_shutdown do
+            start_time = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+            status, headers, app_body = @app.call(env)
+            @response_times << (Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_time)
           end
         else
           @log_writer.log "Unsupported HTTP method used: #{env[REQUEST_METHOD]}"
@@ -263,7 +266,8 @@ module Puma
 
       fast_write_response socket, body, io_buffer, chunked, content_length.to_i
       body.close if close_body
-      keep_alive
+      # if we're shutting down, close keep_alive connections
+      !shutting_down? && keep_alive
     end
 
     # @param env [Hash] see Puma::Client#env, from request
