@@ -77,6 +77,9 @@ module Puma
 
       @thread = nil
       @thread_pool = nil
+      @response_times = Queue.new
+      @response_times_sum = 0.0
+      @delay_max = 0.0
 
       @options = if options.is_a?(UserFileDefaultOptions)
         options
@@ -367,8 +370,15 @@ module Puma
                 # if ThreadPool out_of_band code is running, we don't want to add
                 # clients until the code is finished.
                 sleep 0.001 while pool.out_of_band_running
-                pool.wait_until_not_full
-#                pool.wait_for_less_busy_worker(options[:wait_for_less_busy_worker]) if @clustered
+
+                if @requests_count > 0
+                  @response_times_sum += @response_times.pop until @response_times.empty?
+
+                  @resp_av = @response_times_sum/@requests_count
+                  delay = (pool.busy_threads/@max_threads.to_f) * @resp_av/40
+                  @delay_max = delay if delay > @delay_max
+                  sleep delay
+                end
 
                 io = begin
                   sock.accept_nonblock
