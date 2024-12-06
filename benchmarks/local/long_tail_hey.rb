@@ -101,12 +101,14 @@ module TestPuma
       str = @desc_line.dup
       str_len = str.length
 
-      str << "\n#{@ka.ljust 30}  ──────────────────────── Hey Latency ─────────────────────────\n" \
-        "#{@hey_info_line}  req/sec      10%     25%     50%     75%     90%     95%     99%    100%\n"
+      dly = format'%-5.2f', @dly_app
+      str << "\n#{@ka.ljust 30}  ────────────────────── Hey Latency / #{dly}───────────── Long Tail\n" \
+        "#{@hey_info_line}  req/sec    10%    25%    50%    75%    90%    95%    99%    100%   100% / 10%\n"
 
       @hey_data.each do |k, data|
         str << format("#{@hey_run_data[k]}   %6d   %8.2f  ", data[:requests], data[:rps])
-        data[:latency].each { |pc, time| str << "#{time.to_s.rjust 8}" }
+        data[:latency].each { |pc, time| str << format('%6.2f ', time/@dly_app) }
+        str << format('%9.2f', data[:latency][100]/data[:latency][10])
         str << "\n"
       end
       str << "\n"
@@ -169,10 +171,10 @@ module TestPuma
         end
       else
         str << "\n#{@ka.ljust 23           }  ── Reactor ──   ── Backlog ──\n"
-        str <<   "#{@hey_info_line.ljust 23}     Min/Max        Min/Max\n"
+        str <<   "#{@hey_info_line.ljust 23}     Min/Max         Min/Max\n"
         CONNECTION_REQ.each do |k|
           hsh = @stats_data[k]
-          str << format("#{@hey_run_data[k]}   %6d            %3d            %3d\n", hsh[:requests], hsh[:reactor_max], hsh[:backlog_max])
+          str << format("#{@hey_run_data[k]}   %6d            %3d             %3d\n", hsh[:requests], hsh[:reactor_max], hsh[:backlog_max])
         end
       end
       str << "\n\n"
