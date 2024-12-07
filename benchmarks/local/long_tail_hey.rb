@@ -33,6 +33,7 @@ module TestPuma
     HEY = ENV.fetch('HEY', 'hey')
 
     CONNECTION_MULT = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0]
+    #CONNECTION_MULT = [0.5, 1.0, 1.25, 1.5, 1.75, 2.0 ]
     CONNECTION_REQ = []
 
     def run
@@ -101,14 +102,16 @@ module TestPuma
       str = @desc_line.dup
       str_len = str.length
 
-      dly = format'%-5.2f', @dly_app
+      dly = format '%-5.2f', @dly_app
       str << "\n#{@ka.ljust 30}  ────────────────────── Hey Latency / #{dly}───────────── Long Tail\n" \
         "#{@hey_info_line}  req/sec    10%    25%    50%    75%    90%    95%    99%    100%   100% / 10%\n"
 
       @hey_data.each do |k, data|
         str << format("#{@hey_run_data[k]}   %6d   %8.2f  ", data[:requests], data[:rps])
-        data[:latency].each { |pc, time| str << format('%6.2f ', time/@dly_app) }
-        str << format('%9.2f', data[:latency][100]/data[:latency][10])
+        mult = data[:mult].to_f
+        mult = 1.0 if mult < 1.0
+        data[:latency].each { |pc, time| str << format('%6.2f ', time/(@dly_app * mult)) }
+          str << format('%9.2f', data[:latency][100]/data[:latency][10])
         str << "\n"
       end
       str << "\n"
