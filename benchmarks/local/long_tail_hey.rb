@@ -33,6 +33,7 @@ module TestPuma
     HEY = ENV.fetch('HEY', 'hey')
 
     CONNECTION_MULT = [0.5, 1.0, 1.5, 2.0, 3.0, 4.0]
+    #CONNECTION_MULT = [0.5, 1.0, 1.25, 1.5, 1.75, 2.0 ]
     CONNECTION_REQ = []
 
     def run
@@ -107,8 +108,10 @@ module TestPuma
 
       @hey_data.each do |k, data|
         str << format("#{@hey_run_data[k]}   %6d   %8.2f  ", data[:requests], data[:rps])
-        data[:latency].each { |pc, time| str << format('%6.2f ', time/@dly_app) }
-        str << format('%9.2f', data[:latency][100]/data[:latency][10])
+        mult = data[:mult].to_f
+        mult = 1.0 if mult < 1.0
+        data[:latency].each { |pc, time| str << format('%6.2f ', time/(@dly_app * mult)) }
+          str << format('%9.2f', data[:latency][100]/data[:latency][10])
         str << "\n"
       end
       str << "\n"
