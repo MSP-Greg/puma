@@ -268,20 +268,6 @@ module Puma
       end
     end
 
-    # This method is used by `Puma::Server` to let the server know when the
-    # server can pull (accept) more requests from the listener socket and
-    # process them.
-    #
-    # The wait time delay is based on how busy the thread pool is, accounting
-    # for both 'in-process' requests and pending (@todo array) requests.  The
-    # delay will be zero if all threads are not busy and there are no pending
-    # requests.
-    #
-    def wait_until_not_full
-      return if @shutdown
-      sleep 0.005 * busy_threads/@max.to_f
-    end
-
     # If there are any free threads in the pool, tell one to go ahead
     # and exit. If +force+ is true, then a trim request is requested
     # even if all threads are being utilized.
