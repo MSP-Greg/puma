@@ -79,7 +79,6 @@ module Puma
       @thread_pool = nil
       @response_times = Queue.new
       @response_times_sum = 0.0
-      @delay_max = 0.0
 
       @options = if options.is_a?(UserFileDefaultOptions)
         options
@@ -327,6 +326,7 @@ module Puma
         pool = @thread_pool
         queue_requests = @queue_requests
         drain = options[:drain_on_shutdown] ? 0 : nil
+        max_flt = @max_threads.to_f
 
         addr_send_name, addr_value = case options[:remote_address]
         when :value
@@ -371,12 +371,10 @@ module Puma
                 # clients until the code is finished.
                 sleep 0.001 while pool.out_of_band_running
 
-                if @requests_count > 0
+                unless @requests_count.zero?
                   @response_times_sum += @response_times.pop until @response_times.empty?
-
-                  @resp_av = @response_times_sum/@requests_count
-                  delay = (pool.busy_threads/@max_threads.to_f) * @resp_av/40
-                  @delay_max = delay if delay > @delay_max
+                  @resp_avg = @response_times_sum/@requests_count
+                  delay = (pool.busy_threads/max_flt) * @resp_avg/40
                   sleep delay
                 end
 
