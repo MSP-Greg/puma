@@ -2,9 +2,7 @@
 
 # benchmarks/local/long_tail_hey-0-2-4-8.sh
 #
-# takes one aurgument which is app delay, default to 0.2
-#
-# .067 12:30
+# takes one argument which is app delay, default to 0.2
 #
 # see comments in long_tail_hey.rb
 
@@ -33,4 +31,4 @@ sleep 2s
 benchmarks/local/long_tail_hey.sh -w8 -t5:5 -R100 -d$DLY -k
 sleep 2s
 
-printf '\n%(%m:%S)T All Total Time\n' $SECONDS
+TZ=UTC0 printf '\n%(%H:%M:%S)T All Total Time\n' $SECONDS
