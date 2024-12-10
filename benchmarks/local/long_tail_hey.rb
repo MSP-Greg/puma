@@ -102,7 +102,7 @@ module TestPuma
       str = @desc_line.dup
       str_len = str.length
 
-      dly = format'%-5.2f', @dly_app
+      dly = format '%-5.2f', @dly_app
       str << "\n#{@ka.ljust 30}  ────────────────────── Hey Latency / #{dly}───────────── Long Tail\n" \
         "#{@hey_info_line}  req/sec    10%    25%    50%    75%    90%    95%    99%    100%   100% / 10%\n"
 
