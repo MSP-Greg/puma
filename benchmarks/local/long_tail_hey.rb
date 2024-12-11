@@ -104,10 +104,12 @@ module TestPuma
 
       dly = format '%-5.2f', @dly_app
       str << "\n#{@ka.ljust 30}  ────────────────────── Hey Latency / #{dly}───────────── Long Tail\n" \
-        "#{@hey_info_line}  req/sec    10%    25%    50%    75%    90%    95%    99%    100%   100% / 10%\n"
+        "#{@hey_info_line}   rps %     10%    25%    50%    75%    90%    95%    99%    100%   100% / 10%\n"
+
+      max_rps = @threads * (@workers || 1)/(100.0 * @dly_app)
 
       @hey_data.each do |k, data|
-        str << format("#{@hey_run_data[k]}   %6d   %8.2f  ", data[:requests], data[:rps])
+        str << format("#{@hey_run_data[k]}   %6d    %6.1f   ", data[:requests], data[:rps].to_f/max_rps)
         mult = data[:mult].to_f
         mult = 1.0 if mult < 1.0
         data[:latency].each { |pc, time| str << format('%6.2f ', time/(@dly_app * mult)) }
