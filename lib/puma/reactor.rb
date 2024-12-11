@@ -19,6 +19,7 @@ module Puma
     # @!attribute [rw] reactor_max
     #   Maximum number of clients in the selector.  Reset with calls to `Server.stats`.
     attr_accessor :reactor_max
+    attr_reader :reactor_size
 
     # Create a new Reactor to monitor IO objects added by #add.
     # The provided block will be invoked when an IO has data available to read,
@@ -116,7 +117,7 @@ module Puma
     def register(client)
       @selector.register(client.to_io, :r).value = client
       @reactor_size += 1
-      @reactor_max = @reactor_size if @reactor_size > @reactor_max
+      @reactor_max = @reactor_size if @reactor_max < @reactor_size
       @timeouts << client
     rescue ArgumentError
       # unreadable clients raise error when processed by NIO
