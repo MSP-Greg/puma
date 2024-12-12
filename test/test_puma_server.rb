@@ -52,6 +52,7 @@ class TestPumaServer < Minitest::Test
     assert_equal "HTTP/1.0 200 OK", response.status
     assert_equal "HTTP/1.0"       , response.body
   end
+
   def test_http11_req_to_http11_resp
     server_run do |env|
       [200, {}, [env["SERVER_PROTOCOL"]]]
@@ -59,6 +60,29 @@ class TestPumaServer < Minitest::Test
     response = send_http_read_response GET_11
     assert_equal "HTTP/1.1 200 OK", response.status
     assert_equal "HTTP/1.1"       , response.body
+  end
+
+  # env['SERVER_PROTOCOL'] & env['HTTP_VERSION'] should be equal
+  def test_http11_req_with_no_version_header
+    server_run do |env|
+      body = "#{env['SERVER_PROTOCOL']}\n#{env['HTTP_VERSION']}"
+      [200, {}, [body]]
+    end
+    response = send_http_read_response GET_11
+    assert_equal "HTTP/1.1 200 OK", response.status
+    assert_equal "HTTP/1.1\nHTTP/1.1", response.body
+  end
+
+  # env['SERVER_PROTOCOL'] should equal the normal value, but env['HTTP_VERSION']
+  # should be equal to value in the request header
+  def test_http11_req_with_version_header
+    server_run do |env|
+      body = "#{env['SERVER_PROTOCOL']}\n#{env['HTTP_VERSION']}"
+      [200, {}, [body]]
+    end
+    response = send_http_read_response "GET / HTTP/1.1\r\nversion: 1.2.3\r\n\r\n"
+    assert_equal "HTTP/1.1 200 OK", response.status
+    assert_equal "HTTP/1.1\n1.2.3", response.body
   end
 
   def test_normalize_host_header_missing
