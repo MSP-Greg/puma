@@ -472,9 +472,12 @@ module Puma
         env[REMOTE_ADDR] = addr
       end
 
-      # The legacy HTTP_VERSION header can be sent as a client header.
-      # Rack v4 may remove using HTTP_VERSION.  If so, remove this line.
-      env[HTTP_VERSION] = env[SERVER_PROTOCOL]
+      # The legacy HTTP_VERSION header can be sent as a client header, but some
+      # legacy software may expect it to be equal to env[SERVER_PROTOCOL].
+      # As a means of keeping as much backward compatibility as possible, use the
+      # client supplied value, and if one doesn't exist, set it to the legacy value.
+
+      env[HTTP_VERSION] ||= env[SERVER_PROTOCOL]
     end
     private :normalize_env
 
