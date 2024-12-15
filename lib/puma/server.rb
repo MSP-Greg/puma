@@ -374,7 +374,7 @@ module Puma
                 unless @requests_count.zero?
                   @response_times_sum += @response_times.pop until @response_times.empty?
                   @resp_avg = @response_times_sum/@requests_count
-                  delay = (((@reactor&.reactor_size || 0) + pool.busy_threads)/max_flt) * @resp_avg/40
+                  delay = (((@reactor&.reactor_size || 0) + pool.busy_threads * 1.5)/max_flt) * @resp_avg/50
                   sleep delay
                 end
 
