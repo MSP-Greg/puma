@@ -297,7 +297,7 @@ module Puma
       normalize_env
       req_env_post_parse
       if @error_status_code
-        # @env[HTTP_CONNECTION] = 'close'
+        @env[HTTP_CONNECTION] = 'close'
         raise HttpParserError
       end
       temp
