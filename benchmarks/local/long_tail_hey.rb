@@ -169,7 +169,7 @@ module TestPuma
           end
           var = (sq_sum - sum**2/n)/n
 
-          percents_str = percents.map { |r| format ' %5.1f', r }.join
+          percents_str = percents.map { |r| r.abs >= 100.0 ? format(' %5.0f', r) : format(' %5.1f', r) }.join
 
           str << format("   %7.2f  #{percents_str}\n", Math.sqrt(var))
         end
