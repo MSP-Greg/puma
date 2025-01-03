@@ -411,6 +411,7 @@ class TestIntegration < Minitest::Test
       config: nil,
       unix: nil,
       signal: nil,
+      restarts: 10,
       log: nil
     )
     skipped = true
@@ -439,6 +440,11 @@ class TestIntegration < Minitest::Test
 
     num_requests = (total_requests/num_threads).to_i
 
+    restart_interval = total_requests/(restarts + 1)
+
+    requests_restart = 0
+    restart_queue = Queue.new
+
     num_threads.times do |thread|
       client_threads << Thread.new do
         num_requests.times do |req_num|
@@ -446,6 +452,11 @@ class TestIntegration < Minitest::Test
             begin
               socket = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @tcp_port)
               fast_write socket, "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
+              requests_restart += 1
+              if requests_restart > restart_interval
+                requests_restart = 0
+                restart_queue << nil
+              end
             rescue => e
               replies[:write_error] += 1
               raise e
@@ -483,10 +494,13 @@ class TestIntegration < Minitest::Test
     end
 
     run = true
+    thread_error = nil
 
     restart_thread = Thread.new do
-      sleep 0.2  # let some connections in before 1st restart
-      while run
+      loop do
+        break unless run
+        restart_queue.shift
+        restart_count += 1
         if Puma.windows?
           cli_pumactl 'restart'
         else
@@ -496,27 +510,24 @@ class TestIntegration < Minitest::Test
           # If 'wait_for_server_to_boot' times out, error in thread shuts down CI
           begin
             wait_for_server_to_boot timeout: 5
-          rescue Minitest::Assertion # Timeout
-            run = false
+          rescue Minitest::Assertion, Errno::EBADF => e # Timeout & server log IO error
+            thread_error = e
+            break
           end
         end
-        restart_count += 1
 
-        if Puma.windows?
-          sleep 2.0
-        elsif clustered
+        if clustered
           phase = signal == :USR2 ? 0 : restart_count
           # If 'get_worker_pids phase' times out, error in thread shuts down CI
           begin
             get_worker_pids phase, log: log
             # added sleep as locally 165 restarts in 7 seconds
-            sleep 0.15
-          rescue Minitest::Assertion # Timeout
-            run = false
+          rescue Minitest::Assertion, Errno::EBADF => e # Timeout & server log IO error
+            thread_error = e
+            break
           end
-        else
-          sleep 0.10
         end
+        break if restart_count >= restarts
       end
     end
 
@@ -528,8 +539,10 @@ class TestIntegration < Minitest::Test
       client_threads.compact!
     end
 
+    raise thread_error if thread_error
+
     run = false
-    restart_thread.join
+    # restart_thread.join
     if Puma.windows?
       cli_pumactl 'stop'
       wait_server
