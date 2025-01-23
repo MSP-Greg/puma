@@ -12,7 +12,7 @@ module TestPuma
   # It starts a `Puma` server, then collects data from one or more runs of hey.
   # It logs the hey data as each hey run is done, then summarizes the data.
   #
-  # benchmarks/local/long_tail_hey.sh -t5:5 -R20 -d0.2
+  # benchmarks/local/long_tail_hey.sh -t5:5 -R20 -d0.2  -C ./test/config/fork_worker.rb
   #
   # benchmarks/local/long_tail_hey.sh -w4 -t5:5 -R100 -d0.2
   #
@@ -102,8 +102,7 @@ module TestPuma
       str = @desc_line.dup
       str_len = str.length
 
-      dly = format '%-5.2f', @dly_app
-      str << "\n#{@ka.ljust 30}  ────────────────────── Hey Latency / #{dly}───────────── Long Tail\n" \
+      str << "\n#{@ka.ljust 30}  ───────────────────── Hey Latency ───────────────────── Long Tail\n" \
         "#{@hey_info_line}   rps %     10%    25%    50%    75%    90%    95%    99%    100%   100% / 10%\n"
 
       max_rps = @threads * (@workers || 1)/(100.0 * @dly_app)
@@ -170,7 +169,7 @@ module TestPuma
           end
           var = (sq_sum - sum**2/n)/n
 
-          percents_str = percents.map { |r| format ' %5.1f', r }.join
+          percents_str = percents.map { |r| r.abs >= 100.0 ? format(' %5.0f', r) : format(' %5.1f', r) }.join
 
           str << format("   %7.2f  #{percents_str}\n", Math.sqrt(var))
         end
