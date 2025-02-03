@@ -4,7 +4,7 @@ require 'puma/client'
 require 'puma/const'
 require 'puma/puma_http11'
 
-class TestRequestBase < Minitest::Test
+class TestRequestBase < PumaTest
   include Puma::Const
 
   PEER_ADDR = -> () { ["AF_INET", 80, "127.0.0.1", "127.0.0.1"] }
