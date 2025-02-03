@@ -580,6 +580,7 @@ module Puma
         status = 413
         res_body = ["Payload Too Large"]
         headers = {}
+        headers[CONTENT_LENGTH2] = 17
       else
         status, headers, res_body = lowlevel_error(err, client.env, status_code)
       end
