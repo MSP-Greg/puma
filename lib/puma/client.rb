@@ -323,6 +323,7 @@ module Puma
         hdrs = headers.split("\r\n").map { |h| h.gsub "\n", '\n'}.join "\n"
         raise HttpParserError, "Invalid HTTP format, parsing fails. Bad headers\n#{hdrs}"
       end
+    end
 
     # processes the `env` and the request body
     def process_env_body
