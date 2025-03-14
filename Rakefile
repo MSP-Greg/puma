@@ -79,7 +79,7 @@ else
     if RUBY_ENGINE_VERSION[/\A\d+/]&.to_i < 10
       ext.release = '8'
     else
-      ext.release = '21'
+      ext.release = '17'
     end
   end
 end
