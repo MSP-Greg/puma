@@ -159,6 +159,30 @@ class TestPumaServer < PumaTest
     tf&.close
   end
 
+  def test_response_io_pipe_body
+    server_run do |env|
+      r, w = IO.pipe
+      w.write 'response pipe body'
+      w.close
+      [200, {"Content-Type" => "text/plain"}, r]
+    end
+
+    response = send_http_read_response
+
+    expected = <<~REQ.gsub("\n", "\r\n")
+      HTTP/1.1 200 OK
+      Content-Type: text/plain
+      Transfer-Encoding: chunked
+
+      12
+      response pipe body
+      0
+
+    REQ
+
+    assert_equal expected, response
+  end
+
   def test_proper_stringio_body
     data = nil
 
