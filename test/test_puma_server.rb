@@ -159,17 +159,42 @@ class TestPumaServer < PumaTest
     tf&.close
   end
 
-  def test_pipe_body
+  def test_pipe_body_http11
+    skip if ::Puma::IS_WINDOWS && RUBY_VERSION < '2.7' #encoding issue?
     random_bytes = SecureRandom.random_bytes(4096)
 
-    r, w = IO.pipe
+    r, w = IO.pipe(binmode: true)
 
     w.write random_bytes
     w.close
 
     server_run { |env| [200, {}, r] }
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
+    response = send_http_read_response
+    body = response.decode_body
+
+    assert_equal random_bytes.bytesize, body.bytesize
+    assert_equal random_bytes, body
+  ensure
+    w&.close
+    r&.close
+  end
+
+  def test_pipe_body_http10
+    skip if ::Puma::IS_WINDOWS && RUBY_VERSION < '2.7' || #encoding issue?
+      ::Puma::IS_LINUX && ::Puma::IS_JRUBY
+    bytes = 4_096
+    random_bytes = SecureRandom.random_bytes(bytes)
+
+    r, w = IO.pipe(binmode: true)
+
+    w.write random_bytes
+    w.close
+
+    server_run { |env| [200, {'content-length' => "'#{bytes}'"}, r] }
+
+    response = send_http_read_response GET_10
+    body = response.body
 
     assert_equal random_bytes.bytesize, body.bytesize
     assert_equal random_bytes, body
