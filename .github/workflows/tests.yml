@@ -60,7 +60,9 @@ jobs:
         if: |
           (matrix.ruby == 'jruby-head') &&
           (needs.skip_duplicate_runs.outputs.should_skip != 'true')
-        run: echo 'JAVA_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.6-7/x64' >> $GITHUB_ENV
+        run: |
+          echo 'JAVA_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.6-7/x64' >> $GITHUB_ENV
+          echo 'JAVA_HOME_21_X64=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.6-7/x64' >> $GITHUB_ENV
 
       - name: load ruby, ragel
         if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
