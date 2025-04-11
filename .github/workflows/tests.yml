@@ -167,6 +167,12 @@ jobs:
         if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
         uses: actions/checkout@v4
 
+      - name: Set JAVA_HOME
+        if: |
+          (matrix.ruby == 'jruby-head') &&
+          (needs.skip_duplicate_runs.outputs.should_skip != 'true')
+        run: echo 'JAVA_HOME=/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.6-7/x64' >> $GITHUB_ENV
+
       - name: load ruby, ragel
         if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
         uses: ruby/setup-ruby-pkgs@v1
