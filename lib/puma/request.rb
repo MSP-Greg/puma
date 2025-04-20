@@ -238,7 +238,7 @@ module Puma
 
       fast_write_response socket, body, io_buffer, chunked, content_length.to_i
       body.close if close_body
-      uncork_socket socket
+      uncork_socket socket.to_io
       keep_alive
     end
 
