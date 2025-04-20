@@ -452,6 +452,7 @@ module Puma
           raise HttpParserError, "Invalid Content-Length: #{cl.inspect}"
         end
       else
+        # STDOUT.syswrite "\n\nbody #{body.bytesize}\n#{body}\n"
         @buffer = body.empty? ? nil : body
         @body = EmptyBody
         set_ready
