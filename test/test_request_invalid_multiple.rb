@@ -60,7 +60,7 @@ class TestRequestInvalidMultiple < PumaTest
       elsif Puma::IS_WINDOWS
         [Errno::ECONNABORTED]
       else
-        [EOFError]
+        [Errno::ECONNRESET, EOFError]
       end
     elsif Puma::IS_OSX && !Puma::IS_JRUBY # TruffleRuby
       [Errno::ECONNRESET, EOFError]
@@ -82,7 +82,7 @@ class TestRequestInvalidMultiple < PumaTest
   end
 
   def assert_status(request, status = 400, socket: nil)
-    response = if socket
+    @response = if socket
       socket.req_write(request).read_response
     else
       socket = new_socket
@@ -91,11 +91,11 @@ class TestRequestInvalidMultiple < PumaTest
 
     re = /\AHTTP\/1\.[01] #{status}/
 
-    assert_match re, response, "'#{response[/[^\r]+/]}' should be #{status}"
+    assert_match re, @response, "'#{@response[/[^\r]+/]}' should be #{status}"
 
     if status >= 400
       if @server.leak_stack_on_error
-        cl = response.headers_hash['Content-Length'].to_i
+        cl = @response.headers_hash['Content-Length'].to_i
         refute_equal 0, cl
       end
       socket.req_write GET_11
@@ -113,6 +113,7 @@ class TestRequestInvalidMultiple < PumaTest
     assert_status "GET / HTTP/1.1\r\n\r\n", 200, socket: socket
 
     assert_status "GET #{path} HTTP/1.1\r\n\r\n", socket: socket
+    assert_includes @response.body, "lib/puma/client.rb"
   end
 
   # ──────────────────────────────────── below are invalid Content-Length
@@ -125,6 +126,7 @@ class TestRequestInvalidMultiple < PumaTest
     cl = 'Content-Length: 5.01'
 
     assert_status "#{GET_PREFIX}#{cl}\r\n\r\nHello", socket: socket
+    assert_includes @response.body, "lib/puma/client.rb"
   end
 
   # ──────────────────────────────────── below have http_content_length_limit set
@@ -132,7 +134,7 @@ class TestRequestInvalidMultiple < PumaTest
   # Sets the server to have a http_content_length_limit of 190 kB, then sends a
   # 200 kB body with Content-Length set to the same.
   # Verifies that the connection is closed properly.
-  def __test_http_11_req_oversize_content_length
+  def test_http_11_req_oversize_content_length
     lleh_err = nil
 
     lleh = -> (err) {
@@ -158,7 +160,7 @@ class TestRequestInvalidMultiple < PumaTest
 
   # Sets the server to have a http_content_length_limit of 100 kB, then sends a
   # 200 kB chunked body.  Verifies that the connection is closed properly.
-  def __test_http_11_req_oversize_chunked
+  def test_http_11_req_oversize_chunked
     chunk_length = 20_000
     chunk_part_qty = 10
 
@@ -189,33 +191,6 @@ class TestRequestInvalidMultiple < PumaTest
     sleep 0.5
     refute lleh_err
 
-    assert_raises(Errno::ECONNRESET) { socket << GET_11 }
-  end
-
-  # Sets the server to have a http_content_length_limit of 190 kB, then sends a
-  # 200 kB body with Content-Length set to the same.
-  # Verifies that the connection is closed properly.
-  def __test_http_11_req_oversize_no_content_length
-    lleh_err = nil
-
-    lleh = -> (err) {
-      lleh_err = err
-      [500, {'Content-Type' => 'text/plain'}, ['error']]
-    }
-    long_string = 'a' * 200_000
-    server_run(http_content_length_limit: 190_000, lowlevel_error_handler: lleh) { [200, {}, ['Hello World']] }
-
-    socket = send_http "GET / HTTP/1.1\r\nConnection: Keep-Alive\r\n\r\n" \
-      "#{long_string}"
-
-    response = socket.read_response
-
-    # Content Too Large
-    assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
-    assert_equal HEADERS_413, response.headers
-
-    sleep 0.5
-    refute lleh_err
     assert_raises(Errno::ECONNRESET) { socket << GET_11 }
   end
 end
