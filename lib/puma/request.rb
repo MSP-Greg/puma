@@ -232,6 +232,7 @@ module Puma
 
       fast_write_response socket, body, io_buffer, chunked, content_length.to_i
       body.close if close_body
+
       # if we're shutting down, close keep_alive connections
       !shutting_down? && keep_alive
     end
