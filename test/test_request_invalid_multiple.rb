@@ -13,8 +13,7 @@ require_relative "helpers/test_puma/puma_socket"
 #
 
 class TestRequestInvalidMultiple < PumaTest
-  # running parallel seems to take longer...
-  # parallelize_me! unless JRUBY_HEAD
+  parallelize_me! unless JRUBY_HEAD
 
   include TestPuma
   include TestPuma::PumaSocket
@@ -141,7 +140,7 @@ class TestRequestInvalidMultiple < PumaTest
     assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
     assert_equal HEADERS_413, response.headers
 
-    sleep 0.25
+    sleep 0.1
     refute lleh_err
     assert_raises(*ERROR_ON_CLOSED) { socket << GET_11 }
   end
@@ -176,7 +175,7 @@ class TestRequestInvalidMultiple < PumaTest
     assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
     assert_equal HEADERS_413, response.headers
 
-    sleep 0.25
+    sleep 0.1
     refute lleh_err
 
     assert_raises(*ERROR_ON_CLOSED) { socket << GET_11 }
