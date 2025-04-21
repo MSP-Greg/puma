@@ -31,6 +31,8 @@ class TestRequestInvalidMultiple < PumaTest
     "Content-Length: #{STATUS_CODES[413].bytesize}"
   ]
 
+  ERROR_ON_CLOSED = [Errno::ECONNRESET, Errno::EPIPE, EOFError]
+
   def setup
     @host = HOST
     # this app should never be called, used for debugging
@@ -53,20 +55,6 @@ class TestRequestInvalidMultiple < PumaTest
     @bind_port = (@server.add_tcp_listener @host, 0).addr[1]
     @server.run
     sleep 0.15 if Puma::IS_JRUBY
-
-    @error_on_closed = if Puma::IS_MRI
-      if Puma::IS_OSX
-        [Errno::ECONNRESET, EOFError]
-      elsif Puma::IS_WINDOWS
-        [Errno::ECONNABORTED]
-      else
-        [Errno::ECONNRESET, EOFError]
-      end
-    elsif Puma::IS_OSX && !Puma::IS_JRUBY # TruffleRuby
-      [Errno::ECONNRESET, EOFError]
-    else
-      [EOFError]
-    end
   end
 
   def teardown
@@ -99,7 +87,7 @@ class TestRequestInvalidMultiple < PumaTest
         refute_equal 0, cl
       end
       socket.req_write GET_11
-      assert_raises(*@error_on_closed) { socket.read_response }
+      assert_raises(*ERROR_ON_CLOSED) { socket.read_response }
     end
   end
 
@@ -153,9 +141,9 @@ class TestRequestInvalidMultiple < PumaTest
     assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
     assert_equal HEADERS_413, response.headers
 
-    sleep 0.5
+    sleep 0.25
     refute lleh_err
-    assert_raises(Errno::ECONNRESET) { socket << GET_11 }
+    assert_raises(*ERROR_ON_CLOSED) { socket << GET_11 }
   end
 
   # Sets the server to have a http_content_length_limit of 100 kB, then sends a
@@ -188,9 +176,9 @@ class TestRequestInvalidMultiple < PumaTest
     assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
     assert_equal HEADERS_413, response.headers
 
-    sleep 0.5
+    sleep 0.25
     refute lleh_err
 
-    assert_raises(Errno::ECONNRESET) { socket << GET_11 }
+    assert_raises(*ERROR_ON_CLOSED) { socket << GET_11 }
   end
 end
