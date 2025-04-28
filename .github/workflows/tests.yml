@@ -89,7 +89,7 @@ jobs:
 
       - name: load ruby
         if: ${{ needs.skip_duplicate_runs.outputs.should_skip != 'true' }}
-        uses: ruby/setup-ruby-pkgs@v1
+        uses: MSP-Greg/setup-ruby@00-win-gcc-15
         with:
           ruby-version: ${{ matrix.ruby }}
           apt-get: ragel
