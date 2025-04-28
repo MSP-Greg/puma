@@ -77,4 +77,6 @@ if ENV["PUMA_MAKE_WARNINGS_INTO_ERRORS"]
   end
 end
 
+STDOUT.syswrite "\nCFLAGS\n#{$CFLAGS}\n"
+
 create_makefile("puma/puma_http11")
