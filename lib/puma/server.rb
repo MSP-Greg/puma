@@ -617,7 +617,7 @@ module Puma
 
     def notify_safely(message)
       @notify << message
-    rescue IOError, NoMethodError, Errno::EPIPE, Errno::EBADF
+    rescue IOError, NoMethodError, Errno::EPIPE, Errno::EBADF, ThreadError
       # The server, in another thread, is shutting down
       Puma::Util.purge_interrupt_queue
     rescue RuntimeError => e
