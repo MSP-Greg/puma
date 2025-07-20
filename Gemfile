@@ -11,6 +11,7 @@ gem "minitest-retry"
 gem "minitest-proveit"
 gem "minitest-stub-const"
 gem "concurrent-ruby", "~> 1.3"
+gem "debug"
 
 if ENV['PUMA_CI_RACK']&.strip == 'rack2'
   gem "rack"  , "~> 2.2"
