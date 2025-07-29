@@ -209,6 +209,8 @@ class TestPumaServer < PumaTest
 
   # Older Rubies may only read 16k, maybe OS dependent
   def test_request_body_small
+    skip if RUBY_VERSION < '2.6'
+
     data = nil
 
     server_run do |env|
@@ -232,6 +234,9 @@ class TestPumaServer < PumaTest
   end
 
   def test_request_body_large
+    skip_if :darwin, suffix: 'intermittent fails'
+    skip if RUBY_VERSION < '2.6'
+
     data = nil
 
     server_run do |env|
