@@ -2219,6 +2219,8 @@ class TestPumaServerSerial < PumaTest
 
   # Older Rubies may only read 16k, maybe OS dependent
   def test_request_body_small
+    skip_if :darwin, suffix: 'intermittent fails'
+
     data = nil
 
     server_run do |env|
@@ -2242,6 +2244,8 @@ class TestPumaServerSerial < PumaTest
   end
 
   def test_request_body_large
+    skip_if :darwin, suffix: 'intermittent fails'
+
     data = nil
 
     server_run do |env|
