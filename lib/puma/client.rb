@@ -336,10 +336,7 @@ module Puma
       temp = setup_body
       normalize_env
       req_env_post_parse
-      if @error_status_code
-        # @env[HTTP_CONNECTION] = 'close'
-        raise HttpParserError
-      end
+      raise HttpParserError if @error_status_code
       temp
     end
 
@@ -407,8 +404,7 @@ module Puma
       @body_read_start = Process.clock_gettime(Process::CLOCK_MONOTONIC, :float_millisecond)
 
       if @env[HTTP_EXPECT] == CONTINUE
-        # TODO allow a hook here to check the headers before
-        # going forward
+        # TODO allow a hook here to check the headers before going forward
         @io << HTTP_11_100
         @io.flush
       end
