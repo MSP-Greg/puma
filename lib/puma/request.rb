@@ -107,7 +107,6 @@ module Puma
       prepare_response(status, headers, res_body, requests, client)
     ensure
       io_buffer.reset
-      uncork_socket client.io
       app_body.close if app_body.respond_to? :close
       client&.tempfile_close
       if after_reply = env[RACK_AFTER_REPLY]
@@ -231,6 +230,7 @@ module Puma
       end
 
       fast_write_response socket, body, io_buffer, chunked, content_length.to_i
+      uncork_socket socket.to_io
       body.close if close_body
 
       # if we're shutting down, close keep_alive connections
