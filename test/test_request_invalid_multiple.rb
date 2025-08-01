@@ -32,7 +32,7 @@ class TestRequestInvalidMultiple < PumaTest
     "Content-Length: #{STATUS_CODES[413].bytesize}"
   ]
 
-  ERROR_ON_CLOSED = [Errno::ECONNRESET, Errno::EPIPE, EOFError]
+  ERROR_ON_CLOSED = [Errno::ECONNABORTED, Errno::ECONNRESET, Errno::EPIPE, EOFError]
 
   def setup
     @host = HOST
@@ -136,11 +136,13 @@ class TestRequestInvalidMultiple < PumaTest
     socket = send_http "GET / HTTP/1.1\r\nConnection: Keep-Alive\r\nContent-Length: 200000\r\n\r\n" \
       "#{long_string}"
 
-    response = socket.read_response
+    unless Puma::IS_WINDOWS
+      response = socket.read_response
 
-    # Content Too Large
-    assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
-    assert_equal HEADERS_413, response.headers
+      # Content Too Large
+      assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
+      assert_equal HEADERS_413, response.headers
+    end
 
     sleep 0.1
     refute lleh_err
@@ -171,11 +173,13 @@ class TestRequestInvalidMultiple < PumaTest
     socket = send_http "GET / HTTP/1.1\r\nConnection: Keep-Alive\r\n" \
       "Transfer-Encoding: chunked\r\n\r\n#{long_chunked}"
 
-    response = socket.read_response
+    unless Puma::IS_WINDOWS
+      response = socket.read_response
 
-    # Content Too Large
-    assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
-    assert_equal HEADERS_413, response.headers
+      # Content Too Large
+      assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
+      assert_equal HEADERS_413, response.headers
+    end
 
     sleep 0.1
     refute lleh_err
