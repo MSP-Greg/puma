@@ -224,13 +224,11 @@ module Puma
       # response_hijack.call
       if response_hijack
         fast_write_str socket, io_buffer.read_and_reset
-        uncork_socket socket
         response_hijack.call socket
         return :async
       end
 
       fast_write_response socket, body, io_buffer, chunked, content_length.to_i
-      uncork_socket socket.to_io
       body.close if close_body
 
       # if we're shutting down, close keep_alive connections
@@ -362,6 +360,7 @@ module Puma
         end
       end
       socket.flush
+      uncork_socket socket
     rescue Errno::EAGAIN, Errno::EWOULDBLOCK
       raise ConnectionError, SOCKET_WRITE_ERR_MSG
     rescue  Errno::EPIPE, SystemCallError, IOError
