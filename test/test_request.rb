@@ -67,10 +67,23 @@ class TestRequestValid < TestRequestBase
     end
   end
 
-  def test_underscore_and_dash
+  def test_underscore_and_dash_1st
     request = "GET / HTTP/1.1\r\n" \
       "x-forwarded-for: 1.1.1.1\r\n" \
       "x-forwarded_for: 2.2.2.2\r\n" \
+      "Content-Length: 11\r\n\r\nHello World"
+    create_client request
+    if @parser.finished?
+      assert_equal "1.1.1.1", @client.env['HTTP_X_FORWARDED_FOR']
+    else
+      fail
+    end
+  end
+
+  def test_underscore_and_dash_2nd
+    request = "GET / HTTP/1.1\r\n" \
+      "x-forwarded_for: 2.2.2.2\r\n" \
+      "x-forwarded-for: 1.1.1.1\r\n" \
       "Content-Length: 11\r\n\r\nHello World"
     create_client request
     if @parser.finished?
