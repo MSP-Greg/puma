@@ -24,7 +24,6 @@ class TestIntegrationPumactl < TestIntegration
   end
 
   def test_stop_tcp
-    skip_if :jruby, :truffleruby # Undiagnose thread race. TODO fix
     @control_tcp_port = UniquePort.call
     cli_server "-q test/rackup/sleep.ru #{set_pumactl_args} -S #{@state_path}"
 
@@ -197,7 +196,7 @@ class TestIntegrationPumactl < TestIntegration
 
   def test_clustered_stats
     skip_unless :fork
-    skip_unless :unix
+    # skip_unless :unix
 
     min_threads = 1
     max_threads = 2
@@ -277,6 +276,7 @@ class TestIntegrationPumactl < TestIntegration
   end
 
   def control_gc_stats(unix: false)
+    skip_if :truffleruby_head
     cli_server "-t1:1 -q test/rackup/hello.ru #{set_pumactl_args unix: unix} -S #{@state_path}"
 
     key = Puma::IS_MRI || TRUFFLE_HEAD ? "count" : "used"
