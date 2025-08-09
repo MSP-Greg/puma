@@ -196,7 +196,6 @@ class TestIntegrationPumactl < TestIntegration
 
   def test_clustered_stats
     skip_unless :fork
-    # skip_unless :unix
 
     min_threads = 1
     max_threads = 2
