@@ -167,28 +167,59 @@ module TestSkips
   # optional suffix kwarg is appended to the skip message
   # optional suffix bt should generally not used
   def skip_if(*engs, suffix: '', bt: caller)
+    skip_msg = []
     engs.each do |eng|
-      skip_msg = case eng
-        when :linux       then "Skipped if Linux#{suffix}"       if Puma::IS_LINUX
-        when :darwin      then "Skipped if darwin#{suffix}"      if Puma::IS_OSX
-        when :jruby       then "Skipped if JRuby#{suffix}"       if Puma::IS_JRUBY
-        when :truffleruby then "Skipped if TruffleRuby#{suffix}" if TRUFFLE
-        when :windows     then "Skipped if Windows#{suffix}"     if Puma::IS_WINDOWS
-        when :ci          then "Skipped if ENV['CI']#{suffix}"   if ENV['CI']
-        when :no_bundler  then "Skipped w/o Bundler#{suffix}"    if !defined?(Bundler)
-        when :ssl         then "Skipped if SSL is supported"     if Puma::HAS_SSL
-        when :fork        then "Skipped if Kernel.fork exists"   if HAS_FORK
-        when :unix        then "Skipped if UNIXSocket exists"    if Puma::HAS_UNIX_SOCKET
-        when :aunix       then "Skipped if abstract UNIXSocket"  if Puma.abstract_unix_socket?
-        when :rack3       then "Skipped if Rack 3.x"             if Rack.release >= '3'
-        else false
+      skip_msg << case eng
+        when :linux            ; Puma::IS_LINUX     ? "Linux"            : nil
+        when :darwin           ; Puma::IS_OSX       ? "darwin"           : nil
+        when :jruby            ; Puma::IS_JRUBY     ? "JRuby"            : nil
+        when :truffleruby      ; TRUFFLE            ? "TruffleRuby"      : nil
+        when :truffleruby_head ; TRUFFLE_HEAD       ? "TruffleRuby-Head" : nil
+        when :windows          ; Puma::IS_WINDOWS   ? "Windows"          : nil
+        when :ci               ; ENV['CI']          ? "ENV['CI']"        : nil
+        when :mri              ; Puma::IS_MRI       ? " MRI"             : nil
+        when :no_bundler       ; !defined?(Bundler) ? "no Bundler"       : nil
+        when :ssl              ; Puma::HAS_SSL      ? "has ssl"          : nil
+        when :fork             ; HAS_FORK           ? "Kernel.fork exists"   : nil
+        when :unix             ; Puma::HAS_UNIX_SOCKET ? "UNIXSocket exists" : nil
+        when :aunix            ; Puma.abstract_unix_socket? ? "abstract UNIXSocket" : nil
+        when :rack3            ; Rack.release >= '3' ? "Rack 3.x" : nil
+        else nil
       end
-      skip skip_msg, bt if skip_msg
     end
+    return if skip_msg.include? nil
+    skip_msg = "Skipped if #{skip_msg.join ' and '}#{suffix}"
+    skip skip_msg, bt
   end
 
   # called with only one param
-  def skip_unless(eng, bt: caller)
+  def skip_unless(*engs, suffix: '', bt: caller)
+    skip_msg = []
+    engs.each do |eng|
+      skip_msg << case eng
+        when :linux            ; Puma::IS_LINUX      ? nil : "Linux"
+        when :darwin           ; Puma::IS_OSX        ? nil : "darwin"
+        when :jruby            ; Puma::IS_JRUBY      ? nil : "JRuby"
+        when :truffleruby      ; TRUFFLE             ? nil : "TruffleRuby"
+        when :truffleruby_head ; TRUFFLE_HEAD ? nil        : "TruffleRuby-Head"
+        when :windows          ; Puma::IS_WINDOWS ? nil    : "Windows"
+        when :ci               ; ENV['CI'] ? nil           : "ENV['CI']"
+        when :mri              ; Puma::IS_MRI ? nil        : "MRI"
+        when :no_bundler       ; !defined?(Bundler) ? nil  : "no Bundler"
+        when :ssl              ; Puma::HAS_SSL ? nil       : "has ssl"
+        when :fork             ; HAS_FORK            ? nil : "Kernel.fork exists"
+        when :unix             ; Puma::HAS_UNIX_SOCKET ? nil : "UNIXSocket exists"
+        when :aunix            ; Puma.abstract_unix_socket? ? nil : "abstract UNIXSocket"
+        when :rack3            ; Rack.release >= '3' ? nil        : "Rack 3.x"
+        else nil
+      end
+    end
+    skip_msg.compact!
+    return if skip_msg.empty?
+    skip_msg = "Skipped unless #{skip_msg.join ' and '}#{suffix}"
+    skip skip_msg, bt
+
+
     skip_msg = case eng
       when :linux   then "Skip unless Linux"            unless Puma::IS_LINUX
       when :darwin  then "Skip unless darwin"           unless Puma::IS_OSX
@@ -202,6 +233,7 @@ module TestSkips
       when :rack3   then "Skipped unless Rack >= 3.x"   unless ::Rack.release >= '3'
       else false
     end
+    skip_msg = "Skipped unless #{skip_msg.join ' and '}#{suffix}"
     skip skip_msg, bt if skip_msg
   end
 end
