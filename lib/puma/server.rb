@@ -404,6 +404,7 @@ module Puma
                   next
                 end
                 drain += 1 if shutting_down?
+
                 client = new_client(io, sock)
                 client.send(addr_send_name, addr_value) if addr_value
                 pool << client
@@ -448,6 +449,8 @@ module Puma
       client = Client.new(io, @binder.env(sock))
       client.listener = sock
       client.http_content_length_limit = @http_content_length_limit
+      client.env_set_http_version = @env_set_http_version
+      client.supported_http_methods = @supported_http_methods
       client
     end
 
