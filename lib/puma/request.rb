@@ -295,10 +295,11 @@ module Puma
     #
     def fast_write_str(socket, str)
       n = 0
+      write_limit = 64 * 1_024
       byte_size = str.bytesize
       while n < byte_size
         begin
-          n += socket.write_nonblock(n.zero? ? str : str.byteslice(n..-1))
+          n += socket.write_nonblock(str.byteslice(n, write_limit))
         rescue Errno::EAGAIN, Errno::EWOULDBLOCK
           unless socket.wait_writable WRITE_TIMEOUT
             raise ConnectionError, SOCKET_WRITE_ERR_MSG
