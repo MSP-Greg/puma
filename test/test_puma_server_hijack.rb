@@ -51,10 +51,11 @@ class TestPumaServerHijack < PumaTest
     @bind_port = (@server.add_tcp_listener @host, 0).addr[1]
     @server.run
     min_threads = options[:min_threads]
+    # below may help with intermittent failures Aug-2025
     until @server.running >= min_threads
       Thread.pass
       sleep 0.01
-    end
+    end unless Puma::IS_MRI
   end
 
   # Full hijack does not return headers
