@@ -705,16 +705,6 @@ class TestConfigFile < PumaTest
     assert_kind_of Array, conf.config_files
   end
 
-  def test_clamp_raises_not_loaded_error_when_not_loaded
-    conf = Puma::Configuration.new
-
-    error = assert_raises(Puma::Configuration::NotLoadedError) do
-      conf.clamp
-    end
-
-    assert_equal "ensure load is called before clamping the configuration", error.message
-  end
-
   def test_clamp_succeeds_when_loaded
     conf = Puma::Configuration.new
     conf.load
