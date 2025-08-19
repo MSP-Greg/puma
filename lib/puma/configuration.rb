@@ -282,7 +282,7 @@ module Puma
     # Call once all configuration (included from rackup files)
     # is loaded to flesh out any defaults
     def clamp
-      raise NotLoadedError, "ensure load is called before clamping the configuration" unless @loaded
+      load unless @loaded
 
       @clamped = true
 
