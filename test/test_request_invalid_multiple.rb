@@ -85,10 +85,10 @@ class TestRequestInvalidMultiple < PumaTest
 
   def assert_status(request, status = 400, socket: nil)
     response = if socket
-      socket.req_write(request).read_response
+      socket.send_http_read_response(request)
     else
       socket = new_socket
-      socket.req_write(request).read_response
+      socket.send_http_read_response(request)
     end
 
     re = /\AHTTP\/1\.[01] #{status}/
@@ -100,7 +100,7 @@ class TestRequestInvalidMultiple < PumaTest
         cl = response.headers_hash['Content-Length'].to_i
         refute_equal 0, cl
       end
-      socket.req_write GET_11
+      socket.send_http
       assert_raises(*@error_on_closed) { socket.read_response }
     end
   end
@@ -112,7 +112,7 @@ class TestRequestInvalidMultiple < PumaTest
 
     socket = new_socket
 
-    assert_status "GET / HTTP/1.1\r\n\r\n", 200, socket: socket
+    assert_status GET_11, 200, socket: socket
 
     assert_status "GET #{path} HTTP/1.1\r\n\r\n", socket: socket
   end
