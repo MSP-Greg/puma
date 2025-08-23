@@ -122,7 +122,10 @@ if ENV['CI']
       result_str.gsub!(/^ +/, '')
       str = "\n**#{full_method}**\n**#{issue}**\n```\n#{result_str.strip}\n```\n"
       GITHUB_STEP_SUMMARY_MUTEX.synchronize {
-        File.write SUMMARY_FILE, str, mode: 'a+'
+        begin
+          File.write SUMMARY_FILE, str, mode: 'a+'
+        rescue Errno::EPIPE
+        end
       }
     end
   end
