@@ -439,9 +439,7 @@ module Puma
     #   end
     #
     def before_restart(&block)
-      if __callee__ == :on_restart
-        warn "on_restart is deprecated, use before_restart instead"
-      end
+      Puma.deprecate_method_change :on_restart, __callee__, __method__
 
       process_hook :before_restart, nil, block, 'before_restart'
     end
@@ -751,9 +749,7 @@ module Puma
     #   end
     #
     def before_worker_boot(key = nil, &block)
-      if __callee__ == :on_worker_boot
-        warn "on_worker_boot is deprecated, use before_worker_boot instead"
-      end
+      Puma.deprecate_method_change :on_worker_boot, __callee__, __method__
 
       warn_if_in_single_mode('before_worker_boot')
 
@@ -778,9 +774,7 @@ module Puma
     #   end
     #
     def before_worker_shutdown(key = nil, &block)
-      if __callee__ == :on_worker_shutdown
-        warn "on_worker_shutdown is deprecated, use before_worker_shutdown instead"
-      end
+      Puma.deprecate_method_change :on_worker_shutdown, __callee__, __method__
 
       warn_if_in_single_mode('before_worker_shutdown')
 
@@ -802,9 +796,7 @@ module Puma
     #   end
     #
     def before_worker_fork(&block)
-      if __callee__ == :on_worker_fork
-        warn "on_worker_fork is deprecated, use before_worker_fork instead"
-      end
+      Puma.deprecate_method_change :on_worker_fork, __callee__, __method__
 
       warn_if_in_single_mode('before_worker_fork')
 
@@ -841,9 +833,7 @@ module Puma
     #   end
     #
     def after_booted(&block)
-      if __callee__ == :on_booted
-        warn "on_booted is deprecated, use after_booted instead"
-      end
+      Puma.deprecate_method_change :on_booted, __callee__, __method__
 
       @config.options[:events].after_booted(&block)
     end
@@ -858,9 +848,7 @@ module Puma
     #   end
     #
     def after_stopped(&block)
-      if __callee__ == :on_stopped
-        warn "on_stopped is deprecated, use after_stopped instead"
-      end
+      Puma.deprecate_method_change :on_stopped, __callee__, __method__
 
       @config.options[:events].after_stopped(&block)
     end
@@ -887,9 +875,7 @@ module Puma
     # @version 5.0.0
     #
     def before_refork(key = nil, &block)
-      if __callee__ == :on_refork
-        warn "on_refork is deprecated, use before_refork instead"
-      end
+      Puma.deprecate_method_change :on_refork, __callee__, __method__
 
       warn_if_in_single_mode('before_refork')
 
@@ -937,9 +923,7 @@ module Puma
     #   end
     #
     def before_thread_start(&block)
-      if __callee__ == :on_thread_start
-        warn "on_thread_start is deprecated, use before_thread_start instead"
-      end
+      Puma.deprecate_method_change :on_thread_start, __callee__, __method__
 
       process_hook :before_thread_start, nil, block, 'before_thread_start'
     end
@@ -967,9 +951,7 @@ module Puma
     #   end
     #
     def before_thread_exit(&block)
-      if __callee__ == :on_thread_exit
-        warn "on_thread_exit is deprecated, use before_thread_exit instead"
-      end
+      Puma.deprecate_method_change :on_thread_exit, __callee__, __method__
 
       process_hook :before_thread_exit, nil, block, 'before_thread_exit'
     end
