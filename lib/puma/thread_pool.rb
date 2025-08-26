@@ -115,7 +115,9 @@ module Puma
 
     # @!attribute [r] pool_capacity
     def pool_capacity
-      waiting + (@max - spawned)
+      capacity = waiting + (@max - spawned)
+
+      capacity < 0 ? 0 : capacity
     end
 
     # @!attribute [r] busy_threads
