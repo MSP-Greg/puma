@@ -117,7 +117,9 @@ jobs:
       - name: test
         if: needs.skip_duplicate_runs.outputs.should_skip != 'true'
         timeout-minutes: 10
-        run: test/runner --verbose
+        run: |
+          bundle exec ruby -e 'require "nio"; puts "NIO::Selector.backends: #{NIO::Selector.backends.join ", "}", ""'
+          test/runner --verbose
         env:
           MT_CPU: 2
 
