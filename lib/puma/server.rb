@@ -384,16 +384,8 @@ module Puma
                 # clients until the code is finished.
                 sleep 0.001 while pool.out_of_band_running
 
-                # only use delay when clustered and busy
-                if pool.busy_threads >= @max_threads
-                  if @clustered
-                    delay = 0.0001 * ((@reactor&.reactor_size || 0) + pool.busy_threads * 1.5)/max_flt
-                    sleep delay
-                  else
-                    # use small sleep for busy single worker
-                    sleep 0.0001
-                  end
-                end
+                pool.wait_until_not_full
+                pool.wait_for_less_busy_worker(options[:wait_for_less_busy_worker]) if @clustered
 
                 io = begin
                   sock.accept_nonblock
