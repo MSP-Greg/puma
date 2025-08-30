@@ -385,7 +385,7 @@ module Puma
                 sleep 0.001 while pool.out_of_band_running
 
                 # only use delay when clustered and busy
-                if pool.busy_threads >= @max_threads
+                if pool.waiting.zero?
                   if @clustered
                     delay = 0.0007 * ((@reactor&.reactor_size || 0) + pool.busy_threads * 2.5)/max_flt
                     sleep delay
