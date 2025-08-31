@@ -387,7 +387,7 @@ module Puma
                 # only use delay when clustered and busy
                 if pool.waiting.zero?
                   if @clustered
-                    delay = 0.0007 * ((@reactor&.reactor_size || 0) + pool.busy_threads * 2.5)/max_flt
+                    delay = 0.00007 * ((@reactor&.reactor_size || 0) + pool.busy_threads * 2.5)/max_flt
                     sleep delay
                   else
                     # use small sleep for busy single worker
