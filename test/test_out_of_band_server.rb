@@ -149,4 +149,20 @@ class TestOutOfBandServer < PumaTest
     end
     refute accepted, 'New connection accepted during out of band'
   end
+
+  # OOB should block new requests from being processed.
+  def test_blocks_new_keep_alive
+    oob_server oob_wait: true, max_threads: 2
+
+    readable = true
+    skt = send_http GET_11
+    assert_start_with skt.read_response, 'HTTP/1.1'
+
+    @mutex.synchronize do
+      readable = skt.req_write(GET_11).wait_readable(0.1)
+      @oob_finished.wait(@mutex)
+    end
+    refute readable, 'New request processed during out of band'
+    assert_start_with skt.read_response, 'HTTP/1.1'
+  end
 end
