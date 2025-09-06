@@ -363,7 +363,7 @@ module TestPuma
         retries = 0
         begin
           skt = send_http req
-          sleep dly
+          sleep dly if dly > 0.0
           skt
         rescue Errno::ECONNREFUSED
           retries += 1
