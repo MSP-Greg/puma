@@ -12,12 +12,10 @@ class TestOutOfBandServer < PumaTest
   def setup
     @server = nil
     @oob_finished = ConditionVariable.new
-    @app_finished = ConditionVariable.new
   end
 
   def teardown
     @oob_finished.broadcast
-    @app_finished.broadcast
     @server&.stop true
   end
 
@@ -38,14 +36,10 @@ class TestOutOfBandServer < PumaTest
         end
       end
     }
-    app_wait = options.delete(:app_wait)
+
     app = ->(_) do
       raise 'OOB conflict' if in_oob.locked?
-      @mutex.synchronize do
-        @request_count += 1
-        @app_finished.signal
-        @app_finished.wait(@mutex, 1) if app_wait
-      end
+      @request_count += 1
       [200, {}, [""]]
     end
 
@@ -73,19 +67,56 @@ class TestOutOfBandServer < PumaTest
     assert_equal n, @oob_count
   end
 
-  # Stream of requests on concurrent connections should trigger
+  # Stream of HTTP/1.0 requests on concurrent connections should trigger
   # out_of_band hooks only once after the final request.
   def test_stream
-    oob_server app_wait: true, max_threads: 2
-    n = 100
-    send_http_array GET_10, n, dly: 0.0
-    Thread.pass until @request_count == n
-    @mutex.synchronize do
-      @app_finished.signal
-      @oob_finished.wait(@mutex, 1)
+    oob_server max_threads: 2
+    threads = 10
+    thread_connections = 10
+    skts_q = Queue.new
+    threads_q = Queue.new
+
+    threads.times do
+      threads_q << Thread.new do
+        thread_connections.times { skts_q << send_http(GET_10) }
+      end
     end
-    assert_equal n, @request_count
-    assert_equal 1, @oob_count
+
+    threads_q.pop.join until threads_q.empty?
+    assert_equal 0, @oob_count
+    assert_start_with(skts_q.pop.read_response, 'HTTP/1.0') until skts_q.empty?
+
+    Thread.pass
+
+    assert_equal threads*thread_connections, @request_count
+    refute_equal 0, @oob_count
+  end
+
+  # Stream of HTTP/1.1 requests on concurrent connections should trigger
+  # out_of_band hooks only once after the final request.
+  def test_stream_keep_alive
+    oob_server max_threads: 2
+    threads = 10
+    thread_connections = 10
+    skts_q = Queue.new
+    threads_q = Queue.new
+
+    threads.times do
+      threads_q << Thread.new do
+        skt = send_http(GET_11)
+        skts_q << skt
+        (thread_connections - 1).times do
+          assert_start_with skt.read_response, 'HTTP/1.1'
+          skt.req_write GET_11
+        end
+      end
+    end
+    assert_equal 0, @oob_count
+
+    threads_q.pop.join until threads_q.empty?
+    Thread.pass
+
+    assert_equal threads*thread_connections, @request_count
   end
 
   # New requests should not get processed while OOB is running.
@@ -159,10 +190,11 @@ class TestOutOfBandServer < PumaTest
     assert_start_with skt.read_response, 'HTTP/1.1'
 
     @mutex.synchronize do
-      readable = skt.req_write(GET_11).wait_readable(0.1)
+      readable = skt.req_write(GET_11).wait_readable 0.1
       @oob_finished.wait(@mutex)
     end
     refute readable, 'New request processed during out of band'
     assert_start_with skt.read_response, 'HTTP/1.1'
+    assert_equal 2, @request_count
   end
 end
