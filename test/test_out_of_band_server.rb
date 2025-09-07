@@ -4,7 +4,7 @@ require_relative "helper"
 require_relative "helpers/test_puma/puma_socket"
 
 class TestOutOfBandServer < PumaTest
-#  parallelize_me!
+  parallelize_me!
 
   include TestPuma
   include TestPuma::PumaSocket
@@ -104,11 +104,10 @@ class TestOutOfBandServer < PumaTest
 
     threads.times do
       threads_q << Thread.new do
-        skt = send_http(GET_11)
+        skt = new_socket
         skts_q << skt
-        (thread_connections - 1).times do
-          assert_start_with skt.read_response, 'HTTP/1.1'
-          skt.req_write GET_11
+        thread_connections.times do
+          assert_start_with skt.req_write.read_response, 'HTTP/1.1'
         end
       end
     end
