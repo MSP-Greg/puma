@@ -88,24 +88,26 @@ module TestPuma
       return if skipped?
       super
       # Errno::EBADF raised on macOS
-      until @ios_to_close && @ios_to_close.empty?
-        io = @ios_to_close.pop
-        begin
-          if io.respond_to? :sysclose
-            io.sync_close = true
-            io.sysclose unless io.closed?
-          else
-            io.close if io.respond_to?(:close) && !io.closed?
-            if io.is_a?(File) && (path = io&.path) && File.exist?(path)
-              File.unlink path
+      if @ios_to_close
+        until @ios_to_close.empty?
+          io = @ios_to_close.pop
+          begin
+            if io.respond_to? :sysclose
+              io.sync_close = true
+              io.sysclose unless io.closed?
+            else
+              io.close if io.respond_to?(:close) && !io.closed?
+              if io.is_a?(File) && (path = io&.path) && File.exist?(path)
+                File.unlink path
+              end
             end
+          rescue Errno::EBADF, Errno::ENOENT, IOError
+          ensure
+            io = nil
           end
-        rescue Errno::EBADF, Errno::ENOENT, IOError
-        ensure
-          io = nil
         end
+        @ios_to_close = nil
       end
-      @ios_to_close = nil
     end
 
     # rubocop: disable Metrics/ParameterLists
