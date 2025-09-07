@@ -295,7 +295,7 @@ module TestPuma
     end
 
     # @todo verify whole string is written
-    REQ_WRITE = -> (str) do
+    REQ_WRITE = -> (str = GET_11) do
       sent = 0
       size = str.bytesize
       sent += self.syswrite(str.byteslice(sent, size - sent)) while sent < size
