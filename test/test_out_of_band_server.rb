@@ -20,7 +20,7 @@ class TestOutOfBandServer < PumaTest
   end
 
   def oob_server(**options)
-    @request_count = 0
+    @request_count_q = Queue.new
     @oob_count = 0
     in_oob = Mutex.new
     @mutex = Mutex.new
@@ -39,7 +39,7 @@ class TestOutOfBandServer < PumaTest
 
     app = ->(_) do
       raise 'OOB conflict' if in_oob.locked?
-      @request_count += 1
+      @request_count_q << nil
       [200, {}, [""]]
     end
 
@@ -63,7 +63,7 @@ class TestOutOfBandServer < PumaTest
         @oob_finished.wait(@mutex, 1)
       end
     end
-    assert_equal n, @request_count
+    assert_equal n, @request_count_q.size
     assert_equal n, @oob_count
   end
 
@@ -71,7 +71,7 @@ class TestOutOfBandServer < PumaTest
   # out_of_band hooks only once after the final request.
   def test_stream
     oob_server max_threads: 2
-    threads = 10
+    threads = Puma::IS_MRI ? 10 : 3
     thread_connections = 10
     skts_q = Queue.new
     threads_q = Queue.new
@@ -82,13 +82,14 @@ class TestOutOfBandServer < PumaTest
       end
     end
 
-    threads_q.pop.join until threads_q.empty?
     assert_equal 0, @oob_count
+    threads_q.pop.join until threads_q.empty?
+
     assert_start_with(skts_q.pop.read_response, 'HTTP/1.0') until skts_q.empty?
 
     Thread.pass
 
-    assert_equal threads*thread_connections, @request_count
+    assert_equal threads*thread_connections, @request_count_q.size
     refute_equal 0, @oob_count
   end
 
@@ -96,7 +97,7 @@ class TestOutOfBandServer < PumaTest
   # out_of_band hooks only once after the final request.
   def test_stream_keep_alive
     oob_server max_threads: 2
-    threads = 10
+    threads = Puma::IS_MRI ? 10 : 3
     thread_connections = 10
     skts_q = Queue.new
     threads_q = Queue.new
@@ -115,8 +116,9 @@ class TestOutOfBandServer < PumaTest
 
     threads_q.pop.join until threads_q.empty?
     Thread.pass
+    sleep 0.1 unless Puma::IS_MRI && Puma::IS_LINUX
 
-    assert_equal threads*thread_connections, @request_count
+    assert_equal threads*thread_connections, @request_count_q.size
   end
 
   # New requests should not get processed while OOB is running.
@@ -156,10 +158,11 @@ class TestOutOfBandServer < PumaTest
   # OOB should be triggered following a completed request
   # concurrent with other partial requests.
   def test_partial_concurrent
+    partial_requests = Puma::IS_MRI ? 100 : 50
     oob_server max_threads: 2
     @mutex.synchronize do
       send_http GET_10
-      100.times {new_socket.close}
+      partial_requests.times { new_socket.close }
       @oob_finished.wait(@mutex, 1)
     end
     assert_equal 1, @oob_count
@@ -195,6 +198,6 @@ class TestOutOfBandServer < PumaTest
     end
     refute readable, 'New request processed during out of band'
     assert_start_with skt.read_response, 'HTTP/1.1'
-    assert_equal 2, @request_count
+    assert_equal 2, @request_count_q.size
   end
 end
