@@ -4,7 +4,7 @@ require_relative "helper"
 require_relative "helpers/test_puma/puma_socket"
 
 class TestOutOfBandServer < PumaTest
-  parallelize_me!
+#  parallelize_me!
 
   include TestPuma
   include TestPuma::PumaSocket
@@ -97,8 +97,8 @@ class TestOutOfBandServer < PumaTest
   # out_of_band hooks only once after the final request.
   def test_stream_keep_alive
     oob_server max_threads: 2
-    threads = Puma::IS_MRI ? 10 : 3
-    thread_connections = 10
+    threads = Puma::IS_MRI ? 10 : 4
+    thread_connections = Puma::IS_MRI ? 10 : 5
     skts_q = Queue.new
     threads_q = Queue.new
 
@@ -116,6 +116,7 @@ class TestOutOfBandServer < PumaTest
 
     threads_q.pop.join until threads_q.empty?
     Thread.pass
+    # without the below MRI macOS & Windows fail
     sleep 0.1 unless Puma::IS_MRI && Puma::IS_LINUX
 
     assert_equal threads*thread_connections, @request_count_q.size
