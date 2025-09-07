@@ -31,7 +31,7 @@ class TestIntegration < PumaTest
     @config_file = nil
 
     @pid = nil
-    @ios_to_close = []
+    @ios_to_close ||= Queue.new
     @bind_path    = tmp_path('.sock')
     @control_path     = nil
     @control_tcp_port = nil
@@ -45,7 +45,8 @@ class TestIntegration < PumaTest
       stop_server @pid, signal: :INT
     end
 
-    @ios_to_close&.each do |io|
+    until @ios_to_close && @ios_to_close.empty?
+      io = @ios_to_close.pop
       begin
         io.close if io.respond_to?(:close) && !io.closed?
       rescue
@@ -53,6 +54,7 @@ class TestIntegration < PumaTest
         io = nil
       end
     end
+    @ios_to_close = nil
 
     if @bind_path
       refute File.exist?(@bind_path), "Bind path must be removed after stop"

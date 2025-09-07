@@ -75,7 +75,7 @@ module TestPuma
     SET_TCP_NODELAY = Socket.const_defined?(:IPPROTO_TCP) && ::Socket.const_defined?(:TCP_NODELAY)
 
     def before_setup
-      @ios_to_close ||= []
+      @ios_to_close = Queue.new
       @bind_port = nil
       @bind_path = nil
       @control_port = nil
@@ -88,7 +88,8 @@ module TestPuma
       return if skipped?
       super
       # Errno::EBADF raised on macOS
-      @ios_to_close.each do |io|
+      until @ios_to_close && @ios_to_close.empty?
+        io = @ios_to_close.pop
         begin
           if io.respond_to? :sysclose
             io.sync_close = true
@@ -104,8 +105,6 @@ module TestPuma
           io = nil
         end
       end
-      # not sure about below, may help with gc...
-      @ios_to_close.clear
       @ios_to_close = nil
     end
 
