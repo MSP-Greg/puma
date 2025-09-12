@@ -353,6 +353,7 @@ module Puma
         end
 
         while @status == :run || (drain && shutting_down?)
+          multiple_workers = (@options.fetch :workers, 0) > 1
           begin
             ios = IO.select sockets, nil, nil, (shutting_down? ? 0 : @idle_timeout)
             unless ios
@@ -384,15 +385,9 @@ module Puma
                 # clients until the code is finished.
                 pool.wait_while_out_of_band_running
 
-                # only use delay when clustered and busy
-                if pool.busy_threads >= @max_threads
-                  if @clustered
-                    delay = 0.0001 * ((@reactor&.reactor_size || 0) + pool.busy_threads * 1.5)/max_flt
-                    sleep delay
-                  else
-                    # use small sleep for busy single worker
-                    sleep 0.0001
-                  end
+                if multiple_workers # (@options.fetch :workers, 0) > 1
+                  delay = 0.0002 * pool.busy_threads.clamp(0, 25 * max_flt)/max_flt
+                  sleep delay if delay > 0
                 end
 
                 io = begin
