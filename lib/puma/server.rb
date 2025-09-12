@@ -110,6 +110,11 @@ module Puma
       @enable_keep_alives      &&= @queue_requests
       @io_selector_backend       = @options[:io_selector_backend]
       @http_content_length_limit = @options[:http_content_length_limit]
+      @wait_for_less_busy_worker = @options[:wait_for_less_busy_worker]
+
+      @delay_clamp = 25
+      # set in options so it's accessible for testing
+      @options[:delay_clamp] = @delay_clamp
 
       if @options[:fiber_per_request]
         singleton_class.prepend(FiberPerRequest)
@@ -339,7 +344,6 @@ module Puma
         pool = @thread_pool
         queue_requests = @queue_requests
         drain = options[:drain_on_shutdown] ? 0 : nil
-        max_flt = @max_threads.to_f
 
         addr_send_name, addr_value = case options[:remote_address]
         when :value
@@ -353,6 +357,7 @@ module Puma
         end
 
         while @status == :run || (drain && shutting_down?)
+          multiple_workers = (@options.fetch :workers, 0) > 1
           begin
             ios = IO.select sockets, nil, nil, (shutting_down? ? 0 : @idle_timeout)
             unless ios
@@ -384,15 +389,9 @@ module Puma
                 # clients until the code is finished.
                 pool.wait_while_out_of_band_running
 
-                # only use delay when clustered and busy
-                if pool.busy_threads >= @max_threads
-                  if @clustered
-                    delay = 0.0001 * ((@reactor&.reactor_size || 0) + pool.busy_threads * 1.5)/max_flt
-                    sleep delay
-                  else
-                    # use small sleep for busy single worker
-                    sleep 0.0001
-                  end
+                # no delay if Puma is running 'single' or with one worker
+                if multiple_workers && !(busy = pool.busy_threads).zero?
+                  sleep delay_calc(busy)
                 end
 
                 io = begin
@@ -440,6 +439,22 @@ module Puma
       end
 
       @events.fire :state, :done
+    end
+
+    # Calculates the delay a worker's server sleeps before accepting a request.
+    # This is a 'sleep sort' to encourage the least busy worker to accept the
+    # connection, which hopefully will keep all workers busy.
+    # With a 6x overload, `busy_threads_plus_todo` varies between 6 and 9 times
+    # `@max_threads`, so 25 was chosen as clamp value, which limits the maximum delay.
+    def delay_calc(busy_threads_plus_todo,
+      delay_clamp = @delay_clamp,
+      max_delay = @wait_for_less_busy_worker
+    )
+      # @max_threads may become dynamic, so need to set every call
+      # see https://github.com/puma/puma/pull/3658
+      clamp = delay_clamp * @max_threads.to_f
+      # 0 <= `x.clamp(0, clamp)/clamp` <= 1
+      max_delay * (busy_threads_plus_todo.clamp(0, clamp)/clamp)
     end
 
     # :nodoc:
