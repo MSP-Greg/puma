@@ -59,6 +59,24 @@ module Puma
 
       return :close if closed_socket?(socket)
 
+      if client.http_content_length_limit_exceeded
+        return prepare_response(413, {}, ["Payload Too Large"], requests, client)
+      end
+
+      normalize_env env, client
+
+      env[PUMA_SOCKET] = socket
+
+      if env[HTTPS_KEY] && socket.peer_cert
+        env[PUMA_PEERCERT] = socket.peer_cert
+      end
+
+      env[HIJACK_P] = true
+      env[HIJACK] = client
+
+      env[RACK_INPUT] = client.body
+      env[RACK_URL_SCHEME] ||= default_server_port(env) == PORT_443 ? HTTPS : HTTP
+
       if @early_hints
         env[EARLY_HINTS] = lambda { |headers|
           begin
