@@ -59,10 +59,7 @@ class TestThreadPool < PumaTest
         # While we wait until @trim_requested is 0, the test might inspect other values
         # such as @spawned which may be modified after this variable is modified in the loop
         # Lock for race safety
-        with_mutex do
-          return if @trim_requested == 0
-          Thread.pass
-        end
+        with_mutex { return if @trim_requested == 0 }
       end
     end
   end
@@ -247,13 +244,9 @@ class TestThreadPool < PumaTest
 
     assert_equal 1, pool.spawned
 
-    # Thread.pass helps with intermittent tests, JRuby
     pool.trim
-    Thread.pass
-    sleep 0.1 unless Puma::IS_MRI # intermittent without
+
     assert_equal 0, pool.spawned
-    Thread.pass
-    sleep 0.1 unless Puma::IS_MRI # intermittent without
     assert_equal 1, exited.length
   end
 
