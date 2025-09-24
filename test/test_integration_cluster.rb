@@ -271,16 +271,15 @@ class TestIntegrationCluster < TestIntegration
 
     get_worker_pids # wait for workers to boot
 
-    10.times {
+    5.times {
       fast_connect
-      sleep 0.5
+      sleep 0.8
     }
 
-    sleep 1.15
+    wait_for_server_to_include 'idle timeout'
+    wait_for_server_to_include 'Goodbye!'
 
-    assert_raises Errno::ECONNREFUSED, "Connection refused" do
-      connect
-    end
+    @server_stopped = true
   end
 
   def test_queue_results_disabled
@@ -391,7 +390,7 @@ class TestIntegrationCluster < TestIntegration
       fork_worker
       worker_check_interval 1
       # lower worker timeout from default (60) to avoid test timeout
-      worker_timeout 2
+      worker_timeout 2.5
       # to simulate worker 0 timeout, total boot time for all workers
       # needs to exceed single worker timeout
       workers #{worker_count}
@@ -411,7 +410,7 @@ class TestIntegrationCluster < TestIntegration
   def test_refork_phased_restart_with_fork_worker_and_high_worker_count
     worker_count = 10
 
-    cli_server "test/rackup/hello.ru", config: <<~CONFIG
+    cli_server "test/rackup/hello.ru", merge_err: true, config: <<~CONFIG
       fork_worker
       worker_check_interval 1
       # lower worker timeout from default (60) to avoid test timeout
@@ -640,29 +639,59 @@ class TestIntegrationCluster < TestIntegration
   # Send requests 10 per second.  Send 10, then :TERM server, then send another 30.
   # No more than 10 should throw Errno::ECONNRESET.
   def term_closes_listeners(unix: false)
-    cli_server "-w #{workers} -t 0:6 -q test/rackup/sleep_step.ru", unix: unix
+    cli_server "-w #{workers} -t 1:5 -q test/rackup/sleep_step.ru", unix: unix
     threads = []
     replies = []
     mutex = Mutex.new
     div   = 10
+    skt_q = Queue.new
 
     refused = thread_run_refused unix: unix
 
-    41.times.each do |i|
-      if i == 10
-        threads << Thread.new do
-          sleep i.to_f/div
+    th = Thread.new do
+      41.times.each do |i|
+        sleep 1.0/div
+        if i == 10
           Process.kill :TERM, @pid
-          mutex.synchronize { replies[i] = :term_sent }
-        end
-      else
-        threads << Thread.new do
-          thread_run_step replies, i.to_f/div, 1, i, mutex, refused, unix: unix
+          skt_q << :term_sent
+        else
+          begin
+            skt_q << fast_connect("sleep1.0-#{i}", unix: unix)
+          rescue *refused
+            replies[i] = :refused
+            skt_q << :refused
+          end
         end
       end
     end
 
-    threads.each(&:join)
+    i = 0
+    while i < 41
+      skt = skt_q.pop
+      i += 1
+      next if skt == :term_sent || skt == :refused
+
+      begin
+        body = read_body skt, 20
+        if body.start_with? 'Slept '
+          replies[i] = :success
+        else
+          replies[i] = :failure
+        end
+      rescue Errno::ECONNRESET
+        # connection was accepted but then closed
+        # client would see an empty response
+        replies[i] = :reset
+      rescue *refused
+        replies[i] = :refused
+      rescue Timeout::Error
+        replies[i] = :read_timeout
+      rescue => e
+        replies[i] = e.class
+      end
+    end
+
+    th.join
 
     failures      = replies.count(:failure)
     successes     = replies.count(:success)
@@ -779,28 +808,6 @@ class TestIntegrationCluster < TestIntegration
       mutex.synchronize { replies << :refused }
     rescue Timeout::Error
       mutex.synchronize { replies << :read_timeout }
-    end
-  end
-
-  # used in loop to create several 'requests'
-  def thread_run_step(replies, delay, sleep_time, step, mutex, refused, unix: false)
-    begin
-      sleep delay
-      s = connect "sleep#{sleep_time}-#{step}", unix: unix
-      body = read_body(s, 20)
-      if body[/\ASlept /]
-        mutex.synchronize { replies[step] = :success }
-      else
-        mutex.synchronize { replies[step] = :failure }
-      end
-    rescue Errno::ECONNRESET
-      # connection was accepted but then closed
-      # client would see an empty response
-      mutex.synchronize { replies[step] = :reset }
-    rescue *refused
-      mutex.synchronize { replies[step] = :refused }
-    rescue Timeout::Error
-      mutex.synchronize { replies[step] = :read_timeout }
     end
   end
 
