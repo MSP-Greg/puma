@@ -17,10 +17,16 @@ module TmpPath
   PUMA_TMPDIR =
     begin
       if RUBY_DESCRIPTION.include? 'darwin'
-        # adds subdirectory 'tmp' in repository folder
-        dir_temp = File.absolute_path("#{__dir__}/../../tmp")
-        Dir.mkdir dir_temp unless Dir.exist? dir_temp
-        './tmp'
+        if ENV['PUMA_TMPDIR_DARWIN'] == 'true' && Dir.exist?('/tmp')
+          dir_temp = "#{File.realdirpath '/tmp'}/puma_test"
+          Dir.mkdir dir_temp unless Dir.exist? dir_temp
+          dir_temp
+        else
+          # adds subdirectory 'tmp' in repository folder
+          dir_temp = File.absolute_path("#{__dir__}/../../tmp")
+          Dir.mkdir dir_temp unless Dir.exist? dir_temp
+          './tmp'
+        end
       else
         nil
       end
