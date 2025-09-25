@@ -32,7 +32,7 @@ class TestPumaServer < PumaTest
   end
 
   def teardown
-    @server.stop(true)
+    @server&.stop(true)
     # Errno::EBADF raised on macOS
   end
 
@@ -540,18 +540,34 @@ class TestPumaServer < PumaTest
     assert stderr.empty?, "Expected stderr from server to be empty but it was #{stderr.inspect}"
   end
 
-  def test_force_shutdown_custom_error_message
-    handler = lambda {|err, env, status| [500, {"Content-Type" => "application/json"}, ["{}\n"]]}
-    server_run(lowlevel_error_handler: handler, force_shutdown_after: 2) do
-      @server.stop
-      sleep 5
+  def test_force_shutdown_error_default
+    server_run(force_shutdown_after: 2) do
+      @server.stop true
     end
 
     response = send_http_read_response GET_10
 
+    assert_start_with response.body, 'Puma caught this error: Puma::ThreadPool::ForceShutdown'
+    assert_equal 'HTTP/1.0 503 Service Unavailable', response.status
+    assert_equal 'Detected force shutdown of a thread', @log_writer.stdout.string.strip
+
+    @server = nil
+  end
+
+  def test_force_shutdown_custom_error_message
+    handler = lambda {|err, env, status| [500, {"Content-Type" => "application/json"}, ["{}\n"]]}
+    server_run(lowlevel_error_handler: handler, force_shutdown_after: 2) do
+      @server.stop true
+    end
+
+    response = send_http_read_response GET_10
+
+    assert_includes response.headers, 'content-type: application/json'
     assert_equal 'HTTP/1.0 500 Internal Server Error', response.status
-    assert_match(/content-type: application\/json/, response)
-    assert_match(/{}\n$/, response)
+    assert_equal "{}\n", response.body
+    assert_equal 'Detected force shutdown of a thread', @log_writer.stdout.string.strip
+
+    @server = nil
   end
 
   class ArrayClose < Array
@@ -605,18 +621,6 @@ class TestPumaServer < PumaTest
     assert_equal "HTTP/1.1 500 #{STATUS_CODES[500]}", response.status
     assert_includes response, 'Puma caught this error: no backtrace error (WithoutBacktraceError)'
     assert_includes response, '<no backtrace available>'
-  end
-
-  def test_force_shutdown_error_default
-    server_run(force_shutdown_after: 2) do
-      @server.stop
-      sleep 5
-    end
-
-    response = send_http_read_response GET_10
-
-    assert_equal 'HTTP/1.0 503 Service Unavailable', response.status
-    assert_match(/Puma caught this error.+Puma::ThreadPool::ForceShutdown/, response)
   end
 
   def test_prints_custom_error
