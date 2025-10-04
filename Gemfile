@@ -29,6 +29,7 @@ gem "jruby-openssl", :platform => "jruby"
 
 unless ENV['PUMA_NO_RUBOCOP'] || RUBY_PLATFORM.include?('mswin')
   gem "rubocop"
+  gem 'rubocop-minitest', require: false
   gem 'rubocop-performance', require: false
 end
 

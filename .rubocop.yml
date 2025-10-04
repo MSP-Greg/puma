@@ -1,6 +1,9 @@
 require:
-  - rubocop-performance
   - ./cops/tests_puma.rb
+
+plugins:
+  - rubocop-minitest
+  - rubocop-performance
 
 AllCops:
   DisabledByDefault: true
@@ -16,11 +19,21 @@ AllCops:
   SuggestExtensions: false
   NewCops: enable
 
+# enable all Minitest cops
+Minitest:
+  Enabled: true
+
 # enable all Performance cops
 Performance:
   Enabled: true
 
 # ————————————————————————————————————————— disabled cops
+Minitest/EmptyLineBeforeAssertionMethods:
+  Enabled: false
+
+Minitest/TestFileName:
+  Exclude:
+    - test/helper.rb
 
 # ————————————————————————————————————————— enabled cops
 Layout/AccessModifierIndentation:
