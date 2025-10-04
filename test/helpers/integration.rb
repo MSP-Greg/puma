@@ -55,7 +55,7 @@ class TestIntegration < PumaTest
     end
 
     if @bind_path
-      refute File.exist?(@bind_path), "Bind path must be removed after stop"
+      refute_path_exists @bind_path, "Bind path must be removed after stop"
       File.unlink(@bind_path) rescue nil
     end
 
