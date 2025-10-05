@@ -31,7 +31,9 @@ class TestBundlePruner < PumaTest
   end
 
   def test_extra_runtime_deps_paths_is_empty_for_no_config
-    assert_equal([], bundle_pruner.send(:extra_runtime_deps_paths))
+    t = bundle_pruner.send(:extra_runtime_deps_paths)
+    assert_instance_of Array, t
+    assert_empty t
   end
 
   def test_extra_runtime_deps_paths_is_correctly_built
