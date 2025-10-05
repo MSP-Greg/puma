@@ -13,56 +13,71 @@ class Http11ParserTest < TestIntegration
 
   parallelize_me!
 
-  def test_parse_simple
+  def test_parse_simple # rubocop:disable Minitest/MultipleAssertions
     parser = Puma::HttpParser.new
     req = {}
-    http = "GET /?a=1 HTTP/1.1\r\n\r\n"
-    nread = parser.execute(req, http, 0)
+    http = "GET / HTTP/1.1\r\n\r\n"
+    nread_ret  = parser.execute(req, http, 0)
+    nread_meth = parser.nread
 
-    assert nread == http.length, "Failed to parse the full HTTP request"
-    assert parser.finished?, "Parser didn't finish"
-    assert !parser.error?, "Parser had error"
-    assert nread == parser.nread, "Number read returned from execute does not match"
 
-    assert_equal '/', req['REQUEST_PATH']
-    assert_equal 'HTTP/1.1', req['SERVER_PROTOCOL']
-    assert_equal '/?a=1', req['REQUEST_URI']
-    assert_equal 'GET', req['REQUEST_METHOD']
-    assert_nil req['FRAGMENT']
-    assert_equal "a=1", req['QUERY_STRING']
+    assert_equal http.length, nread_ret, "Failed to parse the full HTTP request"
+    assert_equal nread_meth , nread_ret, "Number read returned from execute does not match Parser#nread"
+
+    assert_predicate parser, :finished?, "Parser didn't finish"
+    refute_predicate parser, :error?   , "Parser had error"
 
     parser.reset
-    assert parser.nread == 0, "Number read after reset should be 0"
+    assert_equal 0, parser.nread, "Number read after reset should be 0"
   end
 
-  def test_parse_escaping_in_query
+  def test_parse_simple_env # rubocop:disable Minitest/MultipleAssertions
+    parser = Puma::HttpParser.new
+    req = {}
+    http = "GET / HTTP/1.1\r\n\r\n"
+    parser.execute(req, http, 0)
+
+    assert_equal '/'       , req['REQUEST_PATH']
+    assert_equal 'HTTP/1.1', req['SERVER_PROTOCOL']
+    assert_equal '/'       , req['REQUEST_URI']
+    assert_equal 'GET'     , req['REQUEST_METHOD']
+    assert_nil req['FRAGMENT']
+    assert_nil req['QUERY_STRING']
+  end
+
+
+  def test_parse_escaping_in_query # rubocop:disable Minitest/MultipleAssertions
     parser = Puma::HttpParser.new
     req = {}
     http = "GET /admin/users?search=%27%%27 HTTP/1.1\r\n\r\n"
-    nread = parser.execute(req, http, 0)
+    nread_ret  = parser.execute(req, http, 0)
+    nread_meth = parser.nread
 
-    assert nread == http.length, "Failed to parse the full HTTP request"
-    assert parser.finished?, "Parser didn't finish"
-    assert !parser.error?, "Parser had error"
-    assert nread == parser.nread, "Number read returned from execute does not match"
+    assert_equal http.length, nread_ret, "Failed to parse the full HTTP request"
+    assert_equal nread_meth , nread_ret, "Number read returned from execute does not match Parser#nread"
+
+    assert_predicate parser, :finished?, "Parser didn't finish"
+    refute_predicate parser, :error?   , "Parser had error"
 
     assert_equal '/admin/users?search=%27%%27', req['REQUEST_URI']
     assert_equal "search=%27%%27", req['QUERY_STRING']
 
     parser.reset
-    assert parser.nread == 0, "Number read after reset should be 0"
+    assert_equal 0, parser.nread, "Number read after reset should be 0"
   end
 
-  def test_parse_absolute_uri
+  def test_parse_absolute_uri # rubocop:disable Minitest/MultipleAssertions
     parser = Puma::HttpParser.new
     req = {}
     http = "GET http://192.168.1.96:3000/api/v1/matches/test?1=1 HTTP/1.1\r\n\r\n"
-    nread = parser.execute(req, http, 0)
+    nread_ret = parser.execute(req, http, 0)
+    nread_meth = parser.nread
 
-    assert nread == http.length, "Failed to parse the full HTTP request"
-    assert parser.finished?, "Parser didn't finish"
-    assert !parser.error?, "Parser had error"
-    assert nread == parser.nread, "Number read returned from execute does not match"
+    assert_equal http.length, nread_ret, "Failed to parse the full HTTP request"
+    assert_equal nread_meth , nread_ret, "Number read returned from execute does not match Parser#nread"
+
+    assert_predicate parser, :finished?, "Parser didn't finish"
+    refute_predicate parser, :error?   , "Parser had error"
 
     assert_equal "GET", req['REQUEST_METHOD']
     assert_equal 'http://192.168.1.96:3000/api/v1/matches/test?1=1', req['REQUEST_URI']
@@ -73,8 +88,7 @@ class Http11ParserTest < TestIntegration
     assert_nil req['QUERY_STRING']
 
     parser.reset
-    assert parser.nread == 0, "Number read after reset should be 0"
-
+    assert_equal 0, parser.nread, "Number read after reset should be 0"
   end
 
   def test_parse_dumbfuck_headers
@@ -83,8 +97,8 @@ class Http11ParserTest < TestIntegration
     should_be_good = "GET / HTTP/1.1\r\naaaaaaaaaaaaa:++++++++++\r\n\r\n"
     nread = parser.execute(req, should_be_good, 0)
     assert_equal should_be_good.length, nread
-    assert parser.finished?
-    assert !parser.error?
+    assert_predicate parser, :finished?, "Parser didn't finish"
+    refute_predicate parser, :error?   , "Parser had error"
   end
 
   def test_parse_error
@@ -100,8 +114,8 @@ class Http11ParserTest < TestIntegration
     end
 
     assert error, "failed to throw exception"
-    assert !parser.finished?, "Parser shouldn't be finished"
-    assert parser.error?, "Parser SHOULD have error"
+    refute_predicate parser, :finished?, "Parser shouldn't be finished"
+    assert_predicate parser, :error?   , "Parser had error"
   end
 
   def test_fragment_in_uri
@@ -111,7 +125,7 @@ class Http11ParserTest < TestIntegration
 
     parser.execute(req, get, 0)
 
-    assert parser.finished?
+    assert_predicate parser, :finished?, "Parser didn't finish"
     assert_equal '/forums/1/topics/2375?page=1', req['REQUEST_URI']
     assert_equal 'posts-17408', req['FRAGMENT']
   end
@@ -123,7 +137,7 @@ class Http11ParserTest < TestIntegration
 
     parser.execute(req, get, 0)
 
-    assert parser.finished?
+    assert_predicate parser, :finished?, "Parser didn't finish"
     assert_equal '/forums/1/path;stillpath/2375?page=1', req['REQUEST_URI']
     assert_equal '/forums/1/path;stillpath/2375', req['REQUEST_PATH']
   end
@@ -142,7 +156,7 @@ class Http11ParserTest < TestIntegration
     res
   end
 
-  def test_get_const_length
+  def test_get_const_length # rubocop:disable Minitest/MultipleAssertions
     skip_unless :jruby
 
     envs = %w[
@@ -206,46 +220,45 @@ class Http11ParserTest < TestIntegration
     http = "GET #{path} HTTP/1.1\r\n\r\n"
     assert_raises Puma::HttpParserError do
       parser.execute(req, http, 0)
-      parser.reset
     end
   end
 
-  def test_horrible_queries
+  def test_horrible_queries # rubocop:disable Minitest/MultipleAssertions
     parser = Puma::HttpParser.new
 
-    # then that large header names are caught
+    # then that large header names are caught, limit is 256
     10.times do |c|
-      get = "GET /#{rand_data(10,120)} HTTP/1.1\r\nX-#{rand_data(1024, 1024+(c*1024))}: Test\r\n\r\n"
+      get = "GET /#{rand_data(10,120)} HTTP/1.1\r\nX-#{rand_data(256, 1024+(c*256))}: Test\r\n\r\n"
       assert_raises Puma::HttpParserError do
         parser.execute({}, get, 0)
-        parser.reset
       end
+      parser.reset
     end
 
-    # then that large mangled field values are caught
+    # then that large mangled field values are caught, limit is 80 * 1024
     10.times do |c|
-      get = "GET /#{rand_data(10,120)} HTTP/1.1\r\nX-Test: #{rand_data(1024, 1024+(c*1024), false)}\r\n\r\n"
+      get = "GET /#{rand_data(10,120)} HTTP/1.1\r\nX-Test: #{rand_data(80*1024, 80*1024+(c*1024), false)}\r\n\r\n"
       assert_raises Puma::HttpParserError do
         parser.execute({}, get, 0)
-        parser.reset
       end
+      parser.reset
     end
 
     # then large headers are rejected too
     get  = "GET /#{rand_data(10,120)} HTTP/1.1\r\n"
-    get += "X-Test: test\r\n" * (80 * 1024)
+    get += "X-Test: test\r\n" * (10 * 1024)
     assert_raises Puma::HttpParserError do
       parser.execute({}, get, 0)
-      parser.reset
     end
+    parser.reset
 
     # finally just that random garbage gets blocked all the time
     10.times do |c|
       get = "GET #{rand_data(1024, 1024+(c*1024), false)} #{rand_data(1024, 1024+(c*1024), false)}\r\n\r\n"
       assert_raises Puma::HttpParserError do
         parser.execute({}, get, 0)
-        parser.reset
       end
+      parser.reset
     end
   end
 
@@ -266,7 +279,7 @@ class Http11ParserTest < TestIntegration
 
     parser.execute(req, http, 0) rescue nil # We test the raise elsewhere.
 
-    assert parser.error?, "Parser SHOULD have error"
+    assert_predicate parser, :error?, "Parser SHOULD have error"
   end
 
   def test_newline_smuggler_two
@@ -276,7 +289,7 @@ class Http11ParserTest < TestIntegration
 
     parser.execute(req, http, 0) rescue nil
 
-    assert parser.error?, "Parser SHOULD have error"
+    assert_predicate parser, :error?, "Parser SHOULD have error"
   end
 
   def test_htab_in_header_val
