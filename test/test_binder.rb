@@ -200,7 +200,7 @@ class TestBinderParallel < TestBinderBase
 
     @binder.close_listeners
 
-    assert File.exist?(unix_path)
+    assert_path_exists unix_path
 
   ensure
     if UNIX_SKT_EXIST
@@ -307,7 +307,7 @@ class TestBinderParallel < TestBinderBase
     env_hash = @binder.envs[@binder.ios.first]
 
     @binder.proto_env.each do |k,v|
-      assert env_hash[k] == v
+      assert_equal v, env_hash[k]
     end
   end
 
@@ -327,7 +327,7 @@ class TestBinderParallel < TestBinderBase
 
     @binder.close
 
-    assert @mocked_ios.map(&:verify).all?
+    assert_predicate @mocked_ios.map(&:verify), :all?
   end
 
   def test_redirects_for_restart_creates_a_hash
@@ -492,7 +492,7 @@ class TestBinderParallel < TestBinderBase
     order.each do |prot|
       assert_match expected_logs[prot], stdout
     end
-  ensure
+  ensure # rubocop:disable Minitest/SkipEnsure
     @binder.close_listeners if order.include?(:unix) && UNIX_SKT_EXIST
   end
 end
