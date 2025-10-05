@@ -409,7 +409,7 @@ class TestCLI < PumaTest
     Puma::CLI.new ['-w 0']
     config = Puma.cli_config
 
-    assert_equal false, config.options[:preload_app]
+    refute config.options[:preload_app]
   end
 
   def test_config_preloads_app_with_workers
@@ -418,6 +418,6 @@ class TestCLI < PumaTest
     Puma::CLI.new ['-w 2']
     config = Puma.cli_config
 
-    assert_equal true, config.options[:preload_app]
+    assert config.options[:preload_app]
   end
 end
