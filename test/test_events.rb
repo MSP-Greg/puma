@@ -13,7 +13,7 @@ class TestEvents < PumaTest
 
     events.fire(:exec)
 
-    assert_equal true, res
+    assert res
   end
 
   def test_register_callback_with_object
@@ -33,7 +33,7 @@ class TestEvents < PumaTest
 
     events.fire(:exec)
 
-    assert_equal true, obj.res
+    assert obj.res
   end
 
   def test_fire_callback_with_multiple_arguments
