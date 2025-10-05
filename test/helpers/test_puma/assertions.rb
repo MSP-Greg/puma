@@ -45,9 +45,9 @@ module TestPuma
       else
         message(msg) { "Expected #{mu_pp matcher} to match:\n#{obj}\n" }
       end
-      assert_respond_to matcher, :"=~"
+
       matcher = Regexp.new Regexp.escape matcher if String === matcher
-      assert matcher =~ obj, msg
+      super matcher, obj, msg
     end
 
     def assert_hash(exp, act)
