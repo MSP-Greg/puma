@@ -64,8 +64,8 @@ class TestConfigFile < PumaTest
     bind_configuration = conf.options.file_options[:binds].first
     app = conf.app
 
-    assert bind_configuration =~ %r{ca=.*ca.crt}
-    assert bind_configuration&.include?('verify_mode=peer')
+    assert_match %r{ca=.*ca.crt}, bind_configuration
+    assert_includes bind_configuration, 'verify_mode=peer'
 
     assert_equal [200, {}, ["embedded app"]], app.call({})
   end
@@ -154,7 +154,7 @@ class TestConfigFile < PumaTest
     conf.clamp
 
     ssl_binding = conf.options[:binds].first
-    assert ssl_binding.include?('&backlog=2048')
+    assert_includes ssl_binding, '&backlog=2048'
   end
 
   def test_ssl_bind_with_low_latency_true
@@ -170,7 +170,7 @@ class TestConfigFile < PumaTest
     conf.clamp
 
     ssl_binding = conf.options[:binds].first
-    assert ssl_binding.include?('&low_latency=true')
+    assert_includes ssl_binding, '&low_latency=true'
   end
 
   def test_ssl_bind_with_low_latency_false
@@ -186,7 +186,7 @@ class TestConfigFile < PumaTest
     conf.clamp
 
     ssl_binding = conf.options[:binds].first
-    assert ssl_binding.include?('&low_latency=false')
+    assert_includes ssl_binding, '&low_latency=false'
   end
 
   def test_ssl_bind_jruby
@@ -295,7 +295,7 @@ class TestConfigFile < PumaTest
     conf.clamp
 
     ssl_binding = conf.options[:binds].first
-    assert ssl_binding.include?("&ssl_cipher_filter=#{cipher_filter}")
+    assert_includes ssl_binding, "&ssl_cipher_filter=#{cipher_filter}"
   end
 
   def test_ssl_bind_with_ciphersuites
@@ -315,7 +315,7 @@ class TestConfigFile < PumaTest
     conf.clamp
 
     ssl_binding = conf.options[:binds].first
-    assert ssl_binding.include?("&ssl_ciphersuites=#{ciphersuites}")
+    assert_includes ssl_binding, "&ssl_ciphersuites=#{ciphersuites}"
   end
 
   def test_ssl_bind_with_verification_flags
@@ -333,7 +333,7 @@ class TestConfigFile < PumaTest
     conf.clamp
 
     ssl_binding = conf.options[:binds].first
-    assert ssl_binding.include?("&verification_flags=TRUSTED_FIRST,NO_CHECK_TIME")
+    assert_includes ssl_binding, "&verification_flags=TRUSTED_FIRST,NO_CHECK_TIME"
   end
 
   def test_ssl_bind_with_ca
@@ -378,9 +378,9 @@ class TestConfigFile < PumaTest
     end
     conf.clamp
 
-    assert_equal conf.options[:workers], 3
+    assert_equal 3, conf.options[:workers]
     conf.options[:workers] += 1
-    assert_equal conf.options[:workers], 4
+    assert_equal 4, conf.options[:workers]
   end
 
   def test_explicit_config_files
@@ -411,7 +411,9 @@ class TestConfigFile < PumaTest
     conf = Puma::Configuration.new(config_files: ['-'])
     conf.clamp
 
-    assert_equal [], conf.config_files
+    config_files = conf.config_files
+    assert_instance_of Array, config_files
+    assert_empty config_files
   end
 
   def test_config_files_with_existing_path
@@ -471,9 +473,9 @@ class TestConfigFile < PumaTest
     end
     conf.clamp
 
-    assert_equal conf.options[:raise_exception_on_sigterm], false
+    refute conf.options[:raise_exception_on_sigterm]
     conf.options[:raise_exception_on_sigterm] = true
-    assert_equal conf.options[:raise_exception_on_sigterm], true
+    assert conf.options[:raise_exception_on_sigterm]
   end
 
   def test_run_hooks_before_restart_hook
@@ -577,7 +579,7 @@ class TestConfigFile < PumaTest
     conf = Puma::Configuration.new
     conf.clamp
 
-    assert_equal false, conf.options[:silence_single_worker_warning]
+    refute conf.options[:silence_single_worker_warning]
   end
 
   def test_silence_single_worker_warning_overwrite
@@ -586,14 +588,14 @@ class TestConfigFile < PumaTest
     end
     conf.clamp
 
-    assert_equal true, conf.options[:silence_single_worker_warning]
+    assert conf.options[:silence_single_worker_warning]
   end
 
   def test_silence_fork_callback_warning_default
     conf = Puma::Configuration.new
     conf.clamp
 
-    assert_equal false, conf.options[:silence_fork_callback_warning]
+    refute conf.options[:silence_fork_callback_warning]
   end
 
   def test_silence_fork_callback_warning_overwrite
@@ -602,7 +604,7 @@ class TestConfigFile < PumaTest
     end
     conf.clamp
 
-    assert_equal true, conf.options[:silence_fork_callback_warning]
+    assert conf.options[:silence_fork_callback_warning]
   end
 
   def test_http_content_length_limit
@@ -631,7 +633,7 @@ class TestConfigFile < PumaTest
     conf = Puma::Configuration.new
     conf.clamp
 
-    assert_kind_of Puma::UserFileDefaultOptions, conf.options
+    assert_instance_of Puma::UserFileDefaultOptions, conf.options
   end
 
   def test_config_files_raises_not_loaded_error_when_not_loaded
@@ -648,14 +650,14 @@ class TestConfigFile < PumaTest
     conf = Puma::Configuration.new
     conf.clamp
 
-    assert_kind_of Array, conf.config_files
+    assert_instance_of Array, conf.config_files
   end
 
   def test_config_does_not_preload_app_if_not_using_workers
     conf = Puma::Configuration.new({ workers: 0 })
     conf.clamp
 
-    assert_equal false, conf.options.default_options[:preload_app]
+    refute conf.options.default_options[:preload_app]
   end
 
   def test_config_preloads_app_if_using_workers
@@ -672,14 +674,14 @@ class TestConfigFile < PumaTest
     end
     conf.clamp
 
-    assert_equal false, conf.options.default_options[:preload_app]
+    refute conf.options.default_options[:preload_app]
   end
 
   def test_config_file_does_not_preload_app_if_not_using_workers
     conf = Puma::Configuration.new { |c| c.load 'test/config/workers_0.rb' }
     conf.clamp
 
-    assert_equal false, conf.options.default_options[:preload_app]
+    refute conf.options.default_options[:preload_app]
   end
 
   def test_config_file_preloads_app_if_using_workers
@@ -848,7 +850,7 @@ class TestConfigEnvVariables < PumaTest
     env = { "WEB_CONCURRENCY" => "0" }
     conf = Puma::Configuration.new({}, {}, env)
     conf.clamp
-    assert_equal false, conf.options.default_options[:preload_app]
+    refute conf.options.default_options[:preload_app]
   end
 
   def test_config_preloads_app_if_using_workers
@@ -910,7 +912,7 @@ class TestConfigFileWithFakeEnv < PumaTest
     conf = Puma::Configuration.new
     conf.clamp
 
-    assert_equal conf.options[:enable_keep_alives], true
+    assert conf.options[:enable_keep_alives]
   end
 
   def test_enable_keep_alives_true
@@ -919,7 +921,7 @@ class TestConfigFileWithFakeEnv < PumaTest
     end
     conf.clamp
 
-    assert_equal conf.options[:enable_keep_alives], true
+    assert conf.options[:enable_keep_alives]
   end
 
   def test_enable_keep_alives_false
@@ -928,7 +930,7 @@ class TestConfigFileWithFakeEnv < PumaTest
     end
     conf.clamp
 
-    assert_equal conf.options[:enable_keep_alives], false
+    refute conf.options[:enable_keep_alives]
   end
 
   def test_on_booted_deprecated_alias_works
