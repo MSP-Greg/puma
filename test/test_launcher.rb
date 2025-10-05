@@ -62,7 +62,7 @@ class TestLauncher < PumaTest
 
     create_launcher(conf).write_state
 
-    assert File.exist?(state_path)
+    assert_path_exists state_path
   ensure
     File.unlink state_path
   end
@@ -76,7 +76,7 @@ class TestLauncher < PumaTest
 
     create_launcher(conf).write_state
 
-    assert File.exist?(state_path)
+    assert_path_exists state_path
   ensure
     File.unlink state_path
   end
