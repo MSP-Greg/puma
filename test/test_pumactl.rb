@@ -337,7 +337,7 @@ class TestPumaControlCli < PumaTest
     end
     @wr.close
 
-    assert_equal(response.status, 1)
+    assert_equal 1, response.status
     if String === expected_out
       assert_includes @rd.read, expected_out
     else
