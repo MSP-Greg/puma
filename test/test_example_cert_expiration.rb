@@ -35,15 +35,12 @@ class TestExampleCertExpiration < PumaTest
 
     failed = expiration_data.select { |ary| ary[0] <= EXPIRE_THRESHOLD }
 
-    if failed.empty?
-      assert true
-    else
+    unless failed.empty?
       msg = +"\n** The below certs in the 'examples/puma' folder are expiring soon.\n" \
         "   See 'examples/generate_all_certs.md' for instructions on how to regenerate.\n\n"
-      failed.each do |ary|
-        msg << "     #{ary[1]}\n"
-      end
-      assert false, msg
+      failed.each { |ary| msg << "     #{ary[1]}\n" }
     end
+
+    assert_predicate failed, :empty?, msg
   end
 end
