@@ -373,7 +373,7 @@ class TestThreadPool < PumaTest
     assert_equal 2, rescued.length
     until rescued.empty?
       thread = rescued.pop
-      refute thread.alive?
+      refute_predicate thread, :alive?
     end
   end
 
