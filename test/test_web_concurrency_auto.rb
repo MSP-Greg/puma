@@ -49,14 +49,14 @@ class TestWebConcurrencyAuto < TestIntegration
     file_path = nil
     skip_unless :fork
 
+    conf = Puma::Configuration.new({}, {}, ENV_WC_TEST)
+    # Mock the require to force it to fail
+    def conf.require(*args)
+      raise LoadError.new("Mocking system where concurrent-ruby is not available")
+    end
+
     _, err = capture_io do
       assert_raises(LoadError) do
-        conf = Puma::Configuration.new({}, {}, ENV_WC_TEST)
-        # Mock the require to force it to fail
-        def conf.require(*args)
-          raise LoadError.new("Mocking system where concurrent-ruby is not available")
-        end
-
         conf.puma_default_options(ENV_WC_TEST)
       end
     end
