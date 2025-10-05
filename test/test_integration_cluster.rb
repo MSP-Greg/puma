@@ -61,7 +61,7 @@ class TestIntegrationCluster < TestIntegration
 
     stop_server
 
-    assert File.exist?(@bind_path)
+    assert_path_exists @bind_path
 
   ensure
     if UNIX_SKT_EXIST
@@ -81,7 +81,7 @@ class TestIntegrationCluster < TestIntegration
     connect(nil, unix: true)
     stop_server
 
-    assert File.exist?(@bind_path)
+    assert_path_exists @bind_path
 
   ensure
     if UNIX_SKT_EXIST
@@ -435,7 +435,7 @@ class TestIntegrationCluster < TestIntegration
     cli_server "-C test/config/prune_bundler_with_multiple_workers.rb"
     reply = read_body(connect)
 
-    assert_equal reply, "embedded app"
+    assert_equal "embedded app", reply
   end
 
   def test_load_path_includes_extra_deps
