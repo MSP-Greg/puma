@@ -120,8 +120,8 @@ class TestIntegrationSingle < TestIntegration
     # Invoke a request which must be rejected
     _stdin, _stdout, rejected_curl_stderr, rejected_curl_wait_thread = Open3.popen3("curl #{HOST}:#{@tcp_port}")
 
-    assert nil != Process.getpgid(@server.pid) # ensure server is still running
-    assert nil != Process.getpgid(curl_wait_thread[:pid]) # ensure first curl invocation still in progress
+    refute_nil Process.getpgid(@server.pid) # ensure server is still running
+    refute_nil Process.getpgid(curl_wait_thread[:pid]) # ensure first curl invocation still in progress
 
     curl_wait_thread.join
     rejected_curl_wait_thread.join
@@ -199,7 +199,7 @@ class TestIntegrationSingle < TestIntegration
     log = File.read('t2-stdout')
 
     assert_match(%r!GET / HTTP/1\.1!, log)
-    assert(!File.file?("t2-pid"))
+    refute File.file?("t2-pid")
     assert_equal("Puma is started\n", out)
   ensure
     File.unlink 't2-stdout' if File.file? 't2-stdout'
@@ -219,7 +219,7 @@ class TestIntegrationSingle < TestIntegration
     log = File.read('t4-stdout')
 
     assert_match(%r!Custom logging: 127\.0\.0\.1.*GET / HTTP/1\.1!, log)
-    assert(!File.file?("t4-pid"))
+    refute File.file?("t4-pid")
     assert_equal("Puma is started\n", out)
   ensure
     File.unlink 't4-stdout' if File.file? 't4-stdout'
@@ -257,15 +257,15 @@ class TestIntegrationSingle < TestIntegration
         rescue Errno::ESRCH
         end
         begin
-          Process.wait2 @pid
+          ret = Process.wait2 @pid
+          pass
         rescue Errno::ECHILD
         end
       end
     rescue Timeout::Error
       Process.kill :SIGKILL, @pid
-      assert false, "Process froze"
+      flunk "Process froze"
     end
-    assert true
   end
 
   def test_puma_debug_loaded_exts
@@ -307,7 +307,7 @@ class TestIntegrationSingle < TestIntegration
       connection = connect(nil, unix: true)
     end
 
-    assert File.exist?(@bind_path)
+    assert_path_exists @bind_path
   ensure
     if UNIX_SKT_EXIST
       File.unlink @bind_path if File.exist? @bind_path
