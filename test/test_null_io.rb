@@ -14,7 +14,7 @@ class TestNullIO < PumaTest
   end
 
   def test_eof_returns_true
-    assert nio.eof?
+    assert_predicate nio, :eof?
   end
 
   def test_gets_returns_nil
@@ -139,7 +139,7 @@ class TestNullIO < PumaTest
   end
 
   def test_sync_returns_true
-    assert_equal true, nio.sync
+    assert nio.sync
   end
 
   def test_flush_returns_self
@@ -147,7 +147,7 @@ class TestNullIO < PumaTest
   end
 
   def test_closed_returns_false
-    assert_equal false, nio.closed?
+    refute_predicate nio, :closed?
   end
 
   def test_set_encoding
@@ -163,7 +163,7 @@ class TestNullIO < PumaTest
   end
 
   def test_binmode?
-    assert nio.binmode?
+    assert_predicate nio, :binmode?
   end
 end
 
