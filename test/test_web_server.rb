@@ -39,11 +39,11 @@ class WebServerTest < PumaTest
   end
 
   def test_requests_count
-    assert_equal @server.requests_count, 0
+    assert_equal 0, @server.requests_count
     3.times do
       hit(["#{@tcp}/test"])
     end
-    assert_equal @server.requests_count, 3
+    assert_equal 3, @server.requests_count
   end
 
   def test_trickle_attack
