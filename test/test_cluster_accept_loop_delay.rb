@@ -11,13 +11,13 @@ class TestClusterAcceptLoopDelay < PumaTest
       workers: 2,
       max_delay: 1
     )
-    assert_equal true, cal_delay.on?
+    assert_predicate cal_delay, :on?
 
     cal_delay = Puma::ClusterAcceptLoopDelay.new(
       workers: 1,
       max_delay: 1
     )
-    assert_equal false, cal_delay.on?
+    refute_predicate cal_delay, :on?
   end
 
   def test_zero_max_delay_always_returns_zero
@@ -25,7 +25,7 @@ class TestClusterAcceptLoopDelay < PumaTest
       workers: 2,
       max_delay: 0
     )
-    assert_equal false, cal_delay.on?
+    refute_predicate cal_delay, :on?
     assert_equal 0, cal_delay.calculate(busy_threads_plus_todo: 0, max_threads: 16)
     assert_equal 0, cal_delay.calculate(busy_threads_plus_todo: 42, max_threads: 16)
     assert_equal 0, cal_delay.calculate(busy_threads_plus_todo: 42 * 42, max_threads: 16)
@@ -60,7 +60,7 @@ class TestClusterAcceptLoopDelay < PumaTest
     )
 
     assert_in_delta 0, cal_delay.calculate(busy_threads_plus_todo: 0.to_f, max_threads: Integer(1)), 0.001
-    assert_equal Float, cal_delay.calculate(busy_threads_plus_todo: Integer(25), max_threads: Integer(1)).class
+    assert_instance_of Float, cal_delay.calculate(busy_threads_plus_todo: Integer(25), max_threads: Integer(1))
     assert_in_delta 5, cal_delay.calculate(busy_threads_plus_todo: 25, max_threads: Integer(1)), 0.001
   end
 
