@@ -95,7 +95,7 @@ class TestPumaServerSSL < PumaTest
 
     # The thread pool should be empty since the request would block on read
     # and our request should have been moved to the reactor.
-    assert busy_threads.zero?, "Our connection is monopolizing a thread"
+    assert_predicate busy_threads, :zero?, "Our connection is monopolizing a thread"
   end
 
   def test_very_large_return
@@ -217,7 +217,7 @@ class TestPumaServerSSL < PumaTest
     thread_pool = @server.instance_variable_get(:@thread_pool)
     busy_threads = thread_pool.spawned - thread_pool.waiting
 
-    assert busy_threads.zero?, "Our connection wasn't dropped"
+    assert_predicate busy_threads, :zero?, "Our connection wasn't dropped"
   end
 
   def test_http_10_close_no_errors
@@ -293,7 +293,7 @@ class TestPumaServerSSL < PumaTest
 
       refute_equal default_cipher, cipher[0]
       assert_equal cipher_suite  , cipher[0]
-      assert_equal cipher[1], 'TLSv1.3'
+      assert_equal 'TLSv1.3', cipher[1]
     end
   end
 end if ::Puma::HAS_SSL
