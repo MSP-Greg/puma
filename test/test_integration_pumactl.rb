@@ -73,7 +73,7 @@ class TestIntegrationPumactl < TestIntegration
 
     # Get the PIDs of the phase 0 workers.
     phase0_worker_pids = get_worker_pids 0
-    assert File.exist? @bind_path
+    assert_path_exists @bind_path
 
     # Phased restart
     cli_pumactl "phased-restart", unix: true
@@ -86,7 +86,7 @@ class TestIntegrationPumactl < TestIntegration
     assert_equal workers, phase0_worker_pids.length, msg
     assert_equal workers, phase1_worker_pids.length, msg
     assert_empty phase0_worker_pids & phase1_worker_pids, "#{msg}\nBoth workers should be replaced with new"
-    assert File.exist?(@bind_path), "Bind path must exist after phased restart"
+    assert_path_exists @bind_path, "Bind path must exist after phased restart"
 
     cli_pumactl "stop", unix: true
 
@@ -107,7 +107,7 @@ class TestIntegrationPumactl < TestIntegration
 
     # Get the PIDs of the phase 0 workers.
     phase0_worker_pids = get_worker_pids 0, wrkrs
-    assert File.exist? @bind_path
+    assert_path_exists @bind_path
 
     cli_pumactl "refork", unix: true
 
@@ -119,7 +119,7 @@ class TestIntegrationPumactl < TestIntegration
     assert_equal wrkrs    , phase0_worker_pids.length, msg
     assert_equal wrkrs - 1, phase1_worker_pids.length, msg
     assert_empty phase0_worker_pids & phase1_worker_pids, "#{msg}\nBoth workers should be replaced with new"
-    assert File.exist?(@bind_path), "Bind path must exist after phased refork"
+    assert_path_exists @bind_path, "Bind path must exist after phased refork"
 
     cli_pumactl "stop", unix: true
 
