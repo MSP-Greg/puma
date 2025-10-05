@@ -41,8 +41,9 @@ class TestPumaLocalhostAuthority < PumaTest
     unless File.exist?(File.join(Localhost::Authority.path,"localhost.key"))
       start_server
     end
-    assert_equal(File.exist?(File.join(Localhost::Authority.path,"localhost.key")), true)
-    assert_equal(File.exist?(File.join(Localhost::Authority.path,"localhost.crt")), true)
+
+    assert_path_exists File.join(Localhost::Authority.path,"localhost.key")
+    assert_path_exists File.join(Localhost::Authority.path,"localhost.crt")
   end
 
 end if ::Puma::HAS_SSL && !Puma::IS_JRUBY
