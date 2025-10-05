@@ -445,7 +445,7 @@ class TestPumaServer < PumaTest
       content-length: 12
     EOF
 
-    assert_equal true, @server.early_hints
+    assert_predicate @server, :early_hints
     assert_equal expected_resp, response
   end
 
@@ -467,7 +467,7 @@ class TestPumaServer < PumaTest
     sleep 0.1
 
     # Expect no errors in stderr
-    assert @log_writer.stderr.pos.zero?, "Server didn't swallow the connection error"
+    assert_predicate @log_writer.stderr.pos, :zero?, "Server didn't swallow the connection error"
   end
 
   def test_early_hints_is_off_by_default
@@ -537,7 +537,7 @@ class TestPumaServer < PumaTest
 
     @server.stop(true)
     stderr = @log_writer.stderr.string
-    assert stderr.empty?, "Expected stderr from server to be empty but it was #{stderr.inspect}"
+    assert_predicate stderr, :empty?, "Expected stderr from server to be empty but it was #{stderr.inspect}"
   end
 
   def test_force_shutdown_custom_error_message
@@ -580,7 +580,7 @@ class TestPumaServer < PumaTest
     assert_includes response, "Array"
     refute_includes response, 'lowlevel_error'
     sleep 0.1 unless ::Puma::IS_MRI
-    assert app_body.closed?
+    assert_predicate app_body, :closed?
   end
 
   def test_lowlevel_error_message
@@ -742,7 +742,7 @@ class TestPumaServer < PumaTest
 
     sleep 1.15
 
-    assert @server.shutting_down?
+    assert_predicate @server, :shutting_down?
 
     assert_raises Errno::ECONNREFUSED do
       send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n"
@@ -792,7 +792,7 @@ class TestPumaServer < PumaTest
 
     sleep 1.15
 
-    assert @server.shutting_down?
+    assert_predicate @server, :shutting_down?
 
     assert socket.wait_readable(1), 'Unexpected timeout'
     assert_raises Errno::ECONNREFUSED do
@@ -827,7 +827,7 @@ class TestPumaServer < PumaTest
 
     sleep 1.15
 
-    assert @server.shutting_down?
+    assert_predicate @server, :shutting_down?
 
     assert socket.wait_readable(1), 'Unexpected timeout'
     assert_raises Errno::ECONNREFUSED do
@@ -858,7 +858,7 @@ class TestPumaServer < PumaTest
 
     sleep 1.15
 
-    assert @server.shutting_down?
+    assert_predicate @server, :shutting_down?
 
     assert socket.wait_readable(1), 'Unexpected timeout'
     assert_raises Errno::ECONNREFUSED do
@@ -1394,7 +1394,7 @@ class TestPumaServer < PumaTest
     assert_equal "hello", body
     assert_equal "5", content_length
     sleep 0.05 if TRUFFLE
-    assert_equal true, last_crlf_written
+    assert last_crlf_written
 
     last_crlf_writer.join
 
@@ -1538,7 +1538,7 @@ class TestPumaServer < PumaTest
 
     socket.read_response
 
-    assert request_body_wait.is_a?(Float)
+    assert_kind_of Float, request_body_wait
     # Could be 1000 but the tests get flaky. We don't care if it's extremely precise so much as that
     # it is set to a reasonable number.
     assert_operator request_body_wait, :>=, 900
@@ -1977,9 +1977,9 @@ class TestPumaServer < PumaTest
 
     assert_equal body_len, response_body.bytesize
     assert_equal str * 3, response_body
-    assert times[1] - times[0] > 0.4
-    assert times[1] - times[0] < 1
-    assert times[2] - times[1] > 1
+    assert_operator(times[1] - times[0], :>, 0.4)
+    assert_operator(times[1] - times[0], :<, 1)
+    assert_operator(times[2] - times[1], :>, 1)
   end
 
   # similar to a longer running app passing its output thru an enum body
