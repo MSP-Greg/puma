@@ -154,6 +154,6 @@ class TestWorkerGemIndependence < TestIntegration
   def verify_process_tag(pid, tag)
     cmd = "ps aux | grep #{pid}"
     io = IO.popen cmd, 'r'
-    assert io.read.include? tag
+    assert_includes io.read, tag
   end
 end
