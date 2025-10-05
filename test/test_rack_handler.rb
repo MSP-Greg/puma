@@ -43,7 +43,7 @@ module TestRackUp
       launcher.stop
       thread.join
 
-      assert_equal after_booted, true
+      assert after_booted
     end
   end
 
@@ -306,7 +306,7 @@ module TestRackUp
       conf = ::Rack::Handler::Puma.config(->{}, @options)
       conf.clamp
 
-      assert_equal false, conf.options[:log_requests]
+      refute conf.options[:log_requests]
     end
 
     def test_file_log_requests_wins_over_default_config
