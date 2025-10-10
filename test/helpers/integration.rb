@@ -179,8 +179,13 @@ class TestIntegration < PumaTest
   # reuses an existing connection to make sure that works
   def restart_server(connection, log: false)
     Process.kill :USR2, @pid
-    wait_for_server_to_include 'Restarting', log: log
-    connection.write "GET / HTTP/1.1\r\n\r\n" # trigger it to start by sending a new request
+
+    if @server_log.include?(' Workers: ')
+      get_worker_pids 0, 1, log: log # wait for at least one worker to start
+    else
+      wait_for_server_to_include 'Restarting', log: log
+    end
+    connection.syswrite "GET / HTTP/1.1\r\n\r\n" # trigger it to start by sending a new request
     wait_for_server_to_boot log: log
   end
 

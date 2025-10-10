@@ -74,9 +74,12 @@ class TestIntegrationCluster < TestIntegration
 
     File.open(@bind_path, mode: 'wb') { |f| f.puts 'pre existing' }
 
-    cli_server "-w #{workers} -q test/rackup/sleep_step.ru", unix: :unix, config: "preload_app! false"
-    connection = connect(nil, unix: true)
-    restart_server connection
+    cli_server "-w #{workers} -t1:1 -q test/rackup/sleep.ru", unix: :unix, config: "preload_app! false"
+
+    socket = fast_connect 'sleep0.001', unix: true
+    read_body socket, 20
+
+    restart_server socket
 
     connect(nil, unix: true)
     stop_server
@@ -104,7 +107,7 @@ class TestIntegrationCluster < TestIntegration
   end
 
   def test_usr2_restart
-    _, new_reply = restart_server_and_listen("-q -w #{workers} test/rackup/hello.ru")
+    _, new_reply = restart_server_and_listen("-q -w #{workers} -t1:1 test/rackup/hello.ru")
     assert_equal "Hello World", new_reply
   end
 
