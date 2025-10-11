@@ -414,7 +414,9 @@ class TestIntegrationCluster < TestIntegration
   def test_refork_phased_restart_with_fork_worker_and_high_worker_count
     worker_count = 10
 
-    cli_server "test/rackup/hello.ru", config: <<~CONFIG
+    # Use merge_err: true due to:
+    # 'Exception handling servers: #<IOError: closed stream>'
+    cli_server "test/rackup/hello.ru", merge_err: true, config: <<~CONFIG
       fork_worker
       worker_check_interval 1
       # lower worker timeout from default (60) to avoid test timeout
