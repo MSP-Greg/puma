@@ -53,6 +53,7 @@ end
 
 require 'minitest'
 require "minitest/mock" unless defined?(::Minitest::Mock)
+require_relative 'helper'
 
 if ARGV.empty? || ARGV.last.start_with?('-')
   Dir['test_*.rb', base: __dir__].sort.each { |tf| require_relative tf }
