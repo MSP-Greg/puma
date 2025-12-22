@@ -218,9 +218,16 @@ class Minitest::Test
 
   PROJECT_ROOT = File.dirname(__dir__)
 
-  def self.run(klass, method_name, reporter) # :nodoc:
-    prove_it!
-    super
+  if RUBY_VERSION < "3.2"
+    def self.run(reporter, options = {}) # :nodoc:
+      prove_it!
+      super
+    end
+  else
+    def self.run(klass, method_name, reporter) # :nodoc:
+      prove_it!
+      super
+    end
   end
 
   def full_name
