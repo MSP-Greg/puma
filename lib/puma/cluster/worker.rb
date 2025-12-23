@@ -137,7 +137,7 @@ module Puma
                 # sub call properly adds 'closing' string
                 io << payload.sub(/,\z/, " }\n")
                 @server.reset_max
-              rescue IOError
+              rescue IOError, Errno::EPIPE
                 break
               end
               sleep @options[:worker_check_interval]
