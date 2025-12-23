@@ -95,12 +95,6 @@ end
 
 Minitest::Test.prepend TimeoutPrepend
 
-class PumaTest < Minitest::Test # rubocop:disable Puma/TestsMustUsePumaTest
-  def teardown
-    clean_tmp_paths if respond_to? :clean_tmp_paths
-  end
-end
-
 if ENV['CI']
   require 'minitest/retry'
 
@@ -346,3 +340,9 @@ module MethodCallAssertions
   end
 end
 Minitest::Test.include MethodCallAssertions
+
+class PumaTest < Minitest::Test # rubocop:disable Puma/TestsMustUsePumaTest
+  def teardown
+    clean_tmp_paths if respond_to? :clean_tmp_paths
+  end
+end
