@@ -10,9 +10,6 @@ end
 
 require "securerandom"
 
-# needs to be loaded before minitest for Ruby 2.7 and earlier
-require_relative "helpers/test_puma/assertions"
-
 require_relative "minitest/verbose"
 require "minitest/autorun"
 require "minitest/pride"
@@ -20,6 +17,7 @@ require "minitest/proveit"
 require "minitest/stub_const"
 require "net/http"
 require_relative "helpers/apps"
+require_relative "helpers/test_puma/assertions"
 
 Thread.abort_on_exception = true
 
