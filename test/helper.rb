@@ -344,6 +344,7 @@ end
 
 class PumaTest < Minitest::Test # rubocop:disable Puma/TestsMustUsePumaTest
   include MethodCallAssertions
+  include TestPuma::Assertions
   include TestSkips
   include TestTempFile
 
