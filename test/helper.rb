@@ -93,46 +93,6 @@ module TimeoutPrepend
   end
 end
 
-# Minitest::Test.prepend TimeoutPrepend
-
-if ENV['CI']
-  require 'minitest/retry'
-  Minitest::Retry.use!
-
-  Minitest::Retry::GHA_STEP_SUMMARY_FILE = ENV['GITHUB_STEP_SUMMARY']
-
-  if Minitest::Retry::GHA_STEP_SUMMARY_FILE && ENV['GITHUB_ACTIONS'] == 'true'
-
-    Minitest::Retry::GHA_STEP_SUMMARY_MUTEX = Mutex.new
-
-    Minitest::Retry.on_failure do |klass, test_name, result|
-      full_method = "#{klass}##{test_name}"
-      result_str = result.to_s.gsub(/#{full_method}:?\s*/, '').dup
-      result_str.gsub!(/\A(Failure:|Error:)\s/, '\1 ')
-      issue = result_str[/\A[^\n]+/]
-      result_str.gsub!(issue, '')
-      # shorten directory lists
-      result_str.gsub! ENV['GITHUB_WORKSPACE'], 'puma'
-      result_str.gsub! ENV['RUNNER_TOOL_CACHE'], ''
-      # remove indent
-      result_str.gsub!(/^ +/, '')
-      str = "\n**#{full_method}**\n**#{issue}**\n```\n#{result_str.strip}\n```\n"
-      Minitest::Retry::GHA_STEP_SUMMARY_MUTEX.synchronize {
-        retry_cntr = 0
-        begin
-          File.write Minitest::Retry::GHA_STEP_SUMMARY_FILE, str, mode: 'a+'
-        rescue IOError # can't write to file, retry once
-          if retry_cntr == 0
-            retry_cntr += 1
-            sleep 0.2
-            retry
-          end
-        end
-      }
-    end
-  end
-end
-
 module TestSkips
 
   HAS_FORK = ::Process.respond_to? :fork
@@ -339,7 +299,44 @@ module MethodCallAssertions
     assert_called_on_instance_of(klass, method_name, message, times: 0, &block)
   end
 end
-# Minitest::Test.include MethodCallAssertions
+
+if ENV['CI']
+  require 'minitest/retry'
+  Minitest::Retry.use!
+
+  Minitest::Retry::GHA_STEP_SUMMARY_FILE = ENV['GITHUB_STEP_SUMMARY']
+
+  if Minitest::Retry::GHA_STEP_SUMMARY_FILE && ENV['GITHUB_ACTIONS'] == 'true'
+
+    Minitest::Retry::GHA_STEP_SUMMARY_MUTEX = Mutex.new
+
+    Minitest::Retry.on_failure do |klass, test_name, result|
+      full_method = "#{klass}##{test_name}"
+      result_str = result.to_s.gsub(/#{full_method}:?\s*/, '').dup
+      result_str.gsub!(/\A(Failure:|Error:)\s/, '\1 ')
+      issue = result_str[/\A[^\n]+/]
+      result_str.gsub!(issue, '')
+      # shorten directory lists
+      result_str.gsub! ENV['GITHUB_WORKSPACE'], 'puma'
+      result_str.gsub! ENV['RUNNER_TOOL_CACHE'], ''
+      # remove indent
+      result_str.gsub!(/^ +/, '')
+      str = "\n**#{full_method}**\n**#{issue}**\n```\n#{result_str.strip}\n```\n"
+      Minitest::Retry::GHA_STEP_SUMMARY_MUTEX.synchronize {
+        retry_cntr = 0
+        begin
+          File.write Minitest::Retry::GHA_STEP_SUMMARY_FILE, str, mode: 'a+'
+        rescue IOError # can't write to file, retry once
+          if retry_cntr == 0
+            retry_cntr += 1
+            sleep 0.2
+            retry
+          end
+        end
+      }
+    end
+  end
+end
 
 class PumaTest < Minitest::Test # rubocop:disable Puma/TestsMustUsePumaTest
   include TestPuma::Assertions
