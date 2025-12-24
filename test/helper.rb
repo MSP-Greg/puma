@@ -93,14 +93,13 @@ module TimeoutPrepend
   end
 end
 
-Minitest::Test.prepend TimeoutPrepend
+# Minitest::Test.prepend TimeoutPrepend
 
 if ENV['CI']
   require 'minitest/retry'
+  Minitest::Retry.use!
 
   Minitest::Retry::GHA_STEP_SUMMARY_FILE = ENV['GITHUB_STEP_SUMMARY']
-
-  Minitest::Retry.use!
 
   if Minitest::Retry::GHA_STEP_SUMMARY_FILE && ENV['GITHUB_ACTIONS'] == 'true'
 
@@ -343,10 +342,10 @@ end
 # Minitest::Test.include MethodCallAssertions
 
 class PumaTest < Minitest::Test # rubocop:disable Puma/TestsMustUsePumaTest
-  include MethodCallAssertions
   include TestPuma::Assertions
   include TestSkips
   include TestTempFile
+  prepend TimeoutPrepend
 
   def teardown
     clean_tmp_paths if respond_to? :clean_tmp_paths
