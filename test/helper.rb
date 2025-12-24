@@ -204,8 +204,8 @@ module TestSkips
   end
 end
 
-Minitest::Test.include TestSkips
-
+# Minitest::Test.include TestSkips
+=begin
 class Minitest::Test
 
   PROJECT_ROOT = File.dirname(__dir__)
@@ -226,6 +226,7 @@ class Minitest::Test
     "#{self.class.name}##{name}"
   end
 end
+=end
 
 Minitest.after_run do
   if ENV['PUMA_TEST_DEBUG']
@@ -308,7 +309,7 @@ module TestTempFile
     fio
   end
 end
-Minitest::Test.include TestTempFile
+# Minitest::Test.include TestTempFile
 
 # This module is modified based on https://github.com/rails/rails/blob/7-1-stable/activesupport/lib/active_support/testing/method_call_assertions.rb
 module MethodCallAssertions
@@ -339,10 +340,32 @@ module MethodCallAssertions
     assert_called_on_instance_of(klass, method_name, message, times: 0, &block)
   end
 end
-Minitest::Test.include MethodCallAssertions
+# Minitest::Test.include MethodCallAssertions
 
 class PumaTest < Minitest::Test # rubocop:disable Puma/TestsMustUsePumaTest
+  include MethodCallAssertions
+  include TestSkips
+  include TestTempFile
+
   def teardown
     clean_tmp_paths if respond_to? :clean_tmp_paths
+  end
+
+  PROJECT_ROOT = File.dirname(__dir__)
+
+  if RUBY_VERSION < "3.2"
+    def self.run(reporter, options = {}) # :nodoc:
+      prove_it!
+      super
+    end
+  else
+    def self.run(klass, method_name, reporter) # :nodoc:
+      prove_it!
+      super
+    end
+  end
+
+  def full_name
+    "#{self.class.name}##{name}"
   end
 end
