@@ -52,7 +52,7 @@ if show_warnings
 end
 
 require 'minitest'
-require "minitest/mock" unless defined?(::Minitest::Mock)
+require 'minitest/mock' unless defined?(::Minitest::Mock)
 require_relative 'helper'
 
 if ARGV.empty? || ARGV.last.start_with?('-')
