@@ -66,14 +66,7 @@ jobs:
           DST="if RUBY_PATCHLEVEL == -1\n  gem 'rack', git: 'https://github.com/rack/rack', ref: 'main'\nelse\n  gem 'rack'\nend"
           sed -i "s#$SRC#$DST#" Gemfile
           #
-          case $RAILS_VERSION in
-            8.*)
-              SQLITE_VERSION='>= 2.1'
-              ;;
-            *)
-              SQLITE_VERSION='~> 1.4'
-              ;;
-          esac
+          SQLITE_VERSION='~> 2.7'
           SRC="gem ['\"]sqlite3['\"].*"
           DST="gem 'sqlite3', '$SQLITE_VERSION'"
           sed -i "s#$SRC#$DST#" Gemfile
