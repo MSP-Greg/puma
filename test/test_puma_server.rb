@@ -2044,14 +2044,10 @@ class TestPumaServer < PumaTest
 
     file_bytesize = file_contents.bytesize + 3 # 3 = BOM byte size
 
-    fio = Tempfile.create 'win_bom_utf8_'
-
+    fio = Tempfile.create 'win_bom_utf8_', mode: File::BINARY
+    fio.write "\xEF\xBB\xBF#{file_contents}"
     temp_file_path = fio.path
     fio.close
-
-    File.open temp_file_path, "wb:UTF-8" do |f|
-      f.write "\xEF\xBB\xBF#{file_contents}"
-    end
 
     server_run do |env|
       req_body = env['rack.input'].read
@@ -2062,7 +2058,7 @@ class TestPumaServer < PumaTest
 
     out_r, _, _ = spawn_cmd cmd
 
-    out_r.wait_readable 3
+    assert out_r.wait_readable(5)
 
     form_file_data = req_body.split("\r\n\r\n", 2)[1].sub(/\r\n----\S+\r\n\z/, '')
 
