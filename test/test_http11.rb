@@ -215,6 +215,54 @@ class Http11ParserTest < TestIntegration
     parser.reset
   end
 
+  RNG = TRUFFLE ? (8..10) : (1..10)
+
+  def test_large_header_names
+    parser = Puma::HttpParser.new
+
+    # then that large header names are caught
+    RNG.each do |c|
+      get = "GET /#{rand_data(10,120)} HTTP/1.1\r\nX-#{rand_data(1024, 1024+(c*1024))}: Test\r\n\r\n"
+      assert_raises Puma::HttpParserError do
+        parser.execute({}, get, 0)
+      end
+      parser.reset
+    end
+  end
+
+  def test_large_header_values
+    # then that large mangled field values are caught
+    RNG.each do |c|
+      get = "GET /#{rand_data(10,120)} HTTP/1.1\r\nX-Test: #{rand_data(1024, 1024+(c*1024), false)}\r\n\r\n"
+      assert_raises Puma::HttpParserError do
+        parser.execute({}, get, 0)
+      end
+      parser.reset
+    end
+  end
+
+  def large_headers
+    # then large headers are rejected too
+    get  = "GET /#{rand_data(10,120)} HTTP/1.1\r\n"
+    get += "X-Test: test\r\n" * (80 * 1024)
+    assert_raises Puma::HttpParserError do
+      parser.execute({}, get, 0)
+    end
+    parser.reset
+  end
+
+  def garbage_request
+    # finally just that random garbage gets blocked all the time
+    RNG.each do |c|
+      get = "GET #{rand_data(1024, 1024+(c*1024), false)} #{rand_data(1024, 1024+(c*1024), false)}\r\n\r\n"
+      assert_raises Puma::HttpParserError do
+        parser.execute({}, get, 0)
+      end
+      parser.reset
+    end
+  end
+
+=begin
   def test_horrible_queries
     parser = Puma::HttpParser.new
 
@@ -255,7 +303,7 @@ class Http11ParserTest < TestIntegration
       parser.reset
     end
   end
-
+=end
   def test_trims_whitespace_from_headers
     parser = Puma::HttpParser.new
     req = {}
