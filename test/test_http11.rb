@@ -230,8 +230,10 @@ class Http11ParserTest < TestIntegration
     end
   end
 
+  # then that large mangled field values are caught
   def test_large_header_values
-    # then that large mangled field values are caught
+    parser = Puma::HttpParser.new
+
     RNG.each do |c|
       get = "GET /#{rand_data(10,120)} HTTP/1.1\r\nX-Test: #{rand_data(1024, 1024+(c*1024), false)}\r\n\r\n"
       assert_raises Puma::HttpParserError do
@@ -241,8 +243,10 @@ class Http11ParserTest < TestIntegration
     end
   end
 
+  # then large headers are rejected too
   def large_headers
-    # then large headers are rejected too
+    parser = Puma::HttpParser.new
+
     get  = "GET /#{rand_data(10,120)} HTTP/1.1\r\n"
     get += "X-Test: test\r\n" * (80 * 1024)
     assert_raises Puma::HttpParserError do
@@ -251,8 +255,10 @@ class Http11ParserTest < TestIntegration
     parser.reset
   end
 
+  # finally just that random garbage gets blocked all the time
   def garbage_request
-    # finally just that random garbage gets blocked all the time
+    parser = Puma::HttpParser.new
+
     RNG.each do |c|
       get = "GET #{rand_data(1024, 1024+(c*1024), false)} #{rand_data(1024, 1024+(c*1024), false)}\r\n\r\n"
       assert_raises Puma::HttpParserError do
