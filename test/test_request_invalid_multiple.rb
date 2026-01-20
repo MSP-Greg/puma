@@ -11,7 +11,6 @@ require_relative "helpers/test_puma/puma_socket"
 #
 # https://httpwg.org/specs/rfc9112.html#body.content-length     Content-Length
 # https://httpwg.org/specs/rfc9112.html#field.transfer-encoding Transfer-Encoding
-# https://httpwg.org/specs/rfc9112.html#chunked.encoding        Chunked Transfer Coding
 #
 
 class TestRequestInvalidMultiple < PumaTest
@@ -85,10 +84,9 @@ class TestRequestInvalidMultiple < PumaTest
 
   def assert_status(request, status = 400, socket: nil)
     response = if socket
-      socket.req_write(request).read_response
+      socket.send_http_read_response(request)
     else
-      socket = new_socket
-      socket.req_write(request).read_response
+      send_http_read_response
     end
 
     re = /\AHTTP\/1\.[01] #{status}/
@@ -100,7 +98,7 @@ class TestRequestInvalidMultiple < PumaTest
         cl = response.headers_hash['content-length'].to_i
         refute_equal 0, cl, "Expected `content-length` header to be non-zero but was `#{cl}`. Headers: #{response.headers_hash}"
       end
-      socket.req_write GET_11
+      socket.send_http GET_11
       assert_raises(*@error_on_closed) { socket.read_response }
     end
   end
