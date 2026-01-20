@@ -20,6 +20,8 @@ class TestPluginSystemd < TestIntegration
       @socket.bind(socket_ai)
       @env = {"NOTIFY_SOCKET" => sockaddr }
     end
+
+    @message = String.new
   end
 
   def teardown
