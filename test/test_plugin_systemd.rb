@@ -21,7 +21,7 @@ class TestPluginSystemd < TestIntegration
       @env = {"NOTIFY_SOCKET" => sockaddr }
     end
 
-    @message = String.new
+    @message = String.new # rubocop: disable Performance/UnfreezeString
   end
 
   def teardown
