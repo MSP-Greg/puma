@@ -18,7 +18,7 @@ require "rack/body_proxy"
 # for use with GitHub Actions...
 
 class TestPumaServerHijack < PumaTest
-  parallelize_me!
+  # parallelize_me!
 
   include TestPuma
   include TestPuma::PumaSocket
