@@ -26,11 +26,10 @@ class TestIntegrationSSL < TestIntegration
 
   def bind_port
     @bind_port ||= UniquePort.call
-    @tcp_port = @bind_port
   end
 
-  def control_tcp_port
-    @control_tcp_port ||= UniquePort.call
+  def control_port
+    @control_port ||= UniquePort.call
   end
 
   def with_server(config)
@@ -67,7 +66,7 @@ class TestIntegrationSSL < TestIntegration
         }
       end
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app 'tcp://#{HOST}:#{control_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
@@ -139,8 +138,6 @@ class TestIntegrationSSL < TestIntegration
   def test_ssl_run_with_curl_client
     skip_if :windows
 
-    require 'stringio'
-
     cert_path = File.expand_path '../examples/puma/client_certs', __dir__
     bind_port
 
@@ -163,15 +160,15 @@ class TestIntegrationSSL < TestIntegration
       app { |_| [200, { 'Content-Type' => 'text/plain' }, ["HELLO", ' ', "THERE"]] }
     CONFIG
 
-
     ca   = "#{cert_path}/ca.crt"
     cert = "#{cert_path}/client.crt"
     key  = "#{cert_path}/client.key"
     # NOTE: JRuby used to end up in a hang with TLS peer verification enabled
-    # it's easier to reproduce using an external client such as CURL (using net/http client the bug isn't triggered)
-    # also the "hang", being buffering related, seems to showcase better with TLS 1.2 than 1.3
+    # it's easier to reproduce using an external client such as CURL (using net/http
+    # client the bug isn't triggered), also the "hang", being buffering related,
+    # seems to showcase better with TLS 1.2 than 1.3
     body = curl_and_get_response "https://#{LOCALHOST}:#{@bind_port}",
-                                 args: "--cacert #{ca} --cert #{cert} --key #{key} --tlsv1.2 --tls-max 1.2"
+             args: "--cacert #{ca} --cert #{cert} --key #{key} --tlsv1.2 --tls-max 1.2"
 
     assert_equal 'HELLO THERE', body
   end
@@ -189,7 +186,7 @@ class TestIntegrationSSL < TestIntegration
         verify_mode: 'none'
       }
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app 'tcp://#{HOST}:#{control_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
@@ -213,7 +210,7 @@ class TestIntegrationSSL < TestIntegration
       require 'localhost'
       ssl_bind '#{HOST}', '#{bind_port}'
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app 'tcp://#{HOST}:#{control_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
@@ -248,7 +245,7 @@ class TestIntegrationSSL < TestIntegration
         key_password_command: key_command
       }
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app 'tcp://#{HOST}:#{control_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
@@ -283,7 +280,7 @@ class TestIntegrationSSL < TestIntegration
         key_password_command: key_command
       }
 
-      activate_control_app 'tcp://#{HOST}:#{control_tcp_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app 'tcp://#{HOST}:#{control_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
