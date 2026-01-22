@@ -36,17 +36,10 @@ class TestIntegration < PumaTest
   end
 
   def after_teardown
-    if @server && defined?(@control_port) && Puma.windows?
+    if @server && defined?(@control_port) && Puma::IS_WINDOWS
       cli_pumactl 'halt'
-    elsif @server && @pid && !Puma.windows?
-      stop_server @pid, signal: :INT
-    end
-
-    close_ios if @ios_to_close
-
-    if @bind_path
-      refute File.exist?(@bind_path), "Bind path must be removed after stop"
-      File.unlink(@bind_path) rescue nil
+    elsif @server && @pid
+      stop_server signal: :INT
     end
 
     # wait until the end for OS buffering?
@@ -57,6 +50,13 @@ class TestIntegration < PumaTest
       ensure
         @server = nil
       end
+    end
+
+    close_ios if @ios_to_close
+
+    if @bind_path
+      refute File.exist?(@bind_path), "Bind path must be removed after stop"
+      File.unlink(@bind_path) rescue nil
     end
 
     [@state_path, @control_path].each { |p| File.unlink(p) rescue nil }
@@ -149,15 +149,17 @@ class TestIntegration < PumaTest
   # that is already stopped/killed, especially since Process.wait2 is
   # blocking
   def stop_server(pid = @pid, signal: :TERM)
-    @server_stopped = true
+    ret = nil
     begin
       Process.kill signal, pid
     rescue Errno::ESRCH
     end
     begin
-      Process.wait2 pid
+      ret = Process.wait2 pid
     rescue Errno::ECHILD
     end
+    @server_stopped = true
+    ret
   end
 
   # Most integration tests do not stop/shutdown the server, which is handled by
@@ -371,8 +373,8 @@ class TestIntegration < PumaTest
       @control_path = tmp_path('.cntl_sock')
       "--control-url unix://#{@control_path} --control-token #{TOKEN}"
     else
-      @control_tcp_port = UniquePort.call
-      "--control-url tcp://#{HOST}:#{@control_tcp_port} --control-token #{TOKEN}"
+      @control_port = UniquePort.call
+      "--control-url tcp://#{HOST}:#{@control_port} --control-token #{TOKEN}"
     end
   end
 
@@ -380,10 +382,10 @@ class TestIntegration < PumaTest
     arg =
       if no_bind
         argv.split(/ +/)
-      elsif @control_path && !@control_tcp_port
+      elsif @control_path && !@control_port
         %W[-C unix://#{@control_path} -T #{TOKEN} #{argv}]
-      elsif @control_tcp_port && !@control_path
-        %W[-C tcp://#{HOST}:#{@control_tcp_port} -T #{TOKEN} #{argv}]
+      elsif @control_port && !@control_path
+        %W[-C tcp://#{HOST}:#{@control_port} -T #{TOKEN} #{argv}]
       end
 
     r, w = IO.pipe
@@ -397,10 +399,10 @@ class TestIntegration < PumaTest
     arg =
       if no_bind
         argv
-      elsif @control_path && !@control_tcp_port
+      elsif @control_path && !@control_port
         %Q[-C unix://#{@control_path} -T #{TOKEN} #{argv}]
-      elsif @control_tcp_port && !@control_path
-        %Q[-C tcp://#{HOST}:#{@control_tcp_port} -T #{TOKEN} #{argv}]
+      elsif @control_port && !@control_path
+        %Q[-C tcp://#{HOST}:#{@control_port} -T #{TOKEN} #{argv}]
       end
 
     pumactl_path = File.expand_path '../../../bin/pumactl', __FILE__
