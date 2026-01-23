@@ -63,6 +63,7 @@ jobs:
           - { os: macos-14        , ruby:  3.2  }
           - { os: macos-14        , ruby:  3.3  }
           - { os: macos-14        , ruby: '4.0' }
+          - { os: macos-14        , ruby:  head }
           - { os: macos-15        , ruby: '3.0' }
           - { os: macos-15        , ruby:  3.2  }
           - { os: macos-15        , ruby:  3.4  }
