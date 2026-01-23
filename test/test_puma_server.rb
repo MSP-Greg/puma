@@ -803,7 +803,8 @@ class TestPumaServer < PumaTest
   def test_idle_timeout_between_request_data
     server_run(idle_timeout: 1)
 
-    socket = send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n"
+    socket = send_http "POST / HTTP/1.1\r\nHost: test.com\r\n" \
+      "Content-Type: text/plain\r\nContent-Length: 12\r\n\r\n"
 
     socket << "hello world!"
 
@@ -811,13 +812,14 @@ class TestPumaServer < PumaTest
 
     assert_equal "HTTP/1.1 200 OK", response.status
 
-    sleep 0.5
+    sleep 0.25
 
-    socket = send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n"
+    socket << "POST / HTTP/1.1\r\nHost: test.com\r\n" \
+      "Content-Type: text/plain\r\nContent-Length: 12\r\n\r\n"
 
     socket << "hello"
 
-    sleep 1.15
+    sleep 1.25
 
     socket << " world!"
 
@@ -825,7 +827,7 @@ class TestPumaServer < PumaTest
 
     assert_equal "HTTP/1.1 200 OK", response.status
 
-    sleep 1.15
+    sleep 1.25
 
     assert @server.shutting_down?
 
