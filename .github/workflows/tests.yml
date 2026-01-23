@@ -72,6 +72,7 @@ jobs:
           - { os: macos-15-intel  , ruby:  3.3  }
           - { os: macos-15-intel  , ruby:  3.4  }
           - { os: macos-15-intel  , ruby: '4.0' }
+          - { os: macos-15-intel  , ruby:  head }
           - { os: macos-26        , ruby: '3.0' }
           - { os: macos-26        , ruby:  3.2  }
           - { os: macos-26        , ruby:  3.3  }
