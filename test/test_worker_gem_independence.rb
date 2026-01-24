@@ -33,13 +33,9 @@ class TestWorkerGemIndependence < TestIntegration
   end
 
   def test_changing_json_version_during_phased_restart_after_querying_stats_from_status_server
-    @control_port = UniquePort.call
-    server_opts = "--control-url tcp://#{HOST}:#{@control_port} --control-token #{TOKEN}"
-    before_restart = ->() do
-      cli_pumactl "stats"
-    end
+    before_restart = ->() { cli_pumactl "stats" }
 
-    change_gem_version_during_phased_restart server_opts: server_opts,
+    change_gem_version_during_phased_restart server_opts: set_pumactl_args,
                                              before_restart: before_restart,
                                              old_app_dir: 'worker_gem_independence_test/old_json',
                                              old_version: '2.7.1',
@@ -48,13 +44,9 @@ class TestWorkerGemIndependence < TestIntegration
   end
 
   def test_changing_json_version_during_phased_restart_after_querying_gc_stats_from_status_server
-    @control_port = UniquePort.call
-    server_opts = "--control-url tcp://#{HOST}:#{@control_port} --control-token #{TOKEN}"
-    before_restart = ->() do
-      cli_pumactl "gc-stats"
-    end
+    before_restart = ->() { cli_pumactl "gc-stats" }
 
-    change_gem_version_during_phased_restart server_opts: server_opts,
+    change_gem_version_during_phased_restart server_opts: set_pumactl_args,
                                              before_restart: before_restart,
                                              old_app_dir: 'worker_gem_independence_test/old_json',
                                              old_version: '2.7.1',
@@ -63,13 +55,9 @@ class TestWorkerGemIndependence < TestIntegration
   end
 
   def test_changing_json_version_during_phased_restart_after_querying_thread_backtraces_from_status_server
-    @control_port = UniquePort.call
-    server_opts = "--control-url tcp://#{HOST}:#{@control_port} --control-token #{TOKEN}"
-    before_restart = ->() do
-      cli_pumactl "thread-backtraces"
-    end
+    before_restart = ->() { cli_pumactl "thread-backtraces" }
 
-    change_gem_version_during_phased_restart server_opts: server_opts,
+    change_gem_version_during_phased_restart server_opts: set_pumactl_args,
                                              before_restart: before_restart,
                                              old_app_dir: 'worker_gem_independence_test/old_json',
                                              old_version: '2.7.1',
