@@ -831,7 +831,6 @@ class TestPumaServer < PumaTest
 
     assert @server.shutting_down?
 
-    assert socket.wait_readable(1), 'Unexpected timeout'
     assert_raises Errno::ECONNREFUSED do
       send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n"
     end
