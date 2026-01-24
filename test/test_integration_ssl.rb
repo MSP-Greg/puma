@@ -4,7 +4,6 @@ require_relative 'helper'
 require_relative "helpers/integration"
 
 if ::Puma::HAS_SSL # don't load any files if no ssl support
-  require "net/http"
   require "openssl"
   require_relative "helpers/test_puma/puma_socket"
 end
@@ -30,16 +29,6 @@ class TestIntegrationSSL < TestIntegration
 
   def control_port
     @control_port ||= UniquePort.call
-  end
-
-  def with_server(config)
-    cli_server "-t1:1", config: config, no_bind: true
-
-    http = Net::HTTP.new HOST, bind_port
-    http.use_ssl = true
-    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-
-    yield http
   end
 
   def test_ssl_run
@@ -73,30 +62,26 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server "-t1:1", config: config, no_bind: true
+
+    body = send_http_read_body ctx: new_ctx
+
+    assert_equal 'https', body
   end
 
   # should use TLSv1.3 with OpenSSL 1.1 or later
   def test_verify_client_cert_roundtrip(tls1_2 = nil)
     cert_path = File.expand_path '../examples/puma/client_certs', __dir__
-    bind_port
 
     cli_server "-t1:5 #{set_pumactl_args}", no_bind: true, config: <<~CONFIG
       if ::Puma::IS_JRUBY
-        ssl_bind '#{LOCALHOST}', '#{@bind_port}', {
+        ssl_bind '#{LOCALHOST}', '#{bind_port}', {
           keystore: '#{cert_path}/keystore.jks',
           keystore_pass: 'jruby_puma',
           verify_mode: 'force_peer'
         }
       else
-        ssl_bind '#{LOCALHOST}', '#{@bind_port}', {
+        ssl_bind '#{LOCALHOST}', '#{bind_port}', {
           cert: '#{cert_path}/server.crt',
           key:  '#{cert_path}/server.key',
           ca:   '#{cert_path}/ca.crt',
@@ -112,7 +97,7 @@ class TestIntegrationSSL < TestIntegration
 
     client_cert = File.read "#{cert_path}/client.crt"
 
-    body = send_http_read_body host: LOCALHOST, port: @bind_port, ctx: new_ctx { |c|
+    body = send_http_read_body ctx: new_ctx { |c|
         ca   = "#{cert_path}/ca.crt"
         key  = "#{cert_path}/client.key"
         c.ca_file = ca
@@ -193,14 +178,11 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server "-t1:1", config: config, no_bind: true
+
+    body = send_http_read_body ctx: new_ctx
+
+    assert_equal 'https', body
   end
 
   def test_ssl_run_with_localhost_authority
@@ -217,14 +199,11 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server "-t1:1", config: config, no_bind: true
+
+    body = send_http_read_body ctx: new_ctx
+
+    assert_equal 'https', body
   end
 
   def test_ssl_run_with_encrypted_key
@@ -252,14 +231,11 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server "-t1:1", config: config, no_bind: true
+
+    body = send_http_read_body ctx: new_ctx
+
+    assert "https", body
   end
 
   def test_ssl_run_with_encrypted_pem
@@ -287,14 +263,11 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
-    end
+    cli_server "-t1:1", config: config, no_bind: true
+
+    body = send_http_read_body ctx: new_ctx
+
+    assert "https", body
   end
 
   private
