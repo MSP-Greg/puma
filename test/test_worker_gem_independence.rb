@@ -33,7 +33,7 @@ class TestWorkerGemIndependence < TestIntegration
   end
 
   def test_changing_json_version_during_phased_restart_after_querying_stats_from_status_server
-    before_restart = ->() { cli_pumactl "stats" }
+    before_restart = ->() { cli_pumactl 'stats' }
 
     change_gem_version_during_phased_restart server_opts: set_pumactl_args,
                                              before_restart: before_restart,
@@ -44,7 +44,7 @@ class TestWorkerGemIndependence < TestIntegration
   end
 
   def test_changing_json_version_during_phased_restart_after_querying_gc_stats_from_status_server
-    before_restart = ->() { cli_pumactl "gc-stats" }
+    before_restart = ->() { cli_pumactl 'gc-stats' }
 
     change_gem_version_during_phased_restart server_opts: set_pumactl_args,
                                              before_restart: before_restart,
@@ -55,7 +55,7 @@ class TestWorkerGemIndependence < TestIntegration
   end
 
   def test_changing_json_version_during_phased_restart_after_querying_thread_backtraces_from_status_server
-    before_restart = ->() { cli_pumactl "thread-backtraces" }
+    before_restart = ->() { cli_pumactl 'thread-backtraces' }
 
     change_gem_version_during_phased_restart server_opts: set_pumactl_args,
                                              before_restart: before_restart,
