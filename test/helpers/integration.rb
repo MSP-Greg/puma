@@ -87,7 +87,8 @@ class TestIntegration < PumaTest
   end
 
   def silent_and_checked_system_command(*args)
-    assert(system(*args, out: File::NULL, err: File::NULL))
+    assert system(*args, out: File::NULL, err: File::NULL),
+      "\nFailure:\n#{args}\n"
   end
 
   def with_unbundled_env
