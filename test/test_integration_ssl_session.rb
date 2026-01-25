@@ -29,58 +29,41 @@ class TestIntegrationSSLSession < TestIntegration
   def teardown
     return if skipped?
     # stop server
-    sock = TCPSocket.new HOST, control_port
-    @ios_to_close << sock
-    sock.syswrite "GET /stop?token=#{TOKEN} HTTP/1.1\r\n\r\n"
-    sock.read
-    assert_match 'Goodbye!', @server.read
+    cli_pumactl 'stop'
+
+    wait_for_server_to_include 'Goodbye!'
 
     @server.close unless @server&.closed?
     @server = nil
   end
 
-  def bind_port
-    @bind_port ||= UniquePort.call
-  end
-
-  def control_port
-    @control_port ||= UniquePort.call
-  end
-
   def set_reuse(reuse)
-    <<~RUBY
-      key  = '#{File.expand_path '../examples/puma/client_certs/server.key', __dir__}'
-      cert = '#{File.expand_path '../examples/puma/client_certs/server.crt', __dir__}'
-      ca   = '#{File.expand_path '../examples/puma/client_certs/ca.crt', __dir__}'
+    key  = File.expand_path '../examples/puma/client_certs/server.key', __dir__
+    cert = File.expand_path '../examples/puma/client_certs/server.crt', __dir__
+    ca   = File.expand_path '../examples/puma/client_certs/ca.crt'    , __dir__
 
-      ssl_bind '#{HOST}', '#{bind_port}', {
-        cert: cert,
-        key:  key,
-        ca: ca,
+    @bind_port    = UniquePort.call
+    @control_port = UniquePort.call
+
+    <<~CONFIG
+      ssl_bind '#{HOST}', #{@bind_port}, {
+        cert: '#{cert}',
+        key:  '#{key}',
+        ca: '#{ca}',
         verify_mode: 'none',
         reuse: #{reuse}
       }
 
-      activate_control_app 'tcp://#{HOST}:#{control_port}', { auth_token: '#{TOKEN}' }
+      activate_control_app 'tcp://#{HOST}:#{@control_port}', { auth_token: '#{TOKEN}' }
 
       app do |env|
         [200, {}, [env['rack.url_scheme']]]
       end
-    RUBY
+    CONFIG
   end
 
   def with_server(config)
-    config_file = Tempfile.new %w(config .rb)
-    config_file.write config
-    config_file.close
-    config_file.path
-
-    # start server
-    cmd = "#{BASE} bin/puma -C #{config_file.path}"
-    @server = IO.popen cmd, 'r'
-    wait_for_server_to_boot log: false
-    @pid = @server.pid
-
+    cli_server '-t1:1', config: config, no_bind: true
     yield
   end
 
@@ -153,7 +136,7 @@ class TestIntegrationSSLSession < TestIntegration
       session_pems << ary.last.to_pem
     }
 
-    skt = OSSL::SSLSocket.new TCPSocket.new(HOST, bind_port), ctx
+    skt = OSSL::SSLSocket.new TCPSocket.new(HOST, @bind_port), ctx
     skt.sync_close = true
     skt
   end
