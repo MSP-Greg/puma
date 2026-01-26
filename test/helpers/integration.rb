@@ -36,10 +36,12 @@ class TestIntegration < PumaTest
   end
 
   def after_teardown
-    if @server && defined?(@control_port) && Puma::IS_WINDOWS
-      cli_pumactl 'halt'
-    elsif @server && @pid
-      stop_server signal: :INT
+    if @server && !@server_stopped
+      if defined?(@control_port) && Puma::IS_WINDOWS
+        cli_pumactl 'halt'
+      elsif @pid && !Puma::IS_WINDOWS
+        stop_server signal: :INT
+      end
     end
 
     # wait until the end for OS buffering?
