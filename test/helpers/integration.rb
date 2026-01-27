@@ -88,6 +88,15 @@ class TestIntegration < PumaTest
     @bind_port ||= UniquePort.call
   end
 
+  def control_path
+    @control_path ||= tmp_path('.sock')
+  end
+
+  def control_port
+    @control_port ||= UniquePort.call
+  end
+
+
   def silent_and_checked_system_command(*args)
     assert(system(*args, out: File::NULL, err: File::NULL))
   end
@@ -370,11 +379,9 @@ class TestIntegration < PumaTest
 
   def set_pumactl_args(unix: false)
     if unix
-      @control_path = tmp_path('.cntl_sock')
-      "--control-url unix://#{@control_path} --control-token #{TOKEN}"
+      "--control-url unix://#{control_path} --control-token #{TOKEN}"
     else
-      @control_port = UniquePort.call
-      "--control-url tcp://#{HOST}:#{@control_port} --control-token #{TOKEN}"
+      "--control-url tcp://#{HOST}:#{control_port} --control-token #{TOKEN}"
     end
   end
 
