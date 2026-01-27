@@ -177,11 +177,13 @@ class TestIntegration < PumaTest
   end
 
   # reuses an existing connection to make sure that works
-  def restart_server(connection, log: false)
+  # timeout is increased to account for the time needed to start a new process,
+  # fork workers (in cluster mode), and boot all workers
+  def restart_server(connection, log: false, timeout: LOG_TIMEOUT * 2)
     Process.kill :USR2, @pid
-    wait_for_server_to_include 'Restarting', log: log
+    wait_for_server_to_include 'Restarting', log: log, timeout: timeout
     connection.write "GET / HTTP/1.1\r\n\r\n" # trigger it to start by sending a new request
-    wait_for_server_to_boot log: log
+    wait_for_server_to_boot log: log, timeout: timeout
   end
 
   # wait for server to say it booted
