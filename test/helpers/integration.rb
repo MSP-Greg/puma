@@ -126,11 +126,9 @@ class TestIntegration < PumaTest
       if no_bind
         "#{BASE} #{puma_path} #{config} #{argv}"
       elsif unix
-        @bind_path = tmp_path('.sock')
         "#{BASE} #{puma_path} #{config} -b unix://#{bind_path} #{argv}"
       else
-        @tcp_port  = bind_port
-        "#{BASE} #{puma_path} #{config} -b tcp://#{HOST}:#{@bind_port} #{argv}"
+        "#{BASE} #{puma_path} #{config} -b tcp://#{HOST}:#{bind_port} #{argv}"
       end
 
     env['PUMA_DEBUG'] = 'true' if puma_debug
@@ -255,7 +253,7 @@ class TestIntegration < PumaTest
   end
 
   def connect(path = nil, unix: false)
-    s = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @tcp_port)
+    s = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @bind_port)
     @ios_to_close << s
     s << "GET /#{path} HTTP/1.1\r\n\r\n"
     s
@@ -264,7 +262,7 @@ class TestIntegration < PumaTest
   # use only if all socket writes are fast
   # does not wait for a read
   def fast_connect(path = nil, unix: false)
-    s = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @tcp_port)
+    s = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @bind_port)
     @ios_to_close << s
     fast_write s, "GET /#{path} HTTP/1.1\r\n\r\n"
     s
@@ -398,6 +396,8 @@ class TestIntegration < PumaTest
         %W[-C unix://#{@control_path} -T #{TOKEN} #{argv}]
       elsif @control_port && !@control_path
         %W[-C tcp://#{HOST}:#{@control_port} -T #{TOKEN} #{argv}]
+      else
+        flunk 'Both @control_path and @control_port esist?'
       end
 
     r, w = IO.pipe
@@ -472,7 +472,7 @@ class TestIntegration < PumaTest
         num_requests.times do |req_num|
           begin
             begin
-              socket = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @tcp_port)
+              socket = unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, @bind_port)
               fast_write socket, "POST / HTTP/1.1\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
             rescue => e
               replies[:write_error] += 1
