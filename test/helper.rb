@@ -73,7 +73,7 @@ module UniquePort
   # comments out`sock.ipv6only! if addr_info.ipv6?` lines
   def self.call(host = '127.0.0.1')
     addr_info = Addrinfo.tcp host, 0
-    sock = Socket.new addr_info.pfamily, addr_info.socktype, addr_info.protocol
+    sock = Socket.new :INET, :STREAM
     # sock.ipv6only! if addr_info.ipv6?
     sock.setsockopt(:SOCKET, :REUSEADDR, 0) unless Puma::IS_JRUBY
     sock.bind addr_info
