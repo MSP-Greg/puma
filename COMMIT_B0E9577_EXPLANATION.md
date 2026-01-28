@@ -47,6 +47,8 @@ module UniquePort
 end
 ```
 
+**Note**: The commit contains a typo in the variable name `adddr_info` (should be `addr_info`). This typo is preserved in the documentation to accurately reflect the commit as written.
+
 ## Why This Change Was Made
 
 ### The Problem: SO_REUSEADDR and Port Reuse Issues
