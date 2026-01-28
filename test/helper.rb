@@ -75,7 +75,7 @@ module UniquePort
     addr_info = Addrinfo.tcp host, 0
     sock = Socket.new addr_info.pfamily, addr_info.socktype, addr_info.protocol
     # sock.ipv6only! if addr_info.ipv6?
-    sock.setsockopt :SOCKET, :REUSEADDR, 0
+    sock.setsockopt(:SOCKET, :REUSEADDR, 0) unless Puma::IS_JRUBY
     sock.bind addr_info
     sock.connect_address.ip_port
   rescue Exception => e
