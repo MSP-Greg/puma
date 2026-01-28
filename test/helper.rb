@@ -69,13 +69,13 @@ def hit(uris)
 end
 
 module UniquePort
-  # below is similar to `Addrinfo.bind`, but sets `REUSEADDR` off and
-  # comments out`sock.ipv6only! if addr_info.ipv6?` lines
+  # below is similar to `Addrinfo.bind`, but comments out `REUSEADDR` and
+  # `sock.ipv6only!` lines
   def self.call(host = '127.0.0.1')
     addr_info = Addrinfo.tcp host, 0
-    sock = Socket.new :INET, :STREAM
+    sock = Socket.new addr_info.pfamily, :STREAM
     # sock.ipv6only! if addr_info.ipv6?
-    sock.setsockopt(:SOCKET, :REUSEADDR, 0) unless Puma::IS_JRUBY
+    # sock.setsockopt(:SOCKET, :REUSEADDR, 1)
     sock.bind addr_info
     sock.connect_address.ip_port
   rescue Exception => e
