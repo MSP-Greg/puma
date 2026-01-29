@@ -474,7 +474,7 @@ class TestPumaServerSSLClient < PumaTest
       client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
       client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
 
-      client_ctx.ssl_version = :TLSv1_2
+      client_ctx.ssl_version = :TLSv1_3
       client_ctx.ciphers = [ 'TLS_RSA_WITH_AES_128_GCM_SHA256' ]
     end
   end if Puma.jruby?
@@ -494,7 +494,7 @@ class TestPumaServerSSLClient < PumaTest
       client_ctx.ca_file = "#{CERT_PATH}/ca.crt"
       client_ctx.verify_mode = OpenSSL::SSL::VERIFY_PEER
 
-      client_ctx.ssl_version = :TLSv1_2
+      client_ctx.ssl_version = :TLSv1_3
       client_ctx.ciphers = [ 'TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384' ]
     end
   end if Puma.jruby?
