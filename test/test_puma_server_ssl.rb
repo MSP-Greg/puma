@@ -464,7 +464,7 @@ class TestPumaServerSSLClient < PumaTest
   def test_allows_to_specify_cipher_suites_and_protocols
     ctx = CTX.dup
     ctx.cipher_suites = [ 'TLS_RSA_WITH_AES_128_GCM_SHA256' ]
-    ctx.protocols = 'TLSv1.2'
+    ctx.protocols = 'TLSv1.3'
 
     assert_ssl_client_error_match(false, context: ctx) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
@@ -482,9 +482,11 @@ class TestPumaServerSSLClient < PumaTest
   def test_fails_when_no_cipher_suites_in_common
     ctx = CTX.dup
     ctx.cipher_suites = [ 'TLS_RSA_WITH_AES_128_GCM_SHA256' ]
-    ctx.protocols = 'TLSv1.2'
+    ctx.protocols = 'TLSv1.3'
 
-    assert_ssl_client_error_match(/no cipher suites in common/, context: ctx) do |client_ctx|
+    error_re = /no cipher suites in common|cipher suites are inappropriate/
+
+    assert_ssl_client_error_match(error_re, context: ctx) do |client_ctx|
       key = "#{CERT_PATH}/client.key"
       crt = "#{CERT_PATH}/client.crt"
       client_ctx.key = OpenSSL::PKey::RSA.new File.read(key)
