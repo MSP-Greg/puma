@@ -148,7 +148,7 @@ module Puma
       @binder = bind
       # Inherited binders should not clean up Unix sockets when closed,
       # as they are shared with other processes
-      @binder.instance_variable_set(:@close_unix_sockets, false) if @binder
+      @binder.close_unix_sockets = false if @binder
     end
 
     class << self

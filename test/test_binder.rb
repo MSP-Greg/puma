@@ -338,8 +338,8 @@ class TestBinderParallel < TestBinderBase
     @binder.parse ["unix://#{unix_path}"], @log_writer
     assert File.socket?(unix_path)
 
-    # Simulate inheriting the binder by setting close_unix_sockets to false
-    @binder.instance_variable_set(:@close_unix_sockets, false)
+    # Simulate inheriting the binder by marking it as not owning Unix sockets
+    @binder.close_unix_sockets = false
 
     @binder.close
 
