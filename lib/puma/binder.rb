@@ -26,6 +26,7 @@ module Puma
       @activated_sockets = {}
       @unix_paths = []
       @env = env
+      @close_unix_sockets = true  # By default, clean up Unix sockets on close
 
       @proto_env = {
         "rack.version".freeze => RACK_VERSION,
@@ -66,7 +67,11 @@ module Puma
     end
 
     def close
-      close_listeners
+      if @close_unix_sockets
+        close_listeners
+      else
+        @ios.each { |i| i.close }
+      end
     end
 
     # @!attribute [r] connected_ports

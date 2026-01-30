@@ -320,8 +320,8 @@ class TestBinderParallel < TestBinderBase
     assert_equal @log_writer.stderr, env_hash["rack.errors"]
   end
 
-  def test_close_calls_close_listeners
-    # close should delegate to close_listeners to ensure Unix socket files are properly cleaned up
+  def test_close_calls_close_listeners_for_non_inherited_binder
+    # By default, close should clean up Unix sockets (close_unix_sockets = true)
     @binder.parse ["tcp://127.0.0.1:#{UniquePort.call}"], @log_writer
 
     refute @binder.listeners.any? { |_l, io| io.closed? }
@@ -329,6 +329,22 @@ class TestBinderParallel < TestBinderBase
     @binder.close
 
     assert @binder.listeners.all? { |_l, io| io.closed? }
+  end
+
+  def test_close_does_not_unlink_inherited_unix_sockets
+    skip_unless :unix
+
+    unix_path = tmp_path('.sock')
+    @binder.parse ["unix://#{unix_path}"], @log_writer
+    assert File.socket?(unix_path)
+
+    # Simulate inheriting the binder by setting close_unix_sockets to false
+    @binder.instance_variable_set(:@close_unix_sockets, false)
+
+    @binder.close
+
+    # Socket file should still exist because we don't own it
+    assert File.exist?(unix_path), "Unix socket should not be removed for inherited binder"
   end
 
   def test_redirects_for_restart_creates_a_hash
