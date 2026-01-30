@@ -66,7 +66,7 @@ module Puma
     end
 
     def close
-      @ios.each { |i| i.close }
+      close_listeners
     end
 
     # @!attribute [r] connected_ports
