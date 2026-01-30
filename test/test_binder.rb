@@ -320,14 +320,15 @@ class TestBinderParallel < TestBinderBase
     assert_equal @log_writer.stderr, env_hash["rack.errors"]
   end
 
-  def test_close_calls_close_on_ios
-    @mocked_ios = [Minitest::Mock.new, Minitest::Mock.new]
-    @mocked_ios.each { |m| m.expect(:close, true) }
-    @binder.ios = @mocked_ios
+  def test_close_calls_close_listeners
+    # close should delegate to close_listeners to ensure Unix socket files are properly cleaned up
+    @binder.parse ["tcp://127.0.0.1:#{UniquePort.call}"], @log_writer
+
+    refute @binder.listeners.any? { |_l, io| io.closed? }
 
     @binder.close
 
-    assert @mocked_ios.map(&:verify).all?
+    assert @binder.listeners.all? { |_l, io| io.closed? }
   end
 
   def test_redirects_for_restart_creates_a_hash
@@ -383,6 +384,17 @@ class TestBinderParallel < TestBinderBase
 
     @binder.close_listeners
     refute File.socket?(unix_path)
+  end
+
+  def test_close_unix_socket_unlink
+    skip_unless :unix
+
+    unix_path = tmp_path('.sock')
+    @binder.parse ["unix://#{unix_path}"], @log_writer
+    assert File.socket?(unix_path)
+
+    @binder.close
+    refute File.exist?(unix_path), "Unix socket should be removed after close"
   end
 
   def test_import_from_env_listen_inherit
