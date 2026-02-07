@@ -223,7 +223,7 @@ module Puma
             # if the buffer has a \r\n but doesn't have a PROXY protocol
             # request, this is just HTTP from a non-PROXY client; move on
             @read_proxy = false
-            return @buffer.size > 0
+            return @buffer.bytesize > 0
           else
             return false
           end
@@ -596,7 +596,7 @@ module Puma
 
     def decode_chunk(chunk)
       if @partial_part_left > 0
-        if @partial_part_left <= chunk.size
+        if @partial_part_left <= chunk.bytesize
           if @partial_part_left > 2
             write_chunk(chunk[0..(@partial_part_left-3)]) # skip the \r\n
           end
@@ -604,7 +604,7 @@ module Puma
           @partial_part_left = 0
         else
           if @partial_part_left > 2
-            if @partial_part_left == chunk.size + 1
+            if @partial_part_left == chunk.bytesize + 1
               # Don't include the last \r
               write_chunk(chunk[0..(@partial_part_left-3)])
             else
@@ -612,7 +612,7 @@ module Puma
               write_chunk(chunk)
             end
           end
-          @partial_part_left -= chunk.size
+          @partial_part_left -= chunk.bytesize
           return false
         end
       end
@@ -661,11 +661,11 @@ module Puma
           # header vs the size of the actual data. Excess can
           # go negative (and is expected to) when the body is
           # significant.
-          # The additional of chunk_hex.size and 2 compensates
+          # The additional of chunk_hex.bytesize and 2 compensates
           # for a client sending 1 byte in a chunked body over
           # a long period of time, making sure that that client
           # isn't accidentally eventually punished.
-          @excess_cr += (line.size - len - chunk_hex.size - 2)
+          @excess_cr += (line.bytesize - len - chunk_hex.bytesize - 2)
 
           if @excess_cr >= MAX_CHUNK_EXCESS
             raise HttpParserError, "Maximum chunk excess detected"
@@ -680,7 +680,7 @@ module Puma
             next
           end
 
-          got = part.size
+          got = part.bytesize
 
           case
           when got == len
@@ -692,13 +692,13 @@ module Puma
             end
           when got <= len - 2
             write_chunk(part)
-            @partial_part_left = len - part.size
+            @partial_part_left = len - part.bytesize
           when got == len - 1 # edge where we get just \r but not \n
             write_chunk(part[0..-2])
-            @partial_part_left = len - part.size
+            @partial_part_left = len - part.bytesize
           end
         else
-          if @prev_chunk.size + line.size >= MAX_CHUNK_HEADER_SIZE
+          if @prev_chunk.bytesize + line.bytesize >= MAX_CHUNK_HEADER_SIZE
             raise HttpParserError, "maximum size of chunk header exceeded"
           end
 
