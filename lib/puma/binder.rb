@@ -7,10 +7,13 @@ require_relative 'const'
 require_relative 'util'
 
 require_relative 'configuration'
+
 if Puma::HAS_NATIVE_SSL
+  require_relative 'ssl'
   require_relative 'ssl/context_builder'
   require_relative 'ssl/server'
-elsif HAS_MINI_SSL
+  require_relative 'ssl/ssl_context'
+elsif Puma::HAS_MINI_SSL
   require_relative 'minissl'
   require_relative 'minissl/context_builder'
 end
@@ -252,7 +255,8 @@ module Puma
                   params["#{v}_pem"] = @options[:store][index]
                 end
               end
-              if HAS_NATIVE_SSL
+
+              if Puma::HAS_NATIVE_SSL
                 SSL::ContextBuilder.new(params, @log_writer).context
               else
                 MiniSSL::ContextBuilder.new(params, @log_writer).context
@@ -330,7 +334,12 @@ module Puma
         local_certificates_path = File.expand_path("~/.localhost")
         [File.join(local_certificates_path, "localhost.key"), File.join(local_certificates_path, "localhost.crt")]
       end
-      MiniSSL::ContextBuilder.new({ "key" => key_path, "cert" => crt_path }, @log_writer).context
+
+      if Puma::HAS_NATIVE_SSL
+        SSL::ContextBuilder.new({ "key" => key_path, "cert" => crt_path }, @log_writer).context
+      else
+        MiniSSL::ContextBuilder.new({ "key" => key_path, "cert" => crt_path }, @log_writer).context
+      end
     end
 
     # Tell the server to listen on host +host+, port +port+.
@@ -390,11 +399,9 @@ module Puma
       s.setsockopt(Socket::SOL_SOCKET,Socket::SO_REUSEADDR, true)
       s.listen backlog
 
-      ssl = if HAS_NATIVE_SSL
-              SSL::Server.new s, ctx
-            else
-              MiniSSL::Server.new s, ctx
-            end
+      ssl = Puma::HAS_NATIVE_SSL ? Puma::SSL::Server.new(s, ctx.to_sslcontext) :
+            MiniSSL::Server.new(s, ctx)
+
       env = @proto_env.dup
       env[HTTPS_KEY] = HTTPS
       @envs[ssl] = env
