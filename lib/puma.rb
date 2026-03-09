@@ -30,14 +30,20 @@ module Puma
 
   HAS_UNIX_SOCKET = Object.const_defined?(:UNIXSocket) && !IS_WINDOWS
 
-  if HAS_MINI_SSL
-    require_relative 'puma/minissl'
-  else
-    module MiniSSL
-      # this class is defined so that it exists when Puma is compiled
-      # without ssl support, as Server and Reactor use it in rescue statements.
-      class SSLError < StandardError ; end
+  if !HAS_NATIVE_SSL
+    if HAS_MINI_SSL
+      require_relative 'puma/minissl'
+    else
+      module MiniSSL
+        # this class is defined so that it exists when Puma is compiled
+        # without ssl support, as Server and Reactor use it in rescue statements.
+        class SSLError < StandardError ; end
+      end
     end
+    SSL_ERROR = MiniSSL::SSLError
+  else
+    require 'openssl'
+    SSL_ERROR = ::OpenSSL::SSL::SSLError
   end
 
   def self.ssl?
