@@ -61,7 +61,8 @@ module Puma
     # Content-Length header value validation
     CONTENT_LENGTH_VALUE_INVALID = /[^\d]/.freeze
 
-    TE_ERR_MSG = 'Invalid Transfer-Encoding'
+    TE_ERR_MSG = "Invalid Transfer-Encoding"
+    H2_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
     # See:
     # https://httpwg.org/specs/rfc9110.html#rfc.section.5.6.1.1
@@ -78,7 +79,8 @@ module Puma
 
     attr_writer :peerip, :http_content_length_limit, :supported_http_methods
 
-    attr_accessor :remote_addr_header, :listener, :env_set_http_version
+    attr_accessor :remote_addr_header, :listener, :env_set_http_version, :accepted,
+      :h2c
 
     def initialize(io, env=nil)
       @io = io
@@ -93,6 +95,7 @@ module Puma
       @read_proxy = false
       @ready = false
 
+      @accepted = nil
       @body = nil
       @body_read_start = nil
       @buffer = nil
@@ -119,6 +122,11 @@ module Puma
 
       # need unfrozen ASCII-8BIT, +'' is UTF-8
       @read_buffer = String.new # rubocop: disable Performance/UnfreezeString
+
+      if io.is_a? OpenSSL::SSL::SSLSocket
+        @alpn = io.alpn_protocol
+        @h2c  = (io.alpn_protocol == 'h2') || nil
+      end
     end
 
     # Remove in Puma 7?
@@ -237,12 +245,21 @@ module Puma
 
       data = nil
       begin
-        data = @io.read_nonblock(CHUNK_SIZE)
+        # Limit first read(s) to detect H2 preface before parser sees anything
+        if @parsed_bytes.zero? && (!@buffer || @buffer.bytesize < 24) && !@alpn&.start_with?('http')
+          data = @io.read_nonblock(24 - (@buffer&.bytesize || 0))
+          # continue reading if not h2
+          if data&.length == 24 && data != H2_PREFACE
+            data << @io.read_nonblock(CHUNK_SIZE)
+          end
+        else
+          data = @io.read_nonblock(CHUNK_SIZE)
+        end
       rescue IO::WaitReadable
         return false
       rescue EOFError
         # Swallow error, don't log
-      rescue SystemCallError, IOError
+      rescue SystemCallError, IOError, OpenSSL::SSL::SSLError
         raise ConnectionError, "Connection error detected during read"
       end
 
@@ -260,6 +277,27 @@ module Puma
       end
 
       return false unless try_to_parse_proxy_protocol
+
+      # Check for HTTP/2 connection preface before feeding to HTTP/1.1 parser
+      if @parsed_bytes.zero?
+        if @buffer.bytesize >= 24
+          if @buffer.start_with? H2_PREFACE
+            @h2c = true
+            @buffer = nil
+            set_ready
+            return true
+          end
+          # Not H2 preface, fall through to parser
+        elsif @buffer.bytesize >= 4
+          unless @buffer.start_with?("PRI ")
+            # Definitely not H2, fall through to parser
+          else
+            return false  # Might be H2, need more bytes
+          end
+        else
+          return false  # Need at least 4 bytes to distinguish
+        end
+      end
 
       @parsed_bytes = parser_execute
 
