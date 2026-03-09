@@ -41,6 +41,8 @@ module Puma
     include Const
     include Response
 
+    SSL_EOF = 'SSL_read: unexpected eof while reading'
+
     attr_reader :options
     attr_reader :thread
     attr_reader :log_writer
@@ -259,6 +261,19 @@ module Puma
 
       @status = :run
 
+      begin
+        if enc['PUMA_NATIVE_SSL'] == 1
+          require "concurrent"
+          require "kantan"
+          require "kantan/rack_handler"
+          @h2_executor = Concurrent::FixedThreadPool.new(5)
+        else
+          # STDOUT.syswrite "\n****** Kantan not loaded\n"
+        end
+      rescue
+        # STDOUT.syswrite "\n****** Kantan not loaded\n"
+      end
+
       @thread_pool = ThreadPool.new(thread_name, options, server: self) do |processor, client|
         process_client(processor, client)
       end
@@ -401,9 +416,15 @@ module Puma
                   sock.accept_nonblock
                 rescue IO::WaitReadable
                   next
+                rescue OpenSSL::SSL::SSLError
+                  next
                 end
                 drain += 1 if shutting_down?
-
+                #if OpenSSL::SSL::SSLSocket === io
+                #  STDOUT.syswrite format("*** #{Process.pid}  %s  %4d requests\n", (io.alpn_protocol || 'na'), @requests_count)
+                #else
+                #  STDOUT.syswrite format("*** #{Process.pid}  %s  %4d requests\n", 'na', @requests_count)
+                #end
                 client = new_client(io, sock)
                 client.send(addr_send_name, addr_value) if addr_value
                 pool << client
@@ -487,16 +508,8 @@ module Puma
 
       requests = 0
 
-      # Perform the SSL handshake.
-      #
-      # Note: I believe this is a blocking operation. A slow client would block this thread.
-      # However, at this stage it's executing in a client thread so it won't prevent other threads
-      # from handling requests. I don't know if that's acceptable or not for Puma.
-      client.io.accept if HAS_NATIVE_SSL && client.io.instance_of?(OpenSSL::SSL::SSLSocket)
-
       begin
         if @queue_requests && !client.eagerly_finish
-
           client.set_timeout(@first_data_timeout)
           if @reactor.add client
             close_socket = false
@@ -512,6 +525,13 @@ module Puma
         while can_loop
           can_loop = false
           @requests_count += 1
+
+          if client.h2c
+            handle_h2c(client)
+            close_socket = false
+            return
+          end
+
           case handle_request(processor, client, requests + 1)
           when :close
           when :async
@@ -547,6 +567,8 @@ module Puma
           end
         end
         true
+      rescue SSL_ERROR => e
+        @log_writer.ssl_error e, client.io
       rescue StandardError => e
         client_error(e, client, requests)
         # The ensure tries to close +client+ down
@@ -563,7 +585,7 @@ module Puma
       client.close
     rescue IOError, SystemCallError
       # Already closed
-    rescue MiniSSL::SSLError => e
+    rescue SSL_ERROR => e
       @log_writer.ssl_error e, client.io
     rescue StandardError => e
       @log_writer.unknown_error e, nil, "Client"
@@ -585,9 +607,11 @@ module Puma
       return if [ConnectionError, EOFError].include?(e.class)
 
       case e
-      when MiniSSL::SSLError
+      when SSL_ERROR
         lowlevel_error(e, client.env)
-        @log_writer.ssl_error e, client.io
+        unless e.message == SSL_EOF
+          @log_writer.ssl_error e, client.io
+        end
       when HttpParserError
         response_to_error(client, requests, e, client.error_status_code || 400)
         @log_writer.parse_error e, client
