@@ -96,6 +96,7 @@ module TestPuma
               chunked ||= part.downcase.include? "\r\ntransfer-encoding: chunked\r\n"
               content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
             end
+
             response << part
             hdrs, body = response.split RESP_SPLIT, 2
             unless body.nil?
@@ -131,6 +132,8 @@ module TestPuma
           if timeout <= 0
             raise Timeout::Error, 'Client Read Timeout'
           end
+        rescue OpenSSL::SSL::SSLError => e
+          raise e
         end
       end
     end
