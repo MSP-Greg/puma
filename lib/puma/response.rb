@@ -33,14 +33,14 @@ module Puma
 
     include Puma::Const
 
-    # Takes the request contained in +client+, invokes the Rack application to construct
-    # the response and writes it back to +client.io+.
+    # Takes the request contained in +client+, invokes the Rack application to
+    # construct the response and writes it back to +client.io+.
     #
     # It'll return +:close+ when the connection is closed, this doesn't mean
     # that the response wasn't successful.
     #
-    # It'll return +:keep_alive+ if the connection is a pipeline or keep-alive connection.
-    # Which may contain additional requests.
+    # It'll return +:keep_alive+ if the connection is a pipeline or keep-alive
+    # connection, which may contain additional requests.
     #
     # It'll return +:async+ if the connection remains open but will be handled
     # elsewhere, i.e. the connection has been hijacked by the Rack application.
@@ -58,24 +58,6 @@ module Puma
       error = nil
 
       return :close if closed_socket?(socket)
-
-      if client.http_content_length_limit_exceeded
-        return prepare_response(413, {}, ["Payload Too Large"], requests, client)
-      end
-
-      normalize_env env, client
-
-      env[PUMA_SOCKET] = socket
-
-      if env[HTTPS_KEY] && socket.peer_cert
-        env[PUMA_PEERCERT] = socket.peer_cert
-      end
-
-      env[HIJACK_P] = true
-      env[HIJACK] = client
-
-      env[RACK_INPUT] = client.body
-      env[RACK_URL_SCHEME] ||= default_server_port(env) == PORT_443 ? HTTPS : HTTP
 
       if @early_hints
         env[EARLY_HINTS] = lambda { |headers|
@@ -281,8 +263,16 @@ module Puma
       while n < byte_size
         begin
           n += socket.write_nonblock(n.zero? ? str : str.byteslice(n..-1))
+        rescue ::IO::WaitWritable
+          unless socket.to_io.wait_writable WRITE_TIMEOUT
+            raise ConnectionError, SOCKET_WRITE_ERR_MSG
+          end
+        rescue ::IO::WaitReadable
+          unless socket.to_io.wait_readable WRITE_TIMEOUT
+            raise ConnectionError, SOCKET_WRITE_ERR_MSG
+          end
         rescue Errno::EAGAIN, Errno::EWOULDBLOCK
-          unless socket.wait_writable WRITE_TIMEOUT
+          unless socket.to_io.wait_writable WRITE_TIMEOUT
             raise ConnectionError, SOCKET_WRITE_ERR_MSG
           end
           retry
@@ -546,5 +536,20 @@ module Puma
       resp_info
     end
     private :str_headers
+
+    def handle_h2c(client)
+      handler = Kantan::RackHandler.new(
+        @app,
+        executor: @h2_executor,
+        server_name: "localhost",
+        server_port: "80",
+        scheme: "http"
+      )
+
+      session = Kantan::H2::Session.new(client.io, handler: handler)
+      session.receive(preface_verified: true)
+      :close
+    end
+    private :handle_h2c
   end
 end
