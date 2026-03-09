@@ -20,6 +20,10 @@ class TestIntegrationSSLSession < TestIntegration
 
   CLIENT_HAS_TLS1_3 = OSSL.const_defined? :TLS1_3_VERSION
 
+  HAS_TLS1_3 = Puma::IS_JRUBY ||
+    ((OpenSSL::OPENSSL_VERSION[/ \d+\.\d+\.\d+/].split('.').map(&:to_i) <=> [1,1,1]) != -1 &&
+     (OpenSSL::OPENSSL_LIBRARY_VERSION[/ \d+\.\d+\.\d+/].split('.').map(&:to_i) <=> [1,1,1]) !=-1)
+
   GET = "GET / HTTP/1.1\r\nConnection: close\r\n\r\n"
 
   RESP = "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 5\r\n\r\nhttps"
@@ -75,7 +79,7 @@ class TestIntegrationSSLSession < TestIntegration
   end
 
   def test_dflt_tls1_3
-    skip 'TLSv1.3 unavailable' unless Puma::MiniSSL::HAS_TLS1_3 && CLIENT_HAS_TLS1_3
+    skip 'TLSv1.3 unavailable' unless HAS_TLS1_3 && CLIENT_HAS_TLS1_3
     reused = run_session true, :TLS1_3
     assert reused, 'session was not reused'
   end
@@ -105,7 +109,7 @@ class TestIntegrationSSLSession < TestIntegration
 
   # TLSv1.3 reuse is always on
   def test_off_tls1_3
-    skip 'TLSv1.3 unavailable' unless Puma::MiniSSL::HAS_TLS1_3 && CLIENT_HAS_TLS1_3
+    skip 'TLSv1.3 unavailable' unless HAS_TLS1_3 && CLIENT_HAS_TLS1_3
     reused = run_session 'nil'
     assert reused, 'TLSv1.3 session was not reused'
   end
