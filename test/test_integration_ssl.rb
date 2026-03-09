@@ -43,7 +43,7 @@ class TestIntegrationSSL < TestIntegration
     cert_path = File.expand_path '../examples/puma', __dir__
 
     config = <<~CONFIG
-      if ::Puma.jruby?
+      if ::Puma::IS_JRUBY
         keystore =  '#{cert_path}/keystore.jks'
         keystore_pass = 'jruby_puma'
 
@@ -87,13 +87,13 @@ class TestIntegrationSSL < TestIntegration
 
     cli_server "-t1:5 #{set_pumactl_args}", no_bind: true, config: <<~CONFIG
       if ::Puma::IS_JRUBY
-        ssl_bind '#{LOCALHOST}', '#{@bind_port}', {
+        ssl_bind '#{LOCALHOST}', #{@bind_port}, {
           keystore: '#{cert_path}/keystore.jks',
           keystore_pass: 'jruby_puma',
           verify_mode: 'force_peer'
         }
       else
-        ssl_bind '#{LOCALHOST}', '#{@bind_port}', {
+        ssl_bind '#{LOCALHOST}', #{@bind_port}, {
           cert: '#{cert_path}/server.crt',
           key:  '#{cert_path}/server.key',
           ca:   '#{cert_path}/ca.crt',
@@ -108,22 +108,22 @@ class TestIntegrationSSL < TestIntegration
     CONFIG
 
     client_cert = File.read "#{cert_path}/client.crt"
+    ca   = "#{cert_path}/ca.crt"
+    key  = "#{cert_path}/client.key"
 
     body = send_http_read_resp_body host: LOCALHOST, port: @bind_port, ctx: new_ctx { |c|
-        ca   = "#{cert_path}/ca.crt"
-        key  = "#{cert_path}/client.key"
-        c.ca_file = ca
-        c.cert = ::OpenSSL::X509::Certificate.new client_cert
-        c.key  = ::OpenSSL::PKey::RSA.new File.read(key)
-        c.verify_mode = ::OpenSSL::SSL::VERIFY_PEER
-        if tls1_2
-          if c.respond_to? :max_version=
-            c.max_version = :TLS1_2
-          else
-            c.ssl_version = :TLSv1_2
-          end
+      c.ca_file = ca
+      c.cert = ::OpenSSL::X509::Certificate.new client_cert
+      c.key  = ::OpenSSL::PKey::RSA.new File.read(key)
+      c.verify_mode = ::OpenSSL::SSL::VERIFY_PEER
+      if tls1_2
+        if c.respond_to? :max_version=
+          c.max_version = :TLS1_2
+        else
+          c.ssl_version = :TLSv1_2
         end
-      }
+      end
+    }
 
     assert_equal client_cert, body
   end
@@ -140,25 +140,25 @@ class TestIntegrationSSL < TestIntegration
     cert_path = File.expand_path '../examples/puma/client_certs', __dir__
     bind_port
 
-    cli_server "-t1:1", no_bind: true, config: <<~CONFIG
+    config = <<~CONFIG
       if ::Puma::IS_JRUBY
-        ssl_bind '#{LOCALHOST}', '#{@bind_port}', {
+        ssl_bind '#{LOCALHOST}', #{@bind_port}, {
           keystore: '#{cert_path}/keystore.jks',
           keystore_pass: 'jruby_puma',
           verify_mode: 'force_peer'
         }
       else
-        ssl_bind '#{LOCALHOST}', '#{@bind_port}', {
+        ssl_bind '#{LOCALHOST}', #{@bind_port}, {
           cert: '#{cert_path}/server.crt',
           key:  '#{cert_path}/server.key',
           ca:   '#{cert_path}/ca.crt',
           verify_mode: 'force_peer'
         }
       end
-
       app { |_| [200, { 'Content-Type' => 'text/plain' }, ["HELLO", ' ', "THERE"]] }
     CONFIG
 
+    cli_server "-t1:1", no_bind: true, config: config
 
     ca   = "#{cert_path}/ca.crt"
     cert = "#{cert_path}/client.crt"
@@ -264,15 +264,17 @@ class TestIntegrationSSL < TestIntegration
   def test_ssl_run_with_encrypted_pem
     skip_if :jruby
 
-    cert_path = File.expand_path '../examples/puma', __dir__
+    require 'puma/dsl'
+
+    ssl_path = File.expand_path '../examples/puma', __dir__
 
     config = <<~CONFIG
-      key_path  = '#{cert_path}/encrypted_puma_keypair.pem'
-      cert_path = '#{cert_path}/cert_puma.pem'
+      key_path  = '#{ssl_path}/encrypted_puma_keypair.pem'
+      cert_path = '#{ssl_path}/cert_puma.pem'
       key_command = ::Puma::IS_WINDOWS ? 'echo hello world' :
-        '#{cert_path}/key_password_command.sh'
+        '#{ssl_path}/key_password_command.sh'
 
-      ssl_bind '#{HOST}', '#{bind_port}', {
+      ssl_bind '#{HOST}', #{bind_port}, {
         cert_pem: File.read(cert_path),
         key_pem: File.read(key_path),
         verify_mode: 'none',
@@ -299,15 +301,16 @@ class TestIntegrationSSL < TestIntegration
   private
 
   def curl_and_get_response(url, method: :get, args: nil); require 'open3'
-    cmd = "curl -s -v --show-error #{args} -X #{method.to_s.upcase} -k #{url}"
+    cmd = "curl -sv --show-error #{args} -X #{method.to_s.upcase} -k #{url}"
+
     begin
-      out, err, status = Open3.capture3(cmd)
+      out, err, status = Open3.capture3(cmd, binmode: true)
     rescue Errno::ENOENT
       fail "curl not available, make sure curl binary is installed and available on $PATH"
     end
 
     if status.success?
-      http_status = err.match(/< HTTP\/1.1 (.*?)/)[1] || '0' # < HTTP/1.1 200 OK\r\n
+      http_status = err[/< HTTP\/1.1 (.*?)/, 1] || '0' # < HTTP/1.1 200 OK\r\n
       if http_status.strip[0].to_i > 2
         warn out
         fail "#{cmd.inspect} unexpected response: #{http_status}\n\n#{err}"
