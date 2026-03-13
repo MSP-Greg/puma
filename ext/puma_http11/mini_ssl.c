@@ -824,7 +824,7 @@ void Init_mini_ssl(VALUE puma) {
 
   rb_define_method(eng, "init?", engine_init, 0);
 
-  /* @!attribute [r] peercert
+  /* @!attribute [r] peer_cert
    * Returns `nil` when `MiniSSL::Context#verify_mode` is set to `VERIFY_NONE`.
    * @return [String, nil] DER encoded cert
    */
