@@ -56,7 +56,7 @@ if Puma::HAS_SSL
     def ssl_error(error, ssl_socket)
       (@errors ||= []) << error
       self.addr = ssl_socket.peeraddr.last rescue "<unknown>"
-      self.cert = ssl_socket.peer_cert
+      self.cert = ssl_socket.peer_cert rescue "<unknown>"
     end
   end
 end
