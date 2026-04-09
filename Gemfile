@@ -45,3 +45,5 @@ end
 
 gem 'm'
 gem "localhost", require: false
+
+gem "kantan", github: "MSP-Greg/kantan", branch: "00-openssl"
