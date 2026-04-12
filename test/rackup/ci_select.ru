@@ -12,7 +12,7 @@ headers['Content-Type'] = 'text/plain; charset=utf-8'.freeze
 25.times { |i| headers["X-My-Header-#{i}"] = SecureRandom.hex(25) }
 
 hdr_dly = 'HTTP_DLY'
-hdr_body_conf = 'HTTP_BODY_CONF'
+hdr_body_conf = 'PATH_INFO'
 hdr_content_length = 'Content-Length'
 
 # length = 1018  bytesize = 1024
@@ -37,7 +37,7 @@ run lambda { |env|
   end
   info_len_adj = 1023 - info.bytesize
 
-  body_conf = env[hdr_body_conf]
+  body_conf = env[hdr_body_conf][1..-1]
 
   if body_conf && body_conf.start_with?(*body_types)
     type = body_conf.slice!(0).to_sym
@@ -50,7 +50,7 @@ run lambda { |env|
     len  = 1
   end
 
-  hash_key << len.to_s
+  hash_key = len
 
   case type
   when :a      # body is an array
