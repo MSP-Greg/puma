@@ -70,7 +70,7 @@ module Puma
       low_latency_str = opts.key?(:low_latency) ? "&low_latency=#{opts[:low_latency]}" : ''
       backlog_str = opts[:backlog] ? "&backlog=#{Integer(opts[:backlog])}" : ''
 
-      if defined?(JRUBY_VERSION)
+      if Puma::IS_JRUBY
         cipher_suites = opts[:ssl_cipher_list] ? "&ssl_cipher_list=#{opts[:ssl_cipher_list]}" : nil # old name
         cipher_suites = "#{cipher_suites}&cipher_suites=#{opts[:cipher_suites]}" if opts[:cipher_suites]
         protocols = opts[:protocols] ? "&protocols=#{opts[:protocols]}" : nil
@@ -118,8 +118,10 @@ module Puma
             nil
           end
 
+          alpn = opts[:alpn] ? "&alpn=#{opts[:alpn]}" : ""
+
         "ssl://#{host}:#{port}?#{cert_flags}#{key_flags}#{password_flags}#{ssl_cipher_filter}#{ssl_ciphersuites}" \
-          "#{reuse_flag}&verify_mode=#{verify}#{tls_str}#{ca_additions}#{v_flags}#{backlog_str}#{low_latency_str}"
+          "#{reuse_flag}&verify_mode=#{verify}#{tls_str}#{ca_additions}#{v_flags}#{backlog_str}#{low_latency_str}#{alpn}"
       end
     end
 
