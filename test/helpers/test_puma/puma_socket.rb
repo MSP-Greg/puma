@@ -215,6 +215,7 @@ module TestPuma
       else
         ctx.verify_mode = OpenSSL::SSL::VERIFY_NONE
       end
+      ctx.alpn_protocols ||= ['http/1.1', 'http/1.0']
       ctx
     end
 
