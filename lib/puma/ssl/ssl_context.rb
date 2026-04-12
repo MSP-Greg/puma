@@ -15,7 +15,7 @@ require 'stringio'
 module Puma
   module SSL
     class Context
-      attr_accessor :verify_mode
+      attr_accessor :verify_mode, :alpn
       attr_reader :no_tlsv1, :no_tlsv1_1
 
       def initialize
@@ -208,8 +208,11 @@ module Puma
             end
         end
 
-        # alpn_list = @alpn || ['h2', 'http/1.1', 'http/1.0']
-        alpn_list = @alpn || ['http/1.1', 'http/1.0']
+        alpn_list = if @alpn
+          @alpn.split(',').map { |i| i.start_with?('1') ? "http/#{i}" : i }
+        else
+          ['http/1.1', 'http/1.0']
+        end
 
         sslctx.alpn_select_cb = -> (protocols) do
           alpn_list.each do |protocol|
