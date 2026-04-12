@@ -63,6 +63,8 @@ module Puma
           ctx.ssl_ciphersuites = params['ssl_ciphersuites'] if params['ssl_ciphersuites'] && HAS_TLS1_3
 
           ctx.reuse = params['reuse'] if params['reuse']
+
+          ctx.alpn  = params['alpn']  if params['alpn']
         end
 
         ctx.no_tlsv1   = params['no_tlsv1'] == 'true'
