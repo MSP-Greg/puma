@@ -172,9 +172,8 @@ class TestPersistent < PumaTest
     assert_equal "HTTP/1.1 200 OK\r\nx-header: Works\r\ncontent-length: 5\r\n\r\n" \
       "Hello", response
 
-    sleep 2
-
     assert_raises EOFError do
+      sleep (TRUFFLE ? 3 : 1.5)
       socket.read_nonblock(1)
     end
   end
