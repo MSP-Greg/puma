@@ -134,13 +134,9 @@ module Puma
 
       @env[PUMA_UNDERSCORE_HEADERS] = underscore_headers if underscore_headers
 
-      if to_delete # rubocop:disable Style/SafeNavigation
-        to_delete.each { |k| env.delete(k) }
-      end
+      to_delete&.each { |k| @env.delete(k) }
 
-      if to_add
-        @env.merge! to_add
-      end
+      @env.merge! to_add if to_add
 
       # A rack extension. If the app writes #call'ables to this
       # array, we will invoke them when the request is done.
