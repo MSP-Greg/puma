@@ -160,7 +160,7 @@ class TestRequestInvalidMultiple < PumaTest
     end
 
     refute lleh_err
-    sleep 0.1 if Puma::IS_JRUBY || Puma::IS_WINDOWS
+    sleep 0.1 if Puma::IS_JRUBY || Puma::IS_WINDOWS || TRUFFLE
     assert_raises(*ERROR_ON_CLOSED) { socket << GET_11 }
   end
 
