@@ -115,27 +115,24 @@ module Puma
     def req_env_post_parse
       to_delete = nil
       to_add = nil
+      underscore_headers = nil
 
       @env.each do |k,v|
-        if k.start_with?("HTTP_") && k.include?(",") && !UNMASKABLE_HEADERS.key?(k)
-          if to_delete
-            to_delete << k
-          else
-            to_delete = [k]
-          end
+        next unless k.start_with?("HTTP_") && k.include?(",")
 
-          new_k = k.tr(",", "_")
-          if @env.key?(new_k)
-            next
-          end
+        (underscore_headers ||= []) << k.delete_prefix("HTTP_").tr("_,", "-_")
+        next if @allow_underscore_headers && UNMASKABLE_HEADERS.key?(k)
 
-          unless to_add
-            to_add = {}
-          end
+        (to_delete ||= []) << k
+        next unless @allow_underscore_headers
 
-          to_add[new_k] = v
-        end
+        new_k = k.tr(",", "_")
+        next if @env.key?(new_k)
+
+        (to_add ||= {})[new_k] = v
       end
+
+      @env[PUMA_UNDERSCORE_HEADERS] = underscore_headers if underscore_headers
 
       if to_delete # rubocop:disable Style/SafeNavigation
         to_delete.each { |k| env.delete(k) }
