@@ -16,9 +16,9 @@ if ENV['PUMA_CI_RACK']&.strip == 'rack2'
   gem "rack"  , "~> 2.2"
   gem "rackup", "~> 1.0"
 ## Temporarily disable using rack & rackup main branches
-#elsif RUBY_PATCHLEVEL == -1
-#  gem "rack"  , github: "rack/rack"  , branch: "main"
-#  gem "rackup", github: "rack/rackup", branch: "main"
+elsif RUBY_PATCHLEVEL == -1
+  gem "rack"  , github: "rack/rack"  , branch: "main"
+  gem "rackup", github: "rack/rackup", branch: "main"
 else
   gem "rack"  , "~> 3.2"
   gem "rackup", "~> 2.3"
