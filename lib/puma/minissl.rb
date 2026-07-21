@@ -9,6 +9,7 @@ require 'open3'
 # need for Puma::MiniSSL::OPENSSL constants used in `HAS_TLS1_3`
 # use require, see https://github.com/puma/puma/pull/2381
 require 'puma/puma_http11'
+require_relative 'minissl/ssl_context'
 
 module Puma
   module MiniSSL
@@ -204,7 +205,7 @@ module Puma
       OPENSSL_NO_TLS1 = false
     end
 
-    class Context
+    class NoContext
       attr_accessor :verify_mode
       attr_reader :no_tlsv1, :no_tlsv1_1
 
@@ -418,7 +419,7 @@ module Puma
       def initialize(socket, ctx)
         @socket = socket
         @ctx = ctx
-        @eng_ctx = IS_JRUBY ? @ctx : SSLContext.new(ctx)
+        @eng_ctx = IS_JRUBY ? @ctx : ctx.to_sslcontext
       end
 
       def accept
