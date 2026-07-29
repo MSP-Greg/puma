@@ -133,7 +133,10 @@ class TestPumaServerSSL < PumaTest
 
     msg = nil
 
-    assert_raises(OpenSSL::SSL::SSLError) do
+    error_ary = Puma::IS_JRUBY ? [OpenSSL::SSL::SSLError, Java::JavaLang::IllegalStateException] :
+      [OpenSSL::SSL::SSLError]
+
+    assert_raises(*error_ary) do
       begin
         send_http_read_response ctx: new_ctx { |ctx|
           if PROTOCOL_USE_MIN_MAX && min_max
@@ -149,7 +152,7 @@ class TestPumaServerSSL < PumaTest
     end
 
     expected = Puma::IS_JRUBY ?
-      /No appropriate protocol \(protocol is disabled or cipher suites are inappropriate\)/ :
+      /No usable protocols enabled|No appropriate protocol \(protocol is disabled or cipher suites are inappropriate\)/ :
       /SSL_connect SYSCALL returned=5|wrong version number|(unknown|unsupported) protocol|no protocols available|version too low|unknown SSL method/
     assert_match expected, msg
 
