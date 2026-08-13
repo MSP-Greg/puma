@@ -237,10 +237,10 @@ class TestPumaServer < PumaTest
   end
 
   def test_puma_socket
-    body = "HTTP/1.1 750 Upgraded to Awesome\r\nDone: Yep!\r\n"
+    body = "HTTP/1.1 750 Upgraded to Awesome\r\nDone: Yep!\r\n\r\n"
     server_run do |env|
       io = env['puma.socket']
-      io.write body
+      io.syswrite body
       io.close
       [-1, {}, []]
     end
