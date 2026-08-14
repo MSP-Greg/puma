@@ -254,7 +254,8 @@ class TestIntegration < PumaTest
 
   # Returns line if and when server log matches re, unless idx is specified,
   # then returns regex match.  Will timeout otherwise.
-  def wait_for_server_to_match(re, idx = nil, timeout: LOG_TIMEOUT, log: false)
+  def wait_for_server_to_match(re, idx = nil, timeout: nil, log: false)
+    timeout ||= LOG_TIMEOUT
     time_timeout = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
     line = ''
 
@@ -396,11 +397,11 @@ class TestIntegration < PumaTest
   end
 
   # gets worker pids from @server output
-  def get_worker_pids(phase = 0, size = workers, log: false)
+  def get_worker_pids(phase = 0, size = workers, timeout: nil, log: false)
     pids = []
     re = /PID: (\d+)\) booted in [.0-9]+s, phase: #{phase}/
     while pids.size < size
-      if pid = wait_for_server_to_match(re, 1, log: log)
+      if pid = wait_for_server_to_match(re, 1, timeout: timeout, log: log)
         pids << pid
       end
     end
