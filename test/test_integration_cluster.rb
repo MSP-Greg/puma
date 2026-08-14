@@ -449,7 +449,7 @@ class TestIntegrationCluster < TestIntegration
 
     Process.kill :SIGURG, @pid
 
-    get_worker_pids 1, worker_count - 1
+    get_worker_pids 1, worker_count - 1, timeout: 15
 
     refute @server_log[/.*Terminating timed out worker.*/]
   end
