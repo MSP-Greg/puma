@@ -145,6 +145,7 @@ class TestIntegration < PumaTest
       config: nil,      # string to use for config file
       no_bind: nil,     # bind is defined by args passed or config file
       merge_err: false, # merge STDERR into STDOUT
+      timeout: nil,     # timeout for `wait_for_server_to_boot`
       log: false,       # output server log to console (for debugging)
       no_wait: false,   # don't wait for server to boot
       puma_debug: nil,  # set env['PUMA_DEBUG'] = 'true'
@@ -180,7 +181,7 @@ class TestIntegration < PumaTest
       @server = IO.popen(env, cmd)
     end
     @pid = @server.pid
-    wait_for_server_to_boot(log: log) unless no_wait
+    wait_for_server_to_boot(timeout: timeout, log: log) unless no_wait
     @server
   end
 
@@ -236,43 +237,41 @@ class TestIntegration < PumaTest
 
   # wait for server to say it booted
   # @server and/or @server.gets may be nil on slow CI systems
-  def wait_for_server_to_boot(timeout: LOG_TIMEOUT, log: false)
+  def wait_for_server_to_boot(timeout: nil, log: false)
     @puma_pid = wait_for_server_to_match(/(?:Master|      ) PID: (\d+)$/, 1, timeout: timeout, log: log)&.to_i
     @pid = @puma_pid if @pid != @puma_pid
     wait_for_server_to_include 'Ctrl-C', timeout: timeout, log: log
   end
 
   # Returns true if and when server log includes str.  Will timeout otherwise.
-  def wait_for_server_to_include(str, timeout: LOG_TIMEOUT, log: false)
-    time_timeout = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+  def wait_for_server_to_include(str, timeout: nil, log: false)
     line = ''
 
     puts "\n——— #{full_name} waiting for '#{str}'" if log
-    line = server_gets(str, time_timeout, log: log) until line&.include?(str)
+    line = server_gets(str, timeout, log: log) until line&.include?(str)
     true
   end
 
   # Returns line if and when server log matches re, unless idx is specified,
   # then returns regex match.  Will timeout otherwise.
   def wait_for_server_to_match(re, idx = nil, timeout: nil, log: false)
-    timeout ||= LOG_TIMEOUT
-    time_timeout = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
     line = ''
 
     puts "\n——— #{full_name} waiting for '#{re.inspect}'" if log
-    line = server_gets(re, time_timeout, log: log) until line&.match?(re)
+    line = server_gets(re, timeout, log: log) until line&.match?(re)
     idx ? line[re, idx] : line
   end
 
-  def server_gets(match_obj, time_timeout, log: false)
+  def server_gets(match_obj, timeout = nil, log: false)
+    time_timeout = Process.clock_gettime(Process::CLOCK_MONOTONIC) +
+      (timeout || LOG_TIMEOUT)
     error_retries = 0
     line = ''
 
-    sleep 0.05 until @server.is_a?(IO) || Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_timeout
+    sleep 0.1 until @server.is_a?(IO) || Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_timeout
 
-    raise Minitest::Assertion,  "@server is not an IO" unless @server.is_a?(IO)
     if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_timeout
-      raise Minitest::Assertion, "Timeout waiting for server to log #{match_obj.inspect}"
+      raise Minitest::Assertion, "server_gets - @server is not an IO, #{match_obj.inspect}"
     end
 
     begin
@@ -282,12 +281,11 @@ class TestIntegration < PumaTest
       end
     rescue StandardError => e
       error_retries += 1
-      raise(Minitest::Assertion,  "Waiting for server to log #{match_obj.inspect} raised #{e.class}") if error_retries == LOG_ERROR_QTY
+      if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_timeout
+        raise Minitest::Assertion, "#{error_retries} retries, timeout waiting for server to log #{match_obj.inspect}"
+      end
       sleep LOG_ERROR_SLEEP
       retry
-    end
-    if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_timeout
-      raise Minitest::Assertion, "Timeout waiting for server to log #{match_obj.inspect}"
     end
     line
   end
