@@ -101,8 +101,7 @@ class TestWorkerGemIndependence < TestIntegration
       end
     end
 
-    connection = connect
-    initial_reply = read_body(connection)
+    initial_reply = send_http_read_body
     assert_equal old_version, initial_reply
 
     before_restart&.call
@@ -118,8 +117,7 @@ class TestWorkerGemIndependence < TestIntegration
     verify_process_tag(@server.pid, File.basename(old_app_dir))
     start_phased_restart
 
-    connection = connect
-    new_reply = read_body(connection)
+    new_reply = send_http_read_body
     verify_process_tag(@server.pid, File.basename(new_app_dir))
     assert_equal new_version, new_reply
   end
