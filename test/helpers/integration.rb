@@ -4,11 +4,15 @@ require "puma/control_cli"
 require "json"
 require "open3"
 require_relative 'tmp_path'
+require_relative 'test_puma/puma_socket'
 
 # Only single mode tests go here. Cluster and pumactl tests
 # have their own files, use those instead
 class TestIntegration < PumaTest
   include TmpPath
+  prepend TestPuma
+  prepend TestPuma::PumaSocket
+
   HOST  = "127.0.0.1"
   TOKEN = "xxyyzz"
   RESP_READ_LEN = 65_536
@@ -221,17 +225,17 @@ class TestIntegration < PumaTest
 
   def restart_server_and_listen(argv, env: {}, log: false)
     cli_server argv, env: env, log: log
-    connection = connect
-    initial_reply = read_body(connection)
-    restart_server connection, log: log
-    [initial_reply, read_body(connect)]
+    socket = send_http
+    initial_body = socket.read_body
+    restart_server socket, log: log
+    [initial_body, send_http_read_body]
   end
 
   # reuses an existing connection to make sure that works
-  def restart_server(connection, log: false)
+  def restart_server(socket, log: false)
     Process.kill :USR2, @pid
     wait_for_server_to_include 'Restarting', log: log
-    connection.write "GET / HTTP/1.1\r\nHost: test.com\r\n\r\n" # trigger it to start by sending a new request
+    socket.send_http # trigger it to start by sending a new request
     wait_for_server_to_boot log: log
   end
 
@@ -262,6 +266,7 @@ class TestIntegration < PumaTest
     idx ? line[re, idx] : line
   end
 
+  # Called by `wait_for_server_to_include` & `_match`
   def server_gets(match_obj, timeout = nil, log: false)
     time_timeout = Process.clock_gettime(Process::CLOCK_MONOTONIC) +
       (timeout || LOG_TIMEOUT)
@@ -288,110 +293,6 @@ class TestIntegration < PumaTest
       retry
     end
     line
-  end
-
-  def open_client_socket(unix: false, timeout: 3)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
-    retries = 0
-    begin
-      unix ? UNIXSocket.new(@bind_path) : TCPSocket.new(HOST, bind_port)
-    rescue Errno::EADDRNOTAVAIL => e
-      raise e if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-      retries += 1
-      sleep 0.01 * retries.clamp(0, 10)
-      retry
-    end
-  end
-
-  def connect(path = nil, unix: false)
-    s = open_client_socket(unix: unix)
-    @ios_to_close << s
-    s << "GET /#{path} HTTP/1.1\r\nHost: test.com\r\n\r\n"
-    s
-  end
-
-  # use only if all socket writes are fast
-  # does not wait for a read
-  def fast_connect(path = nil, unix: false)
-    s = open_client_socket(unix: unix)
-    @ios_to_close << s
-    fast_write s, "GET /#{path} HTTP/1.1\r\nHost: test.com\r\n\r\n"
-    s
-  end
-
-  def fast_write(io, str)
-    n = 0
-    while true
-      begin
-        n = io.syswrite str
-      rescue Errno::EAGAIN, Errno::EWOULDBLOCK => e
-        unless io.wait_writable 5
-          raise e
-        end
-
-        retry
-      rescue Errno::EPIPE, SystemCallError, IOError => e
-        raise e
-      end
-
-      return if n == str.bytesize
-      str = str.byteslice(n..-1)
-    end
-  end
-
-  def read_body(connection, timeout = nil)
-    read_response(connection, timeout).last
-  end
-
-  def read_response(connection, timeout = nil)
-    timeout ||= RESP_READ_TIMEOUT
-    content_length = nil
-    chunked = nil
-    response = +''
-    t_st = Process.clock_gettime Process::CLOCK_MONOTONIC
-    if connection.to_io.wait_readable timeout
-      loop do
-        begin
-          part = connection.read_nonblock(RESP_READ_LEN, exception: false)
-          case part
-          when String
-            unless content_length || chunked
-              chunked ||= part.include? "\r\nTransfer-Encoding: chunked\r\n"
-              content_length = (t = part[/^Content-Length: (\d+)/i , 1]) ? t.to_i : nil
-            end
-
-            response << part
-            hdrs, body = response.split RESP_SPLIT, 2
-            unless body.nil?
-              # below could be simplified, but allows for debugging...
-              ret =
-                if content_length
-                  body.bytesize == content_length
-                elsif chunked
-                  body.end_with? "\r\n0\r\n\r\n"
-                elsif !hdrs.empty? && !body.empty?
-                  true
-                else
-                  false
-                end
-              if ret
-                return [hdrs, body]
-              end
-            end
-            sleep 0.000_1
-          when :wait_readable, :wait_writable # :wait_writable for ssl
-            sleep 0.000_2
-          when nil
-            raise EOFError
-          end
-          if timeout < Process.clock_gettime(Process::CLOCK_MONOTONIC) - t_st
-            raise Timeout::Error, 'Client Read Timeout'
-          end
-        end
-      end
-    else
-      raise Timeout::Error, 'Client Read Timeout'
-    end
   end
 
   # gets worker pids from @server output
@@ -521,13 +422,13 @@ class TestIntegration < PumaTest
         num_requests.times do |req_num|
           begin
             begin
-              socket = open_client_socket(unix: unix)
-              fast_write socket, "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Length: #{message.bytesize}\r\n\r\n#{message}"
+              socket = send_http "POST / HTTP/1.1\r\nHost: test.com\r\n" \
+                "Content-Length: #{message.bytesize}\r\n\r\n#{message}"
             rescue => e
               replies[:write_error] += 1
               raise e
             end
-            body = read_body(socket, 10)
+            body = socket.read_body
             if body == "Hello World"
               mutex.synchronize {
                 replies[:success] += 1
