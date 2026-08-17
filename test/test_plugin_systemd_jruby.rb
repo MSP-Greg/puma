@@ -22,12 +22,10 @@ class TestPluginSystemdJruby < TestIntegration
     cli_server "test/rackup/hello.ru",
       env: {'NOTIFY_SOCKET' => '/tmp/doesntmatter' }, config: <<~CONFIG
       app do |_|
-        [200, {}, [Puma::Plugins.instance_variable_get(:@plugins)['systemd'].to_s]]
+        [200, {}, [(Puma::Plugins.instance_variable_get(:@plugins)['systemd'] || 'nothing').to_s]]
       end
     CONFIG
 
-    assert_empty read_body(connect)
-
-    stop_server
+    assert_equal 'nothing',  send_http_read_body
   end
 end
