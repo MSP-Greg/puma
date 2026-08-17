@@ -61,9 +61,10 @@ module TestPuma
   #
   module PumaSocket
     GET_10 = "GET / HTTP/1.0\r\n\r\n"
-    GET_11 = "GET / HTTP/1.1\r\nHost: test.com\r\n\r\n"
+    GET_11 = "GET / HTTP/1.1\r\nhost: test.com\r\n\r\n"
+    GET_11_C = "GET / HTTP/1.1\r\nhost: test.com\r\nconnection: close\r\n\r\n"
 
-    HELLO_11 = "HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\n" \
+    HELLO_11 = "HTTP/1.1 200 OK\r\nhost: test.com\r\ncontent-type: text/plain\r\n" \
       "Content-Length: 11\r\n\r\nHello World"
 
     RESP_READ_LEN = PumaSocketInclude::RESP_READ_LEN
@@ -235,7 +236,11 @@ module TestPuma
           tcp.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1) if SET_TCP_NODELAY
           if ctx
             @ssl_socket_contexts << ctx if @ssl_socket_contexts
-            PumaSSLSocket.new tcp, ctx
+            ssl = PumaSSLSocket.new tcp, ctx
+            ssl.session = session if session
+            ssl.sync_close = true
+            ssl.connect
+            ssl
           else
             tcp
           end
@@ -244,11 +249,6 @@ module TestPuma
         end
 
       @ios_to_close << skt
-      if ctx
-        skt.session = session if session
-        skt.sync_close = true
-        skt.connect
-      end
       skt
     end
 
