@@ -22,11 +22,12 @@ class TestSkipSystemd < TestIntegration
     cli_server "test/rackup/hello.ru",
                env: { 'PUMA_SKIP_SYSTEMD' => 'true', 'NOTIFY_SOCKET' => '/tmp/doesntmatter' }, config: <<~CONFIG
       app do |_|
-        [200, {}, [Puma::Plugins.instance_variable_get(:@plugins)['systemd'].to_s]]
+        body = (Puma::Plugins.instance_variable_get(:@plugins)['systemd'] || 'nothing').to_s
+        [200, {}, [body]]
       end
     CONFIG
 
-    assert_empty read_body(connect)
+    assert_equal 'nothing', send_http_read_body
 
     stop_server
   end
