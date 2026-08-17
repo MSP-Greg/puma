@@ -75,10 +75,10 @@ class TestIntegrationCluster < TestIntegration
     File.binwrite bind_path, 'pre existing'
 
     cli_server "-w #{workers} -q test/rackup/sleep_step.ru", unix: :unix, config: "preload_app! false"
-    connection = connect(nil, unix: true)
-    restart_server connection
+    socket = send_http
+    restart_server socket
 
-    connect(nil, unix: true)
+    send_http
     stop_server
 
     assert File.exist?(@bind_path)
@@ -275,14 +275,14 @@ class TestIntegrationCluster < TestIntegration
     get_worker_pids # wait for workers to boot
 
     10.times {
-      fast_connect
+      send_http
       sleep 0.5
     }
 
     sleep 1.15
 
     assert_raises Errno::ECONNREFUSED, "Connection refused" do
-      connect
+      send_http
     end
   end
 
@@ -291,7 +291,7 @@ class TestIntegrationCluster < TestIntegration
 
     get_worker_pids # wait for workers to boot
 
-    fast_connect
+    send_http
     assert true
   end
 
@@ -300,14 +300,17 @@ class TestIntegrationCluster < TestIntegration
 
     get_worker_pids # wait for workers to boot
 
-    slow = Thread.new { read_body(fast_connect("sleep2"), 5).split.last.to_i }
+    req2 = "GET /sleep2 HTTP/1.1\r\nhost: test.com\r\n\r\n"
+    req0 = "GET /sleep0 HTTP/1.1\r\nhost: test.com\r\n\r\n"
+
+    slow = Thread.new { send_http(req2).read_response.split.last.to_i }
     sleep 0.5
 
     mutex = Mutex.new
     fast_pids = []
     Array.new(8) do
       Thread.new do
-        pid = read_body(fast_connect("sleep0"), 3).split.last.to_i
+        pid = send_http(req0).read_body.split.last.to_i
         mutex.synchronize { fast_pids << pid }
       end
     end.each(&:join)
@@ -352,16 +355,16 @@ class TestIntegrationCluster < TestIntegration
 
     socks = []
     until refork.read == 'Reforked'
-      socks << fast_connect
+      socks << send_http
       sleep 0.004
     end
 
     100.times {
-      socks << fast_connect
+      socks << send_http
       sleep 0.004
     }
 
-    socks.each { |s| read_body s }
+    socks.each { |s| s.read_body }
 
     refute_includes pids, get_worker_pids(1, wrkrs - 1)
   end
@@ -381,16 +384,16 @@ class TestIntegrationCluster < TestIntegration
     socks = []
     until refork.read == 'Before refork-After refork'
       refork.rewind
-      socks << fast_connect
+      socks << send_http
       sleep 0.004
     end
 
     100.times {
-      socks << fast_connect
+      socks << send_http
       sleep 0.004
     }
 
-    socks.each { |s| read_body s }
+    socks.each { |s| s.read_body }
 
     refute_includes pids, get_worker_pids(1, wrkrs - 1)
   end
@@ -406,7 +409,7 @@ class TestIntegrationCluster < TestIntegration
         [200, {}, [exitstatus.to_s]]
       end
     CONFIG
-    assert_equal '0', read_body(connect)
+    assert_equal '0', send_http_read_body
   end
 
   def test_phased_restart_with_fork_worker_and_high_worker_count
@@ -487,16 +490,15 @@ class TestIntegrationCluster < TestIntegration
 
   def test_prune_bundler_with_multiple_workers
     cli_server "-C test/config/prune_bundler_with_multiple_workers.rb"
-    reply = read_body(connect)
 
-    assert_equal reply, "embedded app"
+    assert_equal "embedded app", send_http_read_body
   end
 
   def test_prune_bundler_preserves_bundle_env_vars
     cli_server "-w #{workers} --prune-bundler test/rackup/bundle_without.ru",
       env: { 'BUNDLE_WITHOUT' => 'development:test' }
 
-    assert_equal 'development:test', read_body(connect)
+    assert_equal 'development:test', send_http_read_body
   end
 
   def test_load_path_includes_extra_deps
@@ -816,7 +818,7 @@ class TestIntegrationCluster < TestIntegration
     [35, 40].each do |sleep_time|
       threads << Thread.new do
         begin
-          connect "sleep#{sleep_time}"
+          send_http "GET /sleep#{sleep_time} HTTP/1.1\r\nhost: test.com\r\n\r\n"
           # stuck connections will raise IOError or Errno::ECONNRESET
           # when shutdown
         rescue IOError, Errno::ECONNRESET
@@ -870,8 +872,7 @@ class TestIntegrationCluster < TestIntegration
   def thread_run_pid(replies, delay, sleep_time, mutex, refused, unix: false)
     begin
       sleep delay
-      s = fast_connect "sleep#{sleep_time}", unix: unix
-      body = read_body(s, 20)
+      body = send_http("sleep#{sleep_time}").read_body
       mutex.synchronize { replies << body }
     rescue Errno::ECONNRESET
       # connection was accepted but then closed
@@ -887,12 +888,12 @@ class TestIntegrationCluster < TestIntegration
   # used in loop to create several 'requests'
   def thread_run_step(replies, start_time, delay, sleep_time, step, mutex, unix: false)
     refused = thread_run_refused unix: unix
+    req = "GET /sleep#{sleep_time}-#{step} HTTP/1.1\r\nHost: test.com\r\n\r\n"
     begin
       sleep_until = start_time + delay
       sleep_time_left = sleep_until - Process.clock_gettime(Process::CLOCK_MONOTONIC)
       sleep sleep_time_left if sleep_time_left > 0
-      s = connect "sleep#{sleep_time}-#{step}", unix: unix
-      body = read_body(s, 20)
+      body = send_http(req).read_body
       if body[/\ASlept /]
         mutex.synchronize { replies[step] = :success }
       else
