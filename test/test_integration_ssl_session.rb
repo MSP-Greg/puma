@@ -3,6 +3,11 @@
 require_relative 'helper'
 require_relative 'helpers/integration'
 
+if ::Puma::HAS_SSL # don't load any files if no ssl support
+  require "openssl"
+  require_relative "helpers/test_puma/puma_socket"
+end
+
 # These tests are used to verify that Puma works with SSL sockets.  Only
 # integration tests isolate the server from the test environment, so there
 # should be a few SSL tests.
@@ -14,13 +19,12 @@ require_relative 'helpers/integration'
 class TestIntegrationSSLSession < TestIntegration
   parallelize_me!
 
-  require "openssl" unless defined?(::OpenSSL::SSL)
+  include TestPuma
+  include TestPuma::PumaSocket
 
   OSSL = ::OpenSSL::SSL
 
   CLIENT_HAS_TLS1_3 = OSSL.const_defined? :TLS1_3_VERSION
-
-  GET = "GET / HTTP/1.1\r\nHost: test.com\r\nConnection: close\r\n\r\n"
 
   RESP = "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 5\r\n\r\nhttps"
 
@@ -110,43 +114,36 @@ class TestIntegrationSSLSession < TestIntegration
     assert reused, 'TLSv1.3 session was not reused'
   end
 
-  def client_skt(tls_vers = nil, session_pems = [], queue = nil)
-    ctx = OSSL::SSLContext.new
-    ctx.verify_mode = OSSL::VERIFY_NONE
-    ctx.session_cache_mode = OSSL::SSLContext::SESSION_CACHE_CLIENT
-    if tls_vers
-      ctx.max_version = tls_vers
-      ctx.min_version = tls_vers
-    end
-    ctx.session_new_cb = ->(ary) {
-      queue << true if queue
-      session_pems << ary.last.to_pem
-    }
-
-    skt = OSSL::SSLSocket.new TCPSocket.new(HOST, bind_port), ctx
-    skt.sync_close = true
-    skt
+  def client_skt(tls_vers = nil, session_pems = [], queue = nil, session: nil)
+    new_socket session: session,
+      ctx: new_ctx { |ctx|
+        ctx.verify_mode = OSSL::VERIFY_NONE
+        ctx.session_cache_mode = OSSL::SSLContext::SESSION_CACHE_CLIENT
+        if tls_vers
+          ctx.max_version = tls_vers
+          ctx.min_version = tls_vers
+        end
+        ctx.session_new_cb = ->(ary) {
+          queue << true if queue
+          session_pems << ary.last.to_pem
+        }
+      }
   end
 
   def ssl_client(tls_vers: nil)
     queue = Thread::Queue.new
     session_pems = []
-    skt_1 = client_skt tls_vers, session_pems, queue
-    skt_1.connect
 
-    skt_1.syswrite GET
-    skt_1.to_io.wait_readable 2
-    assert_equal RESP, skt_1.sysread(1_024)
+    skt_1 = client_skt tls_vers, session_pems, queue
+
+    assert_equal RESP, skt_1.send_http_read_response(GET_11_C)
     skt_1.sysclose
     queue.pop # wait for cb session to be added to first client
 
-    skt_2 = client_skt tls_vers, session_pems
-    skt_2.session = OSSL::Session.new(session_pems[0])
-    skt_2.connect
+    skt_2 = client_skt tls_vers, session_pems,
+      session: OSSL::Session.new(session_pems[0])
 
-    skt_2.syswrite GET
-    skt_2.to_io.wait_readable 2
-    assert_equal RESP, skt_2.sysread(1_024)
+    assert_equal RESP, skt_2.send_http_read_response(GET_11_C)
     queue.close
     queue = nil
 
