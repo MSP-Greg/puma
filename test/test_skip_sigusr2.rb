@@ -26,7 +26,7 @@ class TestSkipSigusr2 < TestIntegration
       end
     CONFIG
 
-    assert_equal 'DEFAULT', read_body(connect)
+    assert_equal 'DEFAULT', send_http_read_body
 
     stop_server
   end
