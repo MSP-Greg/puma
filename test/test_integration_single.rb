@@ -25,8 +25,9 @@ class TestIntegrationSingle < TestIntegration
 
   def test_usr2_restart
     skip_unless_signal_exist? :USR2
-    _, new_reply = restart_server_and_listen("-q test/rackup/hello.ru")
-    assert_equal "Hello World", new_reply
+    response_1, response_2 = restart_server_and_listen("-q test/rackup/hello.ru")
+    assert_equal "Hello World", response_1
+    assert_equal "Hello World", response_2
   end
 
   # It does not share environments between multiple generations, which would break Dotenv
@@ -36,11 +37,11 @@ class TestIntegrationSingle < TestIntegration
     skip_if :jruby
     skip_unless_signal_exist? :USR2
 
-    initial_reply, new_reply = restart_server_and_listen("-q test/rackup/hello-env.ru")
+    response_1, response_2 = restart_server_and_listen("-q test/rackup/hello-env.ru")
 
-    assert_includes initial_reply, "Hello RAND"
-    assert_includes new_reply, "Hello RAND"
-    refute_equal initial_reply, new_reply
+    assert_includes response_1, "Hello RAND"
+    assert_includes response_2, "Hello RAND"
+    refute_equal response_1, response_2
   end
 
   def test_term_exit_code
@@ -75,35 +76,21 @@ class TestIntegrationSingle < TestIntegration
   end
 
   def test_rack_url_scheme_default
-    skip_unless_signal_exist? :TERM
+    cli_server "test/rackup/url_scheme.ru"
 
-    cli_server("test/rackup/url_scheme.ru")
-
-    reply = read_body(connect)
-    stop_server
-
-    assert_match("http", reply)
+    assert_match "http", send_http_read_body
   end
 
   def test_conf_is_loaded_before_passing_it_to_binder
-    skip_unless_signal_exist? :TERM
+    cli_server "-C test/config/rack_url_scheme.rb test/rackup/url_scheme.ru"
 
-    cli_server("-C test/config/rack_url_scheme.rb test/rackup/url_scheme.ru")
-
-    reply = read_body(connect)
-    stop_server
-
-    assert_match("https", reply)
+    assert_match "http", send_http_read_body
   end
 
   def test_prefer_rackup_file_specified_by_cli
-    skip_unless_signal_exist? :TERM
-
     cli_server "-C test/config/with_rackup_from_dsl.rb test/rackup/hello.ru"
-    reply = read_body(connect)
-    stop_server
 
-    assert_match("Hello World", reply)
+    assert_equal "Hello World", send_http_read_body
   end
 
   def test_term_not_accepts_new_connections
@@ -141,16 +128,15 @@ class TestIntegrationSingle < TestIntegration
 
     cli_server 'test/rackup/hello.ru'
     begin
-      sock = TCPSocket.new(HOST, @bind_port)
-      sock.close
+      new_socket.close
     rescue => ex
-      fail("Port didn't open properly: #{ex.message}")
+      fail "Port didn't open properly: #{ex.message}"
     end
 
     Process.kill :INT, @pid
     wait_server
 
-    assert_raises(Errno::ECONNREFUSED) { TCPSocket.new(HOST, @bind_port) }
+    assert_raises(Errno::ECONNREFUSED) { new_socket }
   end
 
   def test_siginfo_thread_print
@@ -228,7 +214,7 @@ class TestIntegrationSingle < TestIntegration
   def test_application_logs_are_flushed_on_write
     cli_server "#{set_pumactl_args} test/rackup/write_to_stdout.ru"
 
-    read_body connect
+    send_http_read_body
 
     cli_pumactl 'stop'
 
@@ -243,10 +229,11 @@ class TestIntegrationSingle < TestIntegration
     skip_unless_signal_exist? :TERM
 
     cli_server "test/rackup/close_listeners.ru", merge_err: true
-    connection = fast_connect
+
+    socket = send_http
 
     begin
-      read_body connection
+      socket.read_body
     rescue EOFError
     end
 
@@ -282,12 +269,12 @@ class TestIntegrationSingle < TestIntegration
     cli_server "test/rackup/hello.ru", config: "idle_timeout 1\n" \
       "#{set_pumactl_config}"
 
-    connect
+    send_http
 
     sleep 1.15
 
     assert_raises Errno::ECONNREFUSED, "Connection refused" do
-      connect
+      send_http
     end
 
     wait_server
@@ -300,14 +287,13 @@ class TestIntegrationSingle < TestIntegration
 
     cli_server "-q test/rackup/hello.ru", unix: :unix, config: "idle_timeout 1"
 
-    sock = connection = connect(nil, unix: true)
-    read_body(connection)
+    socket = send_http
 
     sleep 1.15
 
-    assert sock.wait_readable(1), 'Unexpected timeout'
+    assert socket.wait_readable(1), 'Unexpected timeout'
     assert_raises Puma.jruby? ? IOError : Errno::ECONNREFUSED, "Connection refused" do
-      connection = connect(nil, unix: true)
+      send_http
     end
 
     assert File.exist?(@bind_path)
@@ -316,4 +302,5 @@ class TestIntegrationSingle < TestIntegration
       File.unlink @bind_path if File.exist? @bind_path
     end
   end
+
 end
