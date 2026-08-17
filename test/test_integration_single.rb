@@ -76,19 +76,25 @@ class TestIntegrationSingle < TestIntegration
   end
 
   def test_rack_url_scheme_default
-    cli_server "test/rackup/url_scheme.ru"
+    cli_server "#{set_pumactl_args} test/rackup/url_scheme.ru"
 
     assert_match "http", send_http_read_body
   end
 
   def test_conf_is_loaded_before_passing_it_to_binder
-    cli_server "-C test/config/rack_url_scheme.rb test/rackup/url_scheme.ru"
+    cli_server "test/rackup/url_scheme.ru", config: <<~CONFIG
+      #{set_pumactl_config}
+      rack_url_scheme 'https'
+    CONFIG
 
     assert_match "http", send_http_read_body
   end
 
   def test_prefer_rackup_file_specified_by_cli
-    cli_server "-C test/config/with_rackup_from_dsl.rb test/rackup/hello.ru"
+    cli_server "test/rackup/hello.ru", config: <<~CONFIG
+      #{set_pumactl_config}
+      rackup 'test/rackup/hello-env.ru'
+    CONFIG
 
     assert_equal "Hello World", send_http_read_body
   end
