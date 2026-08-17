@@ -176,7 +176,7 @@ class Http11ParserTest < TestIntegration
         config: cli_config
 
       sleep 0.25
-      result = JSON.parse read_body(connect)
+      result = JSON.parse send_http_read_body
 
       assert_equal conf[:exp][0], result['MAX_REQUEST_URI_LENGTH']
       assert_equal conf[:exp][1], result['MAX_REQUEST_PATH_LENGTH']
