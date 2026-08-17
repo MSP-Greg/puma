@@ -57,9 +57,7 @@ class TestIntegrationPumactl < TestIntegration
 
     start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
-    s = UNIXSocket.new @bind_path
-    @ios_to_close << s
-    s << "GET /sleep1 HTTP/1.0\r\n\r\n"
+    send_http "GET /sleep1 HTTP/1.0\r\nhost: test.com\r\n\r\n"
 
     # Get the PIDs of the phase 0 workers.
     phase0_worker_pids = get_worker_pids 0
@@ -93,7 +91,7 @@ class TestIntegrationPumactl < TestIntegration
 
     start = Time.now
 
-    fast_connect("sleep1", unix: true)
+    send_http "GET /sleep1 HTTP/1.1\r\nhost: test.com\r\n\r\n"
 
     # Get the PIDs of the phase 0 workers.
     phase0_worker_pids = get_worker_pids 0, wrkrs
@@ -122,8 +120,8 @@ class TestIntegrationPumactl < TestIntegration
 
     cli_server "-q -C test/config/prune_bundler_with_multiple_workers.rb #{set_pumactl_args unix: true} -S #{@state_path}", unix: true
 
-    socket = fast_connect(unix: true)
-    headers, body = read_response(socket)
+    socket = send_http "GET / HTTP/1.1\r\nhost: test.com\r\n\r\n"
+    headers, body = socket.read_response.split "\r\n\r\n"
 
     assert_includes headers, "200 OK"
     assert_includes body, "embedded app"
@@ -188,7 +186,7 @@ class TestIntegrationPumactl < TestIntegration
     assert_includes out.read, "Command restart sent success"
 
     sleep 0.5 # give some time to restart
-    read_response connect
+    send_http_read_response
 
     out = cli_pumactl_spawn "-S #{@state_path} status", no_bind: true
     assert_includes out.read, "Puma is started"
@@ -284,7 +282,7 @@ class TestIntegrationPumactl < TestIntegration
     before = JSON.parse resp_io.read.split("\n", 2).last
     gc_before = before[key].to_i
 
-    2.times { fast_connect }
+    2.times { send_http }
 
     resp_io = cli_pumactl "gc", unix: unix
     # below shows gc was called (200 reply)
