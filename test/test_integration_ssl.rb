@@ -4,7 +4,6 @@ require_relative 'helper'
 require_relative "helpers/integration"
 
 if ::Puma::HAS_SSL # don't load any files if no ssl support
-  require "net/http"
   require "openssl"
   require_relative "helpers/test_puma/puma_socket"
 end
@@ -20,23 +19,17 @@ end
 class TestIntegrationSSL < TestIntegration
   parallelize_me!
 
-  LOCALHOST = ENV.fetch 'PUMA_CI_DFLT_HOST', 'localhost'
-
+  include TestPuma
   include TestPuma::PumaSocket
 
-  def bind_port
-    @bind_port ||= UniquePort.call
-    @tcp_port = @bind_port
-  end
+  LOCALHOST = ENV.fetch 'PUMA_CI_DFLT_HOST', 'localhost'
 
   def with_server(config)
     cli_server "-t1:1", config: config, no_bind: true
 
-    http = Net::HTTP.new HOST, bind_port
-    http.use_ssl = true
-    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+    ssl_socket = new_socket ctx: new_ctx
 
-    yield http
+    yield ssl_socket
   end
 
   def test_ssl_run
@@ -70,13 +63,8 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
+    with_server(config) do |ssl_socket|
+      assert_equal 'https', ssl_socket.send_http.read_body
     end
   end
 
@@ -186,12 +174,8 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
+    with_server(config) do |ssl_socket|
+      body = ssl_socket.send_http.read_body
       assert_equal 'https', body
     end
   end
@@ -210,13 +194,8 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
+    with_server(config) do |ssl_socket|
+      assert_equal 'https', ssl_socket.send_http.read_body
     end
   end
 
@@ -245,13 +224,8 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
+    with_server(config) do |ssl_socket|
+      assert_equal 'https', ssl_socket.send_http.read_body
     end
   end
 
@@ -280,13 +254,8 @@ class TestIntegrationSSL < TestIntegration
       end
     CONFIG
 
-    with_server(config) do |http|
-      body = nil
-      http.start do
-        req = Net::HTTP::Get.new '/', {}
-        http.request(req) { |resp| body = resp.body }
-      end
-      assert_equal 'https', body
+    with_server(config) do |ssl_socket|
+      assert_equal 'https', ssl_socket.send_http.read_body
     end
   end
 
