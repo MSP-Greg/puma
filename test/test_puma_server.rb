@@ -411,10 +411,9 @@ class TestPumaServer < PumaTest
   def test_request_payload_too_large
     server_run(http_content_length_limit: 10)
 
-    socket = send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 19\r\n\r\n"
-    socket << "hello world foo bar"
-
-    response = socket.read_response
+    response = send_http("POST / HTTP/1.1\r\nHost: test.com\r\n" \
+      "Content-Type: text/plain\r\nContent-Length: 19\r\n\r\n" \
+      "hello world foo bar").read_response
 
     # Content Too Large
     assert_equal "HTTP/1.1 413 #{STATUS_CODES[413]}", response.status
@@ -1281,7 +1280,8 @@ class TestPumaServer < PumaTest
       [200, {}, [""]]
     }
 
-    response = send_http_read_response "GET / HTTP/1.1\r\nHost: test.com\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
+    response = send_http_read_response "GET / HTTP/1.1\r\nHost: test.com\r\n" \
+      "Transfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n\r\n"
 
     assert_equal "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", response
     assert_equal "hello", body
@@ -1297,7 +1297,8 @@ class TestPumaServer < PumaTest
       [200, {}, [""]]
     }
 
-    socket = send_http "GET / HTTP/1.1\r\nHost: test.com\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n"
+    socket = send_http "GET / HTTP/1.1\r\nHost: test.com\r\n" \
+      "Transfer-Encoding: chunked\r\n\r\n1\r\nh\r\n4\r\nello\r\n0\r\n"
 
     last_crlf_written = false
     last_crlf_writer = Thread.new do
@@ -1318,7 +1319,9 @@ class TestPumaServer < PumaTest
 
     last_crlf_writer.join
 
-    socket << "GET / HTTP/1.1\r\nHost: test.com\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\n\r\n4\r\ngood\r\n3\r\nbye\r\n0\r\n\r\n"
+    socket << "GET / HTTP/1.1\r\nHost: test.com\r\n" \
+      "Transfer-Encoding: chunked\r\n\r\n4\r\ngood\r\n3\r\nbye\r\n0\r\n\r\n"
+
     sleep 0.1
 
     response = socket.read_response
