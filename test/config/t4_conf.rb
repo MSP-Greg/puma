@@ -1,7 +1,8 @@
 stdout_redirect "t4-stdout"
 pidfile "t4-pid"
+
 class CustomLogger
-  def initialize(output=STDOUT)
+  def initialize(output = STDOUT)
     @output = output
   end
 
