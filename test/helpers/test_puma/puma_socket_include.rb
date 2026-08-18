@@ -143,12 +143,16 @@ module TestPuma
       if String === req
         sent = 0
         size = req.bytesize
-        sent += syswrite(req.byteslice(sent, size - sent)) while sent < size
+        while sent < size
+          wait_writable 2
+          sent += syswrite(req.byteslice(sent, size - sent))
+        end
       end
       self
     end
     alias_method :<<, :send_http
     alias_method :req_write, :send_http
+    alias_method :write_req, :send_http
 
     # Writes the request/data to the socket and returns the response body.
     # Assumes one response, use `read_all` to read multiple responses.
