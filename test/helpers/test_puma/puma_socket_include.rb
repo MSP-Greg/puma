@@ -144,13 +144,17 @@ module TestPuma
         sent = 0
         size = req.bytesize
         while sent < size
-          wait_writable 2
+          if respond_to?(:wait_writable)
+            wait_writable 2
+          else
+            to_io.wait_writable 2
+          end
           sent += syswrite(req.byteslice(sent, size - sent))
         end
       end
       self
     end
-    alias_method :<<, :send_http
+    alias_method :<<       , :send_http
     alias_method :req_write, :send_http
     alias_method :write_req, :send_http
 
