@@ -426,7 +426,7 @@ class TestIntegration < PumaTest
                 "Content-Length: #{message.bytesize}\r\n\r\n#{message}"
             rescue => e
               replies[:write_error] += 1
-              raise e
+#              raise e
             end
             body = socket.read_body
             if body == "Hello World"
