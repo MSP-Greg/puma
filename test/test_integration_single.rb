@@ -202,13 +202,14 @@ class TestIntegrationSingle < TestIntegration
 
     cli_server '-C test/config/t4_conf.rb test/rackup/hello.ru'
 
-    system "curl http://localhost:#{@bind_port}/ > /dev/null 2>&1"
+    send_http_read_body
 
-    out=`#{BASE} bin/pumactl -F test/config/t4_conf.rb status`
+    out = %x[#{BASE} bin/pumactl -F test/config/t4_conf.rb status]
 
     stop_server
 
     log = File.read('t4-stdout')
+    STDOUT.syswrite "\n\n#{log}\n\n"
 
     assert_match(%r!Custom logging: 127\.0\.0\.1.*GET / HTTP/1\.1!, log)
     assert(!File.file?("t4-pid"))
