@@ -140,16 +140,18 @@ module TestPuma
     #
     def send_http(req = nil)
       req ||= PumaSocket::GET_11
+      timeout = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
       if String === req
         sent = 0
         size = req.bytesize
         while sent < size
-          if respond_to?(:wait_writable)
-            wait_writable 2
-          else
-            to_io.wait_writable 2
+          begin
+            sent += syswrite(req.byteslice(sent, size - sent))
+          rescue Errno::EAGAIN
+            sleep 1
+            raise Errno::EAGAIN if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= timeout
+            retry
           end
-          sent += syswrite(req.byteslice(sent, size - sent))
         end
       end
       self
