@@ -68,6 +68,8 @@ class TestIntegrationSSL < TestIntegration
   def test_verify_client_cert_roundtrip(tls1_2 = nil)
     cert_path = File.expand_path '../examples/puma/client_certs', __dir__
     bind_port
+    #   should work without the below, Ubuntu arm 4.0 had a problem with it
+    control_port
 
     cli_server "-t1:5 #{set_pumactl_args}", no_bind: true, config: <<~CONFIG
       if ::Puma::IS_JRUBY
@@ -100,7 +102,10 @@ class TestIntegrationSSL < TestIntegration
         c.cert = ::OpenSSL::X509::Certificate.new client_cert
         c.key  = ::OpenSSL::PKey::RSA.new File.read(key)
         c.verify_mode = ::OpenSSL::SSL::VERIFY_PEER
-        c.max_version = :TLS1_2 if tls1_2
+        if tls1_2
+          c.max_version = :TLS1_2
+          c.min_version = :TLS1_2
+        end
       }
 
     assert_equal client_cert, body
