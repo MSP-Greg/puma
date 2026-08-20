@@ -130,26 +130,28 @@ module TestPuma
     # @!macro skt
     # @!macro resp
     # @return [Array<String>] array of header lines in the response
-    def send_http_read_headers(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
+    def send_req_read_headers(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: nil, timeout: nil)
       send_http(req, host: host, port: port, path: path, ctx: ctx, session: session)
         .read_response(timeout: timeout, len: len)
         .split(RESP_SPLIT, 2).first.split "\r\n"
     end
+    alias :send_http_read_headers      :send_req_read_headers
+    alias :send_http_read_resp_headers :send_req_read_headers
 
     # Sends a request and returns the HTTP response body.
     # @!macro req
     # @!macro skt
     # @!macro resp
     # @return [Response] the body portion of the HTTP response
-    def send_http_read_body(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
+    def send_req_read_body(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: nil, timeout: nil)
       send_http(req, host: host, port: port, path: path, ctx: ctx, session: session)
         .read_body(timeout: timeout, len: len)
     end
 
-    alias :send_http_read_resp_headers :send_http_read_headers
-    alias :send_http_read_resp_body    :send_http_read_body
+    alias :send_http_read_body      :send_req_read_body
+    alias :send_http_read_resp_body :send_req_read_body
 
     # Sends a request and returns whatever can be read.  Use when multiple
     # responses are sent by the server
@@ -157,32 +159,35 @@ module TestPuma
     # @!macro skt
     # @!macro resp
     # @return [String] socket read string
-    def send_http_read_all(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
+    def send_req_read_all(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: RESP_READ_LEN, timeout: 15)
       send_http(req, host: host, port: port, path: path, ctx: ctx, session: session)
         .read_all(timeout: timeout, len: len)
     end
+    alias :send_http_read_all :send_req_read_all
 
     # Sends a request and returns the HTTP response.  Assumes one response is sent.
     # @!macro req
     # @!macro skt
     # @!macro resp
     # @return [Response] the HTTP response
-    def send_http_read_response(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
+    def send_req_read_response(req = GET_11, host: nil, port: nil, path: nil, ctx: nil,
         session: nil, len: nil, timeout: nil)
       send_http(req, host: host, port: port, path: path, ctx: ctx, session: session)
         .read_response(timeout: timeout, len: len)
     end
+    alias :send_http_read_response :send_req_read_response
 
     # Sends a request and returns the socket
     # @param req [String, nil] The request string.
     # @!macro req
     # @!macro skt
     # @return [PumaSSLSocket, PumaTCPSocket, PumaUNIXSocket] the created socket
-    def send_http(req = GET_11, host: nil, port: nil, path: nil, ctx: nil, session: nil)
+    def send_req(req = GET_11, host: nil, port: nil, path: nil, ctx: nil, session: nil)
       new_socket(host: host, port: port, path: path, ctx: ctx, session: session)
         .send_http req
     end
+    alias :send_http :send_req
 
     # Determines whether the socket has been closed by the server.  Only works when
     # `Socket::TCP_INFO is defined`, linux/Ubuntu
@@ -257,7 +262,7 @@ module TestPuma
     # @param len [Integer] the number of requests to send
     # @return [Array<PumaSSLSocket, PumaTCPSocket, PumaUNIXSocket>]
     #
-    def send_http_array(req = GET_11, len, dly: 0.000_1, max_retries: 5)
+    def send_req_array(req = GET_11, len, dly: 0.000_1, max_retries: 5)
       Array.new(len) {
         retries = 0
         begin
@@ -274,6 +279,7 @@ module TestPuma
         end
       }
     end
+    alias :send_http_array :send_req_array
 
     # Reads an array of sockets that have already had requests sent.
     # @param skts [Array<Sockets]] an array of sockets that have already had
