@@ -62,7 +62,7 @@ class TestPersistent < PumaTest
 
     assert_equal @valid_response, response
 
-    response = socket.req_write(@valid_request).read_response
+    response = socket.send_req(@valid_request).read_response
 
     assert_equal @valid_response, response
   end
@@ -81,7 +81,7 @@ class TestPersistent < PumaTest
 
     assert_equal expected, response
 
-    response = socket.req_write(@valid_request).read_response
+    response = socket.send_req(@valid_request).read_response
 
     assert_equal @valid_response, response
   end
