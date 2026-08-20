@@ -30,10 +30,6 @@ class TestIntegrationSSLSession < TestIntegration
 
   CERT_PATH = File.expand_path "../examples/puma/client_certs", __dir__
 
-  def bind_port
-    @bind_port ||= UniquePort.call
-  end
-
   def set_reuse(reuse)
     <<~RUBY
       key  = '#{File.expand_path '../examples/puma/client_certs/server.key', __dir__}'
