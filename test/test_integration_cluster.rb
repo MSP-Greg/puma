@@ -76,10 +76,10 @@ class TestIntegrationCluster < TestIntegration
 
     cli_server "-w #{workers} -q test/rackup/sleep_step.ru",
       unix: :unix, config: "preload_app! false"
-    socket = send_http
+    socket =  send_req
     restart_server socket
 
-    send_http
+     send_req
     stop_server
 
     assert File.exist?(@bind_path)
@@ -290,14 +290,15 @@ class TestIntegrationCluster < TestIntegration
     get_worker_pids # wait for workers to boot
 
     10.times {
-      send_http
+       send_req
       sleep 0.5
     }
 
-    sleep 1.15
+    wait_for_server_to_include "All workers reached idle timeout"
+    sleep 0.25
 
     assert_raises Errno::ECONNREFUSED, "Connection refused" do
-      send_http
+       send_req
     end
   end
 
@@ -306,7 +307,7 @@ class TestIntegrationCluster < TestIntegration
 
     get_worker_pids # wait for workers to boot
 
-    send_http
+     send_req
     assert true
   end
 
@@ -318,14 +319,14 @@ class TestIntegrationCluster < TestIntegration
     req2 = "GET /sleep2 HTTP/1.1\r\nhost: test.com\r\n\r\n"
     req0 = "GET /sleep0 HTTP/1.1\r\nhost: test.com\r\n\r\n"
 
-    slow = Thread.new { send_http(req2).read_response.split.last.to_i }
+    slow = Thread.new {  send_req(req2).read_response.split.last.to_i }
     sleep 0.5
 
     mutex = Mutex.new
     fast_pids = []
     Array.new(8) do
       Thread.new do
-        pid = send_http(req0).read_body.split.last.to_i
+        pid =  send_req(req0).read_body.split.last.to_i
         mutex.synchronize { fast_pids << pid }
       end
     end.each(&:join)
@@ -370,12 +371,12 @@ class TestIntegrationCluster < TestIntegration
 
     socks = []
     until refork.read == 'Reforked'
-      socks << send_http
+      socks <<  send_req
       sleep 0.004
     end
 
     100.times {
-      socks << send_http
+      socks <<  send_req
       sleep 0.004
     }
 
@@ -399,12 +400,12 @@ class TestIntegrationCluster < TestIntegration
     socks = []
     until refork.read == 'Before refork-After refork'
       refork.rewind
-      socks << send_http
+      socks <<  send_req
       sleep 0.004
     end
 
     100.times {
-      socks << send_http
+      socks <<  send_req
       sleep 0.004
     }
 
@@ -424,7 +425,7 @@ class TestIntegrationCluster < TestIntegration
         [200, {}, [exitstatus.to_s]]
       end
     CONFIG
-    assert_equal '0', send_http_read_body
+    assert_equal '0',  send_req_read_body
   end
 
   def test_phased_restart_with_fork_worker_and_high_worker_count
@@ -506,14 +507,14 @@ class TestIntegrationCluster < TestIntegration
   def test_prune_bundler_with_multiple_workers
     cli_server "-C test/config/prune_bundler_with_multiple_workers.rb"
 
-    assert_equal "embedded app", send_http_read_body
+    assert_equal "embedded app",  send_req_read_body
   end
 
   def test_prune_bundler_preserves_bundle_env_vars
     cli_server "-w #{workers} --prune-bundler test/rackup/bundle_without.ru",
       env: { 'BUNDLE_WITHOUT' => 'development:test' }
 
-    assert_equal 'development:test', send_http_read_body
+    assert_equal 'development:test',  send_req_read_body
   end
 
   def test_load_path_includes_extra_deps
@@ -833,7 +834,7 @@ class TestIntegrationCluster < TestIntegration
     [35, 40].each do |sleep_time|
       threads << Thread.new do
         begin
-          send_http "GET /sleep#{sleep_time} HTTP/1.1\r\nhost: test.com\r\n\r\n"
+           send_req "GET /sleep#{sleep_time} HTTP/1.1\r\nhost: test.com\r\n\r\n"
           # stuck connections will raise IOError or Errno::ECONNRESET
           # when shutdown
         rescue IOError, Errno::ECONNRESET
@@ -887,7 +888,7 @@ class TestIntegrationCluster < TestIntegration
   def thread_run_pid(replies, delay, sleep_time, mutex, refused, unix: false)
     begin
       sleep delay
-      body = send_http("sleep#{sleep_time}").read_body
+      body =  send_req("sleep#{sleep_time}").read_body
       mutex.synchronize { replies << body }
     rescue Errno::ECONNRESET
       # connection was accepted but then closed
@@ -908,7 +909,7 @@ class TestIntegrationCluster < TestIntegration
       sleep_until = start_time + delay
       sleep_time_left = sleep_until - Process.clock_gettime(Process::CLOCK_MONOTONIC)
       sleep sleep_time_left if sleep_time_left > 0
-      body = send_http(req).read_body
+      body =  send_req(req).read_body
       if body[/\ASlept /]
         mutex.synchronize { replies[step] = :success }
       else
