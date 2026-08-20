@@ -461,8 +461,6 @@ class TestIntegration < PumaTest
             end
           end
         end
-        
-        # STDOUT.puts "#{thread} #{replies[:success]}"
       end
     end
 
