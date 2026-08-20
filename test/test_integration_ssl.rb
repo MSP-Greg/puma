@@ -5,7 +5,6 @@ require_relative "helpers/integration"
 
 if ::Puma::HAS_SSL # don't load any files if no ssl support
   require "openssl"
-  require_relative "helpers/test_puma/puma_socket"
 end
 
 # These tests are used to verify that Puma works with SSL sockets.  Only
@@ -18,9 +17,6 @@ end
 
 class TestIntegrationSSL < TestIntegration
   parallelize_me!
-
-  include TestPuma
-  include TestPuma::PumaSocket
 
   LOCALHOST = ENV.fetch 'PUMA_CI_DFLT_HOST', 'localhost'
 
