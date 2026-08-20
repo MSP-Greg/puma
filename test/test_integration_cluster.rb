@@ -74,7 +74,8 @@ class TestIntegrationCluster < TestIntegration
 
     File.binwrite bind_path, 'pre existing'
 
-    cli_server "-w #{workers} -q test/rackup/sleep_step.ru", unix: :unix, config: "preload_app! false"
+    cli_server "-w #{workers} -q test/rackup/sleep_step.ru",
+      unix: :unix, config: "preload_app! false"
     socket = send_http
     restart_server socket
 
@@ -128,7 +129,8 @@ class TestIntegrationCluster < TestIntegration
   end
 
   def test_term_suppress
-    cli_server "-w #{workers} -C test/config/suppress_exception.rb test/rackup/hello.ru"
+    cli_server "-w #{workers} test/rackup/hello.ru",
+      config: "raise_exception_on_sigterm false\n"
 
     _, status = stop_server
 
@@ -137,11 +139,24 @@ class TestIntegrationCluster < TestIntegration
 
   def test_after_booted_and_after_stopped
     skip_unless_signal_exist? :TERM
-    cli_server "-w #{workers} " \
-      "-C test/config/event_after_booted_and_after_stopped.rb " \
-      "-C test/config/event_after_booted_exit.rb " \
-      "test/rackup/hello.ru",
-      no_wait: true
+
+    cli_server "-w #{workers} test/rackup/hello.ru", no_wait: true, config: <<~CONFIG
+      after_booted  { puts 'after_booted called'  }
+      after_stopped { puts 'after_stopped called' }
+
+      after_booted do
+        pid = Process.pid
+        begin
+          Process.kill :TERM, pid
+        rescue Errno::ESRCH
+        end
+
+        begin
+          Process.wait2 pid
+        rescue Errno::ECHILD
+        end
+      end
+    CONFIG
 
     # below is logged after workers boot
     assert wait_for_server_to_include('after_booted called')
@@ -261,7 +276,7 @@ class TestIntegrationCluster < TestIntegration
       before_worker_boot do
         Thread.new do
           sleep 1
-          Thread.list.find {|t| t.name == 'puma stat pld'}.kill
+          Thread.list.find {|t| t.name == 'puma stat pld'}&.kill
         end
       end
     CONFIG
@@ -909,5 +924,4 @@ class TestIntegrationCluster < TestIntegration
       mutex.synchronize { replies[step] = :read_timeout }
     end
   end
-
 end if ::Process.respond_to?(:fork)
