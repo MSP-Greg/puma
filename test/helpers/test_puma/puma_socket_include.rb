@@ -134,11 +134,11 @@ module TestPuma
       end
     end
 
-    # Writes the request/data to the socket.  Returns self
+    # Sends the request/data on the socket.  Returns self
     # @param req [String] the request or data to write
     # @return [self] the socket
     #
-    def send_http(req = nil)
+    def send_req(req = nil)
       req ||= PumaSocket::GET_11
       timeout = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
       if String === req
@@ -156,33 +156,33 @@ module TestPuma
       end
       self
     end
-    alias_method :<<      , :send_http
-    alias_method :send_req, :send_http
+    alias :<<        :send_req
+    alias :send_http :send_req
 
-    # Writes the request/data to the socket and returns the response body.
+    # Sends the request/data to the socket and returns the response body.
     # Assumes one response, use `read_all` to read multiple responses.
     # @param req [String] the request or data to write
     # @!macro resp
     # @return [String] The response body.  Chunked bodies are not decoded.
     #
-    def send_http_read_body(req = nil, timeout: nil, len: nil)
+    def send_req_read_body(req = nil, timeout: nil, len: nil)
       req ||= PumaSocket::GET_11
       send_http_read_response(req, timeout: timeout, len: len)
         .split(RESP_SPLIT, 2).last
     end
-    alias_method :send_req_read_body, :send_http_read_body
+    alias :send_http_read_body :send_req_read_body
 
-    # Writes the request/data to the socket and returns the response.  Assumes
+    # Sends the request/data to the socket and returns the response.  Assumes
     # one response, use `read_all` to read multiple responses.
     # @param req [String] the request or data to write
     # @!macro resp
     # @return [Response] the HTTP response
     #
-    def send_http_read_response(req = nil, timeout: nil, len: nil)
+    def send_req_read_response(req = nil, timeout: nil, len: nil)
       req ||= PumaSocket::GET_11
       send_http(req).read_response(timeout: timeout, len: len)
     end
-    alias_method :send_req_read_response, :send_http_read_response
+    alias :send_http_read_response :send_req_read_response
 
     # Uses a single `sysread` statement to read the socket.  Reads `len` bytes
     # from the socket.  A `wait_readable` call using `timeout:` precedes it.
