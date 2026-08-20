@@ -209,6 +209,6 @@ class TestRequestInvalidMultiple < PumaTest
 
     refute lleh_err
     sleep 0.1
-    assert_raises(*ERROR_ON_CLOSED) { socket << GET_11 }
+    assert_raises(*ERROR_ON_CLOSED) { socket.send_req.read_response }
   end
 end
