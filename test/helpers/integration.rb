@@ -13,8 +13,6 @@ class TestIntegration < PumaTest
   prepend TestPuma
   prepend TestPuma::PumaSocket
 
-  HOST  = "127.0.0.1"
-  TOKEN = "xxyyzz"
   RESP_READ_LEN = 65_536
   RESP_READ_TIMEOUT = 10
   RESP_SPLIT = "\r\n\r\n"
@@ -120,7 +118,7 @@ class TestIntegration < PumaTest
   end
 
   def bind_port
-    @bind_port ||= UniquePort.call
+    @bind_port ||= new_port
   end
 
   def control_path
@@ -128,7 +126,7 @@ class TestIntegration < PumaTest
   end
 
   def control_port
-    @control_port ||= UniquePort.call
+    @control_port ||= new_port
   end
 
   def silent_and_checked_system_command(*args)
@@ -330,10 +328,8 @@ class TestIntegration < PumaTest
 
   def set_pumactl_config(unix: false)
     if unix
-      @control_path = tmp_path('.cntl_sock')
       "activate_control_app 'unix://#{control_path}', { auth_token: '#{TOKEN}' }"
     else
-      @control_port = UniquePort.call
       "activate_control_app 'tcp://#{HOST}:#{control_port}', { auth_token: '#{TOKEN}' }"
     end
   end
