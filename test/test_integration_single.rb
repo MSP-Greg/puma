@@ -200,7 +200,7 @@ class TestIntegrationSingle < TestIntegration
   def test_puma_started_log_writing_with_custom_logging
     skip_unless_signal_exist? :TERM
 
-    cli_server '-C test/config/t4_conf.rb test/rackup/hello.ru'
+    cli_server '-v -C test/config/t4_conf.rb test/rackup/hello.ru'
 
     send_http_read_body
 
@@ -209,9 +209,9 @@ class TestIntegrationSingle < TestIntegration
     stop_server
 
     log = File.read('t4-stdout')
-    STDOUT.syswrite "\n\n#{log}\n\n"
 
     assert_match(%r!Custom logging: 127\.0\.0\.1.*GET / HTTP/1\.1!, log)
+    assert_includes log, "Custom logging: - Gracefully stopping, waiting for"
     assert(!File.file?("t4-pid"))
     assert_equal("Puma is started\n", out)
   ensure
