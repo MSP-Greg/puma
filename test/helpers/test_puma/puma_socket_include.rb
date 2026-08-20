@@ -156,9 +156,8 @@ module TestPuma
       end
       self
     end
-    alias_method :<<       , :send_http
-    alias_method :req_write, :send_http
-    alias_method :write_req, :send_http
+    alias_method :<<      , :send_http
+    alias_method :send_req, :send_http
 
     # Writes the request/data to the socket and returns the response body.
     # Assumes one response, use `read_all` to read multiple responses.
@@ -171,6 +170,7 @@ module TestPuma
       send_http_read_response(req, timeout: timeout, len: len)
         .split(RESP_SPLIT, 2).last
     end
+    alias_method :send_req_read_body, :send_http_read_body
 
     # Writes the request/data to the socket and returns the response.  Assumes
     # one response, use `read_all` to read multiple responses.
@@ -182,6 +182,7 @@ module TestPuma
       req ||= PumaSocket::GET_11
       send_http(req).read_response(timeout: timeout, len: len)
     end
+    alias_method :send_req_read_response, :send_http_read_response
 
     # Uses a single `sysread` statement to read the socket.  Reads `len` bytes
     # from the socket.  A `wait_readable` call using `timeout:` precedes it.
