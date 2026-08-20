@@ -57,7 +57,7 @@ module TestPuma
   # * `read_response` - reads the response and returns it
   # * `read_body` - reads the response and returns the body
   # * `read_all` - reads all available data on the socket
-  # * `send_http`/`<<`/`req_write` - writes to the socket with `syswrite`, returns the socket
+  # * `send_http`/`<<`/`send_req` - writes to the socket with `syswrite`, returns the socket
   #
   module PumaSocket
     GET_10 = "GET / HTTP/1.0\r\n\r\n"
