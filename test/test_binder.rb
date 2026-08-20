@@ -138,7 +138,7 @@ class TestBinderParallel < TestBinderBase
   def test_correct_zero_port
     @binder.parse ["tcp://localhost:0"], @log_writer
 
-    m = %r!http://#{HOST}:(\d+)!.match(@log_writer.stdout.string)
+    m = %r!http://#{HOST}:(\d+)!o.match(@log_writer.stdout.string)
     port = m[1].to_i
 
     refute_equal 0, port
@@ -147,7 +147,7 @@ class TestBinderParallel < TestBinderBase
   def test_correct_zero_port_ssl
     skip_unless :ssl
 
-    ssl_regex = %r!ssl://#{HOST}:(\d+)!
+    ssl_regex = %r!ssl://#{HOST}:(\d+)!o
 
     @binder.parse ["ssl://localhost:0?#{ssl_query}"], @log_writer
 
@@ -159,7 +159,7 @@ class TestBinderParallel < TestBinderBase
   def test_logs_all_localhost_bindings
     @binder.parse ["tcp://localhost:0"], @log_writer
 
-    assert_match %r!http://#{HOST}:(\d+)!, @log_writer.stdout.string
+    assert_match %r!http://#{HOST}:(\d+)!o, @log_writer.stdout.string
     if Socket.ip_address_list.any? {|i| i.ipv6_loopback? }
       assert_match %r!http://\[::1\]:(\d+)!, @log_writer.stdout.string
     end
@@ -170,7 +170,7 @@ class TestBinderParallel < TestBinderBase
 
     @binder.parse ["ssl://localhost:0?#{ssl_query}"], @log_writer
 
-    assert_match %r!ssl://#{HOST}:(\d+)!, @log_writer.stdout.string
+    assert_match %r!ssl://#{HOST}:(\d+)!o, @log_writer.stdout.string
     if Socket.ip_address_list.any? {|i| i.ipv6_loopback? }
       assert_match %r!ssl://\[::1\]:(\d+)!, @log_writer.stdout.string
     end
