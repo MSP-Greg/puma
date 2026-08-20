@@ -388,13 +388,14 @@ class TestIntegration < PumaTest
       total_requests: 500,
       config: nil,
       unix: nil,
-      signal: nil,
+      signal:,
       log: nil
     )
     skipped = true
     skip_if :jruby, suffix: ' - file descriptors are not preserved on exec on JRuby; ' \
       'connection reset errors are expected during restarts'
     skip_if :truffleruby, suffix: ' - Undiagnosed failures on TruffleRuby'
+    # skip('macOS MRI, less than 3.2') if /darwin\d{2}\z/.match?(RUBY_PLATFORM) && RUBY_VERSION < '3.2' && Puma::IS_MRI
     skipped = nil
 
     clustered = (workers || 0) >= 2
@@ -409,9 +410,13 @@ class TestIntegration < PumaTest
 
     replies = Hash.new 0
     refused = thread_run_refused unix: false
-    message = 'A' * 16_256  # 2^14 - 128
+
+    req_body = 'A' * 16_256  # 2^14 - 128
+    req_body_size = req_body.bytesize
 
     mutex = Mutex.new
+    queue = Queue.new
+    ttl_reqs = 0
     restart_count = 0
     client_threads = []
 
@@ -422,14 +427,14 @@ class TestIntegration < PumaTest
         num_requests.times do |req_num|
           begin
             begin
+              queue << nil
               socket = send_http "POST / HTTP/1.1\r\nHost: test.com\r\n" \
-                "Content-Length: #{message.bytesize}\r\n\r\n#{message}"
+                "Content-Length: #{req_body_size}\r\n\r\n#{req_body}"
             rescue => e
-              replies[:write_error] += 1
-#              raise e
+              mutex.synchronize { replies[:write_error] += 1 }
             end
-            body = socket.read_body
-            if body == "Hello World"
+
+            if socket.read_body == "Hello World"
               mutex.synchronize {
                 replies[:success] += 1
                 replies[:restart] += 1 if restart_count > 0
@@ -456,6 +461,7 @@ class TestIntegration < PumaTest
             end
           end
         end
+        
         # STDOUT.puts "#{thread} #{replies[:success]}"
       end
     end
@@ -469,7 +475,11 @@ class TestIntegration < PumaTest
         if Puma.windows?
           cli_pumactl 'restart'
         else
-          Process.kill signal, @pid
+          begin
+            Process.kill signal, @pid
+          rescue Errno::ESRCH
+            break
+          end
         end
         if signal == :USR2
           # If 'wait_for_server_to_boot' times out, error in thread shuts down CI
@@ -501,10 +511,15 @@ class TestIntegration < PumaTest
       end
     end
 
+    until ttl_reqs >= total_requests do
+      queue.pop
+      ttl_reqs += 1
+    end
+
     # cycle thru threads rather than one at a time
     until client_threads.empty?
       client_threads.each_with_index do |t, i|
-        client_threads[i] = nil if t.join(1)
+        client_threads[i] = nil if t.join(2)
       end
       client_threads.compact!
     end
