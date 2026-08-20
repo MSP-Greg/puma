@@ -147,9 +147,9 @@ module TestPuma
         while sent < size
           begin
             sent += syswrite(req.byteslice(sent, size - sent))
-          rescue Errno::EAGAIN
-            sleep 1
-            raise Errno::EAGAIN if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= timeout
+          rescue => error
+            wait_writable 2.0
+            raise error if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= timeout
             retry
           end
         end
