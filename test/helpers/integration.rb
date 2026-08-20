@@ -432,6 +432,12 @@ class TestIntegration < PumaTest
                 "Content-Length: #{req_body_size}\r\n\r\n#{req_body}"
             rescue => e
               mutex.synchronize { replies[:write_error] += 1 }
+              next
+            end
+
+            unless socket
+              mutex.synchronize { replies[:write_error] += 1 }
+              next
             end
 
             if socket.read_body == "Hello World"
