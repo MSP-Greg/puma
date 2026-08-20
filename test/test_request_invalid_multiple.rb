@@ -85,10 +85,10 @@ class TestRequestInvalidMultiple < PumaTest
 
   def assert_status(request, status = 400, socket: nil)
     @response = if socket
-      socket.req_write(request).read_response
+      socket.send_req(request).read_response
     else
       socket = new_socket
-      socket.req_write(request).read_response
+      socket.send_req(request).read_response
     end
 
     re = /\AHTTP\/1\.[01] #{status}/
@@ -100,7 +100,7 @@ class TestRequestInvalidMultiple < PumaTest
         cl = @response.headers_hash['content-length'].to_i
         refute_equal 0, cl, "Expected `content-length` header to be non-zero but was `#{cl}`. Headers: #{@response.headers_hash}"
       end
-      socket.req_write GET_11
+      socket.send_req GET_11
       assert_raises(*ERROR_ON_CLOSED) { socket.read_response }
       assert_includes @server.log_writer.stderr.string, STDERR_STR
     end
@@ -171,7 +171,7 @@ class TestRequestInvalidMultiple < PumaTest
 
     refute lleh_err
     sleep 0.1 if Puma::IS_JRUBY || Puma::IS_WINDOWS
-    assert_raises(*ERROR_ON_CLOSED) { socket << GET_11 }
+    assert_raises(*ERROR_ON_CLOSED) { socket.send_req.read_response }
   end
 
   # Sets the server to have a http_content_length_limit of 100 kB, then sends a
