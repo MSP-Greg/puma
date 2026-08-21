@@ -68,7 +68,7 @@ class TestOutOfBandServer < PumaTest
     oob_server
     n.times do
       @mutex.synchronize do
-        send_http GET_10
+        send_req GET_10
         @oob_finished.wait(@mutex, 1)
       end
     end
@@ -81,7 +81,7 @@ class TestOutOfBandServer < PumaTest
   def test_stream
     oob_server app_wait: true, max_threads: 2
     n = 100
-    Array.new(n) { send_http GET_10 }
+    Array.new(n) { send_req GET_10 }
     Thread.pass until @request_count == n
     @mutex.synchronize do
       @app_finished.signal
@@ -100,7 +100,7 @@ class TestOutOfBandServer < PumaTest
     sleep 0.01
 
     @mutex.synchronize do
-      send_http GET_10
+      send_req GET_10
       @oob_finished.wait(@mutex) # enter OOB
 
       # Send Req2
@@ -130,7 +130,7 @@ class TestOutOfBandServer < PumaTest
   def test_partial_concurrent
     oob_server max_threads: 2
     @mutex.synchronize do
-      send_http GET_10
+      send_req GET_10
       100.times { new_socket.close }
       @oob_finished.wait(@mutex, 1)
     end
@@ -141,7 +141,7 @@ class TestOutOfBandServer < PumaTest
   def test_blocks_new_connection
     oob_server oob_wait: true, max_threads: 2
     @mutex.synchronize do
-      send_http GET_10
+      send_req GET_10
       @oob_finished.wait(@mutex)
     end
     accepted = false
