@@ -1,3 +1,5 @@
+log_requests
+
 stdout_redirect "t4-stdout"
 pidfile "t4-pid"
 
@@ -12,5 +14,4 @@ class CustomLogger
   end
 end
 
-log_requests
 custom_logger CustomLogger.new(STDOUT)
