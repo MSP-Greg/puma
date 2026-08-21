@@ -80,13 +80,11 @@ module Puma
           # Wakeup any registered object that receives incoming data.
           # Block until the earliest timeout or Selector#wakeup is called.
           timeout = (earliest = @timeouts.first) && earliest.timeout
-          @selector.select(timeout) do |monitor|
-            wakeup!(monitor.value)
-          end
+          @selector.select(timeout) { |monitor| wakeup! monitor.value }
 
           # Wakeup all objects that timed out.
           timed_out = @timeouts.take_while { |client| client.timeout == 0 }
-          timed_out.each { |client| wakeup!(client) }
+          timed_out.each { |client| wakeup! client }
 
           unless @input.empty?
             until @input.empty?
@@ -97,9 +95,8 @@ module Puma
           end
         end
       rescue StandardError => e
-        STDERR.puts "Error in reactor loop escaped: #{e.message} (#{e.class})"
-        STDERR.puts e.backtrace
-
+        STDERR.puts "Error in reactor loop escaped: #{e.message} (#{e.class})\n" \
+          "#{e.backtrace.join "\n"}"
         retry
       end
 
