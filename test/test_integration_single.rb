@@ -78,7 +78,7 @@ class TestIntegrationSingle < TestIntegration
   def test_rack_url_scheme_default
     cli_server "#{set_pumactl_args} test/rackup/url_scheme.ru"
 
-    assert_match "http", send_http_read_body
+    assert_match "http", send_req_read_body
   end
 
   def test_conf_is_loaded_before_passing_it_to_binder
@@ -87,7 +87,7 @@ class TestIntegrationSingle < TestIntegration
       rack_url_scheme 'https'
     CONFIG
 
-    assert_match "http", send_http_read_body
+    assert_match "http", send_req_read_body
   end
 
   def test_prefer_rackup_file_specified_by_cli
@@ -96,7 +96,7 @@ class TestIntegrationSingle < TestIntegration
       rackup 'test/rackup/hello-env.ru'
     CONFIG
 
-    assert_equal "Hello World", send_http_read_body
+    assert_equal "Hello World", send_req_read_body
   end
 
   def test_term_not_accepts_new_connections
@@ -190,9 +190,9 @@ class TestIntegrationSingle < TestIntegration
 
     log = File.read('t2-stdout')
 
-    assert_match(%r!GET / HTTP/1\.1!, log)
-    assert(!File.file?("t2-pid"))
-    assert_equal("Puma is started\n", out)
+    assert_match %r!GET / HTTP/1\.1!, log
+    refute File.file?("t2-pid")
+    assert_equal "Puma is started\n", out
   ensure
     File.unlink 't2-stdout' if File.file? 't2-stdout'
   end
@@ -200,19 +200,20 @@ class TestIntegrationSingle < TestIntegration
   def test_puma_started_log_writing_with_custom_logging
     skip_unless_signal_exist? :TERM
 
-    cli_server '-v -C test/config/t4_conf.rb test/rackup/hello.ru'
+    cli_server '-t1:1 -C test/config/t4_conf.rb test/rackup/hello.ru'
 
-    send_http_read_body
+    send_req_read_body
 
-    out = %x[#{BASE} bin/pumactl -F test/config/t4_conf.rb status]
+    out = %x[#{BASE} bin/pumactl -P t4-pid status]
 
     stop_server
-
+    sleep 0.5
     log = File.read('t4-stdout')
+    STDOUT.syswrite "\n\n#{log}\n\n"
 
-    assert_match(%r!Custom logging: 127\.0\.0\.1.*GET / HTTP/1\.1!, log)
+    assert_match %r!Custom logging: 127\.0\.0\.1.*GET / HTTP/1\.1!, log
     assert_includes log, "Custom logging: - Gracefully stopping, waiting for"
-    assert(!File.file?("t4-pid"))
+    refute File.file?("t4-pid")
     assert_equal("Puma is started\n", out)
   ensure
     File.unlink 't4-stdout' if File.file? 't4-stdout'
@@ -221,7 +222,7 @@ class TestIntegrationSingle < TestIntegration
   def test_application_logs_are_flushed_on_write
     cli_server "#{set_pumactl_args} test/rackup/write_to_stdout.ru"
 
-    send_http_read_body
+    send_req_read_body
 
     cli_pumactl 'stop'
 
@@ -237,7 +238,7 @@ class TestIntegrationSingle < TestIntegration
 
     cli_server "test/rackup/close_listeners.ru", merge_err: true
 
-    socket = send_http
+    socket =  send_req
 
     begin
       socket.read_body
@@ -276,12 +277,12 @@ class TestIntegrationSingle < TestIntegration
     cli_server "test/rackup/hello.ru", config: "idle_timeout 1\n" \
       "#{set_pumactl_config}"
 
-    send_http
+     send_req
 
     sleep 1.15
 
     assert_raises Errno::ECONNREFUSED, "Connection refused" do
-      send_http
+       send_req
     end
 
     wait_server
@@ -294,13 +295,13 @@ class TestIntegrationSingle < TestIntegration
 
     cli_server "-q test/rackup/hello.ru", unix: :unix, config: "idle_timeout 1"
 
-    socket = send_http
+    socket =  send_req
 
     sleep 1.15
 
     assert socket.wait_readable(1), 'Unexpected timeout'
     assert_raises Puma.jruby? ? IOError : Errno::ECONNREFUSED, "Connection refused" do
-      send_http
+       send_req
     end
 
     assert File.exist?(@bind_path)
