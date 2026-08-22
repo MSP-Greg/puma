@@ -115,6 +115,7 @@ class TestIntegrationPumactl < TestIntegration
 
     wait_server
     assert_operator Time.now - start, :<, 60
+    @server_stopped = true
   end
 
   def test_prune_bundler_with_multiple_workers
