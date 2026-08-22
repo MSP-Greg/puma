@@ -81,7 +81,7 @@ class TestIntegrationSSLSession < TestIntegration
   end
 
   def test_1000_tls1_2
-    reused = run_session '{size: 1_000}', :TLS1_2
+    reused = run_session '{size: 1000}', :TLS1_2
     assert reused, 'session was not reused'
   end
 
