@@ -120,7 +120,7 @@ class TestIntegrationSingle < TestIntegration
     # Invoke a request which must be rejected
     _stdin, _stdout, rejected_curl_stderr, rejected_curl_wait_thread = Open3.popen3("curl #{HOST}:#{@bind_port}")
 
-    refute_nil Process.getpgid(@server.pid) # ensure server is still running
+    refute_nil Process.getpgid(@pid) # ensure server is still running
     refute_nil Process.getpgid(curl_wait_thread[:pid]) # ensure first curl invocation still in progress
 
     curl_wait_thread.join
@@ -263,9 +263,10 @@ class TestIntegrationSingle < TestIntegration
       end
     rescue Timeout::Error
       Process.kill :SIGKILL, @pid
-      assert false, "Process froze"
+      fail "Process froze"
     end
     assert true
+    @ignore_stderr = true
   end
 
   def test_puma_debug_loaded_exts
