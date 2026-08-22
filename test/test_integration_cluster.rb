@@ -430,6 +430,7 @@ class TestIntegrationCluster < TestIntegration
     get_worker_pids 1, worker_count
 
     refute_includes @server_log, 'Terminating timed out worker.'
+    @ignore_stderr = true
   end
 
   def test_refork_phased_restart_with_fork_worker_and_high_worker_count
@@ -451,7 +452,8 @@ class TestIntegrationCluster < TestIntegration
 
     get_worker_pids 1, worker_count - 1
 
-    refute @server_log[/.*Terminating timed out worker.*/]
+    refute_includes @server_log, 'Terminating timed out worker.'
+    @ignore_stderr = true
   end
 
   def test_phased_restart_with_fork_worker_worker_order
@@ -718,7 +720,7 @@ class TestIntegrationCluster < TestIntegration
 
     assert wait_for_server_to_include('Loaded Extensions - worker 0:')
     assert wait_for_server_to_include('Loaded Extensions - master:')
-    @pid = @server.pid
+    @ignore_err = true
   end
 
   private
