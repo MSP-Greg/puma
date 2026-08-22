@@ -115,12 +115,12 @@ class TestWorkerGemIndependence < TestIntegration
       end
     end
 
-    verify_process_tag(@server.pid, File.basename(old_app_dir))
+    verify_process_tag(@pid, File.basename(old_app_dir))
     start_phased_restart
 
     connection = connect
     new_reply = read_body(connection)
-    verify_process_tag(@server.pid, File.basename(new_app_dir))
+    verify_process_tag(@pid, File.basename(new_app_dir))
     assert_equal new_version, new_reply
   end
 
