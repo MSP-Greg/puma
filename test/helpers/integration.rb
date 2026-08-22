@@ -38,6 +38,7 @@ class TestIntegration < PumaTest
     @bind_port    = nil
     @control_path = nil
     @control_port = nil
+    @ignore_stderr = nil
   end
 
   def teardown
@@ -51,17 +52,11 @@ class TestIntegration < PumaTest
       end
     end
 
-    close_ios if @ios_to_close
-
-    # wait until the end for OS buffering?
-    if @server
-      begin
-        @server.close unless @server.closed?
-      rescue
-      ensure
-        @server = nil
-      end
+    if !@ignore_stderr && (err = @server_err&.read)
+      flunk "  #{err}\n" unless err.empty?
     end
+
+    close_ios if @ios_to_close
 
     if @bind_path
       refute File.exist?(@bind_path), "Bind path must be removed after stop"
@@ -174,15 +169,22 @@ class TestIntegration < PumaTest
 
     STDOUT.syswrite "\n#{full_name}\n  #{cmd}\n" if log
 
-    if merge_err
-      @server = IO.popen(env, cmd, :err=>[:child, :out])
-    else
-      @server = IO.popen(env, cmd)
-    end
-    @pid = @server.pid
+    @server, @server_err, @pid = spawn_cmd env, cmd
+
     wait_for_server_to_boot(log: log) unless no_wait
     @server
   end
+
+  def spawn_cmd(env = {}, cmd)
+    out_r, out_w = IO.pipe
+    err_r, err_w = IO.pipe
+
+    pid = spawn env, cmd, { out: out_w, err: err_w }
+    [out_w, err_w].each(&:close)
+    @ios_to_close << out_r << err_r
+    [out_r, err_r, pid]
+  end
+
 
   # rescue statements are just in case method is called with a server
   # that is already stopped/killed, especially since Process.wait2 is
@@ -214,8 +216,7 @@ class TestIntegration < PumaTest
     rescue Errno::ECHILD # raised on Windows ?
     end
   ensure
-    @server.close unless @server.closed?
-    @server = nil
+    @server_stopped = true
   end
 
   def restart_server_and_listen(argv, env: {}, log: false)
@@ -617,7 +618,6 @@ class TestIntegration < PumaTest
     else
       stop_server
     end
-    @server = nil
 
     msg = ("   %4d unexpected_response\n"   % replies.fetch(:unexpected_response,0)).dup
     msg << "   %4d refused\n"               % replies.fetch(:refused,0)
