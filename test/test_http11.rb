@@ -172,7 +172,6 @@ class Http11ParserTest < TestIntegration
     tests.each do |conf|
       cli_server 'test/rackup/hello.ru',
         env: {envs[0]  => conf[:envs][0], envs[1] => conf[:envs][1], envs[2] => conf[:envs][2]},
-        merge_err: true,
         config: cli_config
 
       sleep 0.25
@@ -186,8 +185,10 @@ class Http11ParserTest < TestIntegration
       assert_includes result['MAX_REQUEST_PATH_LENGTH_ERR'], "longer than the #{conf[:exp][1]} allowed length"
       assert_includes result['MAX_QUERY_STRING_LENGTH_ERR'], "longer than the #{conf[:exp][2]} allowed length"
 
+      error_log = @server_err.read
+
       conf[:error_indexes].each do |index|
-        assert_includes @server_log, "The value #{conf[:envs][index]} for #{envs[index]} is invalid. "\
+        assert_includes error_log, "The value #{conf[:envs][index]} for #{envs[index]} is invalid. "\
           "Using default value #{default_exp[index]} instead"
       end
 
