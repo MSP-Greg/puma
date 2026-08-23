@@ -42,6 +42,9 @@ class TestIntegration < PumaTest
   end
 
   def teardown
+    err = (Puma::IS_JRUBY || @ignore_stderr || !@server_err&.wait_readable(0.001)) ?
+      nil : @server_err&.read
+
     if @server && !@server_stopped
       if @control_port && Puma::IS_WINDOWS
         cli_pumactl 'halt'
@@ -50,10 +53,6 @@ class TestIntegration < PumaTest
       elsif Puma::IS_WINDOWS
         flunk 'Windows must use Puma::ControlCLI to shut down!'
       end
-    end
-
-    if !Puma::IS_JRUBY && !@ignore_stderr && (err = @server_err&.read)
-      flunk "STDERR was written to:\n#{err}\n" unless err.empty?
     end
 
     close_ios if @ios_to_close
@@ -81,6 +80,8 @@ class TestIntegration < PumaTest
     end
 
     [@state_path, @control_path].each { |p| File.unlink(p) rescue nil }
+
+    flunk "Fail - STDERR was written to:\n#{err}" if err && !err.empty?
   end
 
   private
