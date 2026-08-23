@@ -52,8 +52,8 @@ class TestIntegration < PumaTest
       end
     end
 
-    if !@ignore_stderr && (err = @server_err&.read)
-      flunk "  #{err}\n" unless err.empty?
+    if !Puma::IS_JRUBY && !@ignore_stderr && (err = @server_err&.read)
+      flunk "STDERR was written to:\n#{err}\n" unless err.empty?
     end
 
     close_ios if @ios_to_close
@@ -177,12 +177,19 @@ class TestIntegration < PumaTest
 
   def spawn_cmd(env = {}, cmd)
     out_r, out_w = IO.pipe
-    err_r, err_w = IO.pipe
 
-    pid = spawn env, cmd, { out: out_w, err: err_w }
-    [out_w, err_w].each(&:close)
-    @ios_to_close << out_r << err_r
-    [out_r, err_r, pid]
+    if Puma::IS_JRUBY
+      pid = spawn env, cmd, { out: out_w, err: out_w }
+      out_w.close
+      @ios_to_close << out_r
+      [out_r, nil, pid]
+    else
+      err_r, err_w = IO.pipe
+      pid = spawn env, cmd, { out: out_w, err: err_w }
+      [out_w, err_w].each(&:close)
+      @ios_to_close << out_r << err_r
+      [out_r, err_r, pid]
+    end
   end
 
 
@@ -590,7 +597,7 @@ class TestIntegration < PumaTest
           begin
             get_worker_pids phase, log: log
             # Wait with an exponential backoff before signaling next restart
-            sleep restart_loop_sleep * restart_count
+            sleep restart_loop_sleep * restart_count/2.0
           rescue Minitest::Assertion # Timeout
             run = false
           rescue Errno::EBADF # bad restart?
