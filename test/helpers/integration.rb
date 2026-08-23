@@ -46,7 +46,7 @@ class TestIntegration < PumaTest
       err = nil
     else
       begin
-        err = @server_err&.sysread(10_240)
+        err = @server_err&.read_nonblock(10_240)
       rescue EOFError
         err = nil
       end
