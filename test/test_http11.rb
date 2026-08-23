@@ -145,56 +145,79 @@ class Http11ParserTest < TestIntegration
     res
   end
 
-  def test_get_const_length
+  def jruby_get_const_length(values, asserts, std_err_tests)
     skip_unless :jruby
 
-    envs = %w[
+    keys = %w[
       PUMA_REQUEST_URI_MAX_LENGTH
       PUMA_REQUEST_PATH_MAX_LENGTH
       PUMA_QUERY_STRING_MAX_LENGTH
     ]
+
     default_exp = [1024 * 12, 8192, 10 * 1024]
-    tests = [{ envs: %w[60000 61000 62000], exp: [60000, 61000, 62000], error_indexes: [] },
-             { envs: ['', 'abc', nil], exp: default_exp, error_indexes: [1] },
-             { envs: %w[-4000 0 3000.45], exp: default_exp, error_indexes: [0, 1, 2] }]
+    
+    asserts ||= default_exp
+
     cli_config = <<~CONFIG
-        app do |_|
-          [200, {}, [JSONSerialization.generate({
-                       MAX_REQUEST_URI_LENGTH:      org.jruby.puma.Http11::MAX_REQUEST_URI_LENGTH,
-                       MAX_REQUEST_PATH_LENGTH:     org.jruby.puma.Http11::MAX_REQUEST_PATH_LENGTH,
-                       MAX_QUERY_STRING_LENGTH:     org.jruby.puma.Http11::MAX_QUERY_STRING_LENGTH,
-                       MAX_REQUEST_URI_LENGTH_ERR:  org.jruby.puma.Http11::MAX_REQUEST_URI_LENGTH_ERR,
-                       MAX_REQUEST_PATH_LENGTH_ERR: org.jruby.puma.Http11::MAX_REQUEST_PATH_LENGTH_ERR,
-                       MAX_QUERY_STRING_LENGTH_ERR: org.jruby.puma.Http11::MAX_QUERY_STRING_LENGTH_ERR })]]
-        end
+      app do |_|
+        [200, {}, [JSONSerialization.generate({
+             MAX_REQUEST_URI_LENGTH:      org.jruby.puma.Http11::MAX_REQUEST_URI_LENGTH,
+             MAX_REQUEST_PATH_LENGTH:     org.jruby.puma.Http11::MAX_REQUEST_PATH_LENGTH,
+             MAX_QUERY_STRING_LENGTH:     org.jruby.puma.Http11::MAX_QUERY_STRING_LENGTH,
+             MAX_REQUEST_URI_LENGTH_ERR:  org.jruby.puma.Http11::MAX_REQUEST_URI_LENGTH_ERR,
+             MAX_REQUEST_PATH_LENGTH_ERR: org.jruby.puma.Http11::MAX_REQUEST_PATH_LENGTH_ERR,
+             MAX_QUERY_STRING_LENGTH_ERR: org.jruby.puma.Http11::MAX_QUERY_STRING_LENGTH_ERR })
+          ]
+        ]
+      end
     CONFIG
 
-    tests.each do |conf|
-      cli_server 'test/rackup/hello.ru',
-        env: {envs[0]  => conf[:envs][0], envs[1] => conf[:envs][1], envs[2] => conf[:envs][2]},
-        config: cli_config
+    cli_server '',
+      env: {keys[0]  => values[0], keys[1] => values[1], keys[2] => values[2]},
+      config: cli_config
 
-      sleep 0.25
-      result = JSON.parse read_body(connect)
+    sleep 0.25
+    result = JSON.parse read_body(connect)
 
-      assert_equal conf[:exp][0], result['MAX_REQUEST_URI_LENGTH']
-      assert_equal conf[:exp][1], result['MAX_REQUEST_PATH_LENGTH']
-      assert_equal conf[:exp][2], result['MAX_QUERY_STRING_LENGTH']
+    assert_equal asserts[0], result['MAX_REQUEST_URI_LENGTH']
+    assert_equal asserts[1], result['MAX_REQUEST_PATH_LENGTH']
+    assert_equal asserts[2], result['MAX_QUERY_STRING_LENGTH']
 
-      assert_includes result['MAX_REQUEST_URI_LENGTH_ERR'], "longer than the #{conf[:exp][0]} allowed length"
-      assert_includes result['MAX_REQUEST_PATH_LENGTH_ERR'], "longer than the #{conf[:exp][1]} allowed length"
-      assert_includes result['MAX_QUERY_STRING_LENGTH_ERR'], "longer than the #{conf[:exp][2]} allowed length"
+    assert_includes result['MAX_REQUEST_URI_LENGTH_ERR'] , "longer than the #{asserts[0]} allowed length"
+    assert_includes result['MAX_REQUEST_PATH_LENGTH_ERR'], "longer than the #{asserts[1]} allowed length"
+    assert_includes result['MAX_QUERY_STRING_LENGTH_ERR'], "longer than the #{asserts[2]} allowed length"
 
-      error_log = @server_err.read
-
-      conf[:error_indexes].each do |index|
-        assert_includes error_log, "The value #{conf[:envs][index]} for #{envs[index]} is invalid. "\
-          "Using default value #{default_exp[index]} instead"
-      end
-
-      stop_server
-     end
+    std_err_tests.each do |index|
+      assert_includes @server_log, "The value #{values[index]} for #{keys[index]} is invalid. " \
+        "Using default value #{default_exp[index]} instead"
+    end
   end
+
+  def test_jruby_get_const_length_1
+    jruby_get_const_length(
+      %w[60000 61000 62000],
+      [60000, 61000, 62000],
+      []
+    )
+  end
+
+  def test_jruby_get_const_length_2
+    jruby_get_const_length(
+      ['', 'abc', nil],
+      nil,
+      [1]
+    )
+  end
+
+  def test_jruby_get_const_length_3
+    jruby_get_const_length(
+      %w[-4000 0 3000.45],
+      nil,
+      [0, 1, 2]
+    )
+  end
+
+
 
   def test_max_uri_path_length
     parser = Puma::HttpParser.new
