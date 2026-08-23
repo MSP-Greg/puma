@@ -42,7 +42,7 @@ class TestIntegration < PumaTest
   end
 
   def teardown
-    err = (Puma::IS_JRUBY || @ignore_stderr || !@server_err&.wait_readable(0.001)) ?
+    err = Puma::IS_JRUBY || @ignore_stderr || !@server_err&.wait_readable(0.001) ?
       nil : @server_err&.read
 
     if @server && !@server_stopped
