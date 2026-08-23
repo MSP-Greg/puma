@@ -42,8 +42,15 @@ class TestIntegration < PumaTest
   end
 
   def teardown
-    err = Puma::IS_JRUBY || @ignore_stderr || !@server_err&.wait_readable(0.001) ?
-      nil : @server_err&.sysread(10_240)
+    if Puma::IS_JRUBY || @ignore_stderr # || !@server_err&.wait_readable(0.001)
+      err = nil
+    else
+      begin
+        err = @server_err&.sysread(10_240)
+      rescue EOFError
+        err = nil
+      end
+    end
 
     if @server && !@server_stopped
       if @control_port && Puma::IS_WINDOWS
