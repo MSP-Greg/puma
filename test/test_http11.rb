@@ -155,7 +155,7 @@ class Http11ParserTest < TestIntegration
     ]
 
     default_exp = [1024 * 12, 8192, 10 * 1024]
-    
+
     asserts ||= default_exp
 
     cli_config = <<~CONFIG
