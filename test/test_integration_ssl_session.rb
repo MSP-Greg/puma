@@ -98,7 +98,7 @@ class TestIntegrationSSLSession < TestIntegration
   def test_off_tls1_2
     ssl_vers = Puma::MiniSSL::OPENSSL_LIBRARY_VERSION
     old_ssl = ssl_vers.include?(' 1.0.') || ssl_vers.match?(/ 1\.1\.1[ a-e]/)
-    skip 'Requires 1.1.1f or later' if old_ssl
+    skip 'Requires OpenSSL 1.1.1f or later' if old_ssl
     reused = run_session 'nil', :TLS1_2
     assert reused, 'session was not reused'
   end
