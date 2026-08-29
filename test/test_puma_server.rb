@@ -509,7 +509,7 @@ class TestPumaServer < PumaTest
     # Internal Server Error
     assert_equal "HTTP/1.0 500 #{STATUS_CODES[500]}", response.status
     assert_includes response, 'Puma caught this error: Oh no an error (NoMethodError)'
-    assert_includes response, 'TestPumaServer#test_lowlevel_error_message'
+    assert_includes response, 'test_lowlevel_error_message'
   end
 
   def test_lowlevel_error_message_without_backtrace
