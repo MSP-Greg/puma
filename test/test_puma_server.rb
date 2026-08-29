@@ -508,8 +508,8 @@ class TestPumaServer < PumaTest
 
     # Internal Server Error
     assert_equal "HTTP/1.0 500 #{STATUS_CODES[500]}", response.status
-    
-    re = /Puma caught this error: Oh no an error.*\(NoMethodError\).*test\/test_puma_server.rb/m 
+
+    re = /Puma caught this error: Oh no an error.*\(NoMethodError\).*test\/test_puma_server.rb/m
     assert_match re, response
     assert_includes response, 'Puma caught this error: Oh no an error (NoMethodError)'
     assert_includes response, 'test_lowlevel_error_message'
