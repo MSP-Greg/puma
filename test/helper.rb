@@ -309,10 +309,13 @@ module TestTempFile
   require "tempfile"
   def tempfile_create(basename, data, mode: File::BINARY)
     fio = Tempfile.create(basename, mode: mode)
-    fio.write data
-    fio.flush
+    if fio.respond_to? :syswrite
+      fio.syswrite data
+    else
+      fio.write data
+      fio.flush
+    end
     fio.rewind
-    @ios << fio if defined?(@ios)
     @ios_to_close << fio if defined?(@ios_to_close)
     fio
   end
