@@ -136,6 +136,8 @@ module TestPuma
         .split(RESP_SPLIT, 2).first.split "\r\n"
     end
 
+    alias :send_http_read_resp_headers :send_http_read_headers
+
     # Sends a request and returns the HTTP response body.
     # @!macro req
     # @!macro skt
@@ -147,8 +149,7 @@ module TestPuma
         .read_body(timeout: timeout, len: len)
     end
 
-    alias :send_http_read_resp_headers :send_http_read_headers
-    alias :send_http_read_resp_body    :send_http_read_body
+    alias :send_http_read_resp_body :send_http_read_body
 
     # Sends a request and returns whatever can be read.  Use when multiple
     # responses are sent by the server
