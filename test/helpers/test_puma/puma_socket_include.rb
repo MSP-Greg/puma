@@ -127,8 +127,7 @@ module TestPuma
               return response
             end
           end
-          timeout = time_end - Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          if timeout <= 0
+          if Process.clock_gettime(Process::CLOCK_MONOTONIC) > time_end
             raise Timeout::Error, 'Client Read Timeout'
           end
         end
