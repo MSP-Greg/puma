@@ -77,18 +77,22 @@ class TestPumaServer < PumaTest
   end
 
   def test_streaming_body
+    queue = Queue.new
     server_run do |env|
       body = lambda do |stream|
-        stream.write("Hello World")
+        stream.syswrite "Hello World"
         stream.close
+        queue << true
       end
 
       [200, {}, body]
     end
 
-    body = send_http_read_resp_body "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
+    socket = send_http "GET / HTTP/1.0\r\nConnection: close\r\n\r\n"
 
-    assert_equal "Hello World", body
+    queue.pop
+
+    assert_equal "Hello World", socket.read_body
   end
 
   def test_file_body
@@ -237,10 +241,10 @@ class TestPumaServer < PumaTest
   end
 
   def test_puma_socket
-    body = "HTTP/1.1 750 Upgraded to Awesome\r\nDone: Yep!\r\n"
+    body = "HTTP/1.1 750 Upgraded to Awesome\r\nDone: Yep!\r\n\r\n"
     server_run do |env|
       io = env['puma.socket']
-      io.write body
+      io.syswrite body
       io.close
       [-1, {}, []]
     end
