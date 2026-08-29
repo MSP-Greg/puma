@@ -96,29 +96,27 @@ class TestPumaServer < PumaTest
   end
 
   def test_file_body
-    random_bytes = SecureRandom.random_bytes(4096 * 32)
+    random_bytes = SecureRandom.random_bytes(1_024 * 128)
 
     tf = tempfile_create("test_file_body", random_bytes)
 
     server_run { |env| [200, {}, tf] }
 
-    body = send_http_read_resp_body "GET / HTTP/1.1\r\nHost: [::ffff:127.0.0.1]:#{@bind_port}\r\n\r\n"
+    body = send_http_read_body
 
     assert_equal random_bytes.bytesize, body.bytesize
     assert_equal random_bytes, body
-  ensure
-    tf&.close
   end
 
   def test_file_to_path
-    random_bytes = SecureRandom.random_bytes(4096 * 32)
+    random_bytes = SecureRandom.random_bytes(1_024 * 128)
 
     tf = tempfile_create("test_file_to_path", random_bytes)
-    path = tf.path
+    tf.close
 
     obj = Object.new
-    obj.singleton_class.send(:define_method, :to_path) { path }
-    obj.singleton_class.send(:define_method, :each) { path } # dummy, method needs to exist
+    obj.singleton_class.send(:define_method, :to_path) { tf.path }
+    obj.singleton_class.send(:define_method, :each) { puts 'called each' } # dummy, method needs to exist
 
     server_run { |env| [200, {}, obj] }
 
@@ -126,8 +124,6 @@ class TestPumaServer < PumaTest
 
     assert_equal random_bytes.bytesize, body.bytesize
     assert_equal random_bytes, body
-  ensure
-    tf&.close
   end
 
   def test_pipe_body_http11
@@ -512,7 +508,8 @@ class TestPumaServer < PumaTest
 
     # Internal Server Error
     assert_equal "HTTP/1.0 500 #{STATUS_CODES[500]}", response.status
-    assert_match(/Puma caught this error: Oh no an error.*\(NoMethodError\).*test\/test_puma_server.rb/m, response)
+    assert_includes response, 'Puma caught this error: Oh no an error (NoMethodError)'
+    assert_includes response, 'TestPumaServer#test_lowlevel_error_message'
   end
 
   def test_lowlevel_error_message_without_backtrace
@@ -660,7 +657,7 @@ class TestPumaServer < PumaTest
   def test_idle_timeout_before_first_request
     server_run(idle_timeout: 1)
 
-    sleep 1.15
+    sleep 1.25
 
     assert @server.shutting_down?
 
@@ -727,9 +724,7 @@ class TestPumaServer < PumaTest
 
     socket << "hello world!"
 
-    response = socket.read_response
-
-    assert_equal "HTTP/1.1 200 OK", response.status
+    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
 
     sleep 0.5
 
@@ -741,17 +736,18 @@ class TestPumaServer < PumaTest
 
     socket << " world!"
 
-    response = socket.read_response
+    assert_equal "HTTP/1.1 200 OK", socket.read_response.status
 
-    assert_equal "HTTP/1.1 200 OK", response.status
+    sleep 1.5
 
-    sleep 1.15
+    assert @server.shutting_down?, 'Server is not shutting down'
 
-    assert @server.shutting_down?
+    sleep 0.25 if TRUFFLE
 
     assert socket.wait_readable(1), 'Unexpected timeout'
     assert_raises Errno::ECONNREFUSED do
-      send_http "POST / HTTP/1.1\r\nHost: test.com\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\n"
+      response = send_http("POST / HTTP/1.1\r\nHost: test.com\r\n" \
+        "Content-Type: text/plain\r\nContent-Length: 12\r\n\r\n").read_response
     end
   end
 
@@ -776,9 +772,9 @@ class TestPumaServer < PumaTest
 
     assert_equal "HTTP/1.1 200 OK", response.status
 
-    sleep 1.15
+    sleep 1.25
 
-    assert @server.shutting_down?
+    assert @server.shutting_down?, 'server is not shutting down'
 
     assert socket.wait_readable(1), 'Unexpected timeout'
     assert_raises Errno::ECONNREFUSED do
