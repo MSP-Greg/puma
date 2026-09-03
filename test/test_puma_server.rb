@@ -1220,6 +1220,49 @@ class TestPumaServer < PumaTest
     assert_equal "5", content_length
   end
 
+  def test_chunked_request_pause_after_last_chunk_1
+    body = nil
+    content_length = nil
+    server_run { |env|
+      body ||= env["rack.input"].read
+      content_length ||= env["CONTENT_LENGTH"]
+      [200, {}, [""]]
+    }
+
+    socket = send_http "GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\nHost: test.com\r\n\r\n0\r\n"
+
+    sleep 1
+
+    response = socket.send_http("X-Trailer: value\r\n\r\n#{GET_11}").read_all
+
+    assert_equal "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n" * 2, response
+    assert_equal "", body
+    assert_equal "0", content_length
+  end
+
+  def test_chunked_request_pause_after_last_chunk_2
+    body = nil
+    content_length = nil
+    server_run { |env|
+      body ||= env["rack.input"].read
+      content_length ||= env["CONTENT_LENGTH"]
+      [200, {}, [""]]
+    }
+
+    socket = send_http "GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\nHost: test.com\r\n\r\n" \
+    "5\r\nhello\r\n" \
+    "6\r\n\nworld\r\n0\r\n"
+
+    sleep 1
+
+    responses = socket.send_http("X-Trailer: value\r\n\r\n#{GET_11}").read_all
+
+    assert_equal "hello\nworld", body
+    assert_equal "11", content_length
+
+    assert_equal "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n" * 2, responses
+  end
+
   # See https://github.com/puma/puma/issues/3337 & https://github.com/puma/puma/pull/3338
   #
   def test_chunked_body_pause_within_chunk_size_hex
