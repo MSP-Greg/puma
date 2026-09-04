@@ -234,7 +234,6 @@ module TestPuma
           tcp = PumaTCPSocket.new ip, port.to_i
           tcp.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1) if SET_TCP_NODELAY
           if ctx
-            @ssl_socket_contexts << ctx if @ssl_socket_contexts
             PumaSSLSocket.new tcp, ctx
           else
             tcp
@@ -243,13 +242,15 @@ module TestPuma
           raise 'port or path must be set!'
         end
 
-      @ios_to_close << skt
       if ctx
         skt.session = session if session
         skt.sync_close = true
         skt.connect
       end
       skt
+    ensure
+      @ios_to_close << skt
+      @ssl_socket_contexts << ctx if ctx && @ssl_socket_contexts
     end
 
     # Creates an array of sockets, sending a request on each
