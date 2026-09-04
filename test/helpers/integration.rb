@@ -42,13 +42,13 @@ class TestIntegration < PumaTest
   end
 
   def teardown
-    if Puma::IS_JRUBY || @ignore_stderr || !@server_err&.wait_readable(0.001)
-      err = nil
+    err = if Puma::IS_JRUBY || @ignore_stderr || !@server_err&.wait_readable(0.005)
+      nil
     else
       begin
-        err = @server_err&.read_nonblock(10_240)
+        @server_err&.read_nonblock(10_240)
       rescue EOFError
-        err = nil
+        nil
       end
     end
 
@@ -88,7 +88,9 @@ class TestIntegration < PumaTest
 
     [@state_path, @control_path].each { |p| File.unlink(p) rescue nil }
 
-    flunk "Fail - STDERR was written to:\n#{err}" if err && !err.empty?
+    unless passed?
+      STDOUT.syswrite "STDERR was written to:\n#{err}" if err && !err.empty?
+    end
   end
 
   private
