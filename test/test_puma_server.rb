@@ -111,16 +111,11 @@ class TestPumaServer < PumaTest
   end
 
   def test_file_to_path
-    random_bytes = SecureRandom.random_bytes(4096 * 32)
+    random_bytes = "#{SecureRandom.random_bytes 4095}\n" * 8
 
-    tf = tempfile_create("test_file_to_path", random_bytes)
-    path = tf.path
+    tf = tempfile_create "test_file_to_path", random_bytes
 
-    obj = Object.new
-    obj.singleton_class.send(:define_method, :to_path) { path }
-    obj.singleton_class.send(:define_method, :each) { path } # dummy, method needs to exist
-
-    server_run { |env| [200, {}, obj] }
+    server_run { |_| [200, {}, tf] }
 
     body = send_http_read_resp_body
 
@@ -129,6 +124,25 @@ class TestPumaServer < PumaTest
   ensure
     tf&.close
   end
+
+  def test_large_file_greater_than_content_length
+    random_bytes = "#{SecureRandom.random_bytes 4095}\n" * 18 # 72k
+
+    tf = tempfile_create "test_file_to_path", random_bytes
+
+    cl = 1024 * 68
+
+    server_run { |_|
+      [200, {'content-length' => cl.to_s}, tf] }
+
+    resp = send_http_read_response
+
+    assert_includes resp.headers, "content-length: #{cl}"
+
+    assert_equal cl, resp.body.bytesize
+  end
+
+
 
   def test_pipe_body_http11
     random_bytes = SecureRandom.random_bytes(4096)
