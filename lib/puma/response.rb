@@ -161,7 +161,7 @@ module Puma
       if res_body.respond_to?(:each) && !resp_info[:response_hijack]
         # below converts app_body into body, dependent on app_body's characteristics, and
         # content_length will be set if it can be determined
-        if !content_length && !resp_info[:transfer_encoding] && status != 204
+        if content_length.nil? && resp_info[:transfer_encoding].nil? && status != 204
           if res_body.respond_to?(:to_ary) && (array_body = res_body.to_ary) &&
               array_body.is_a?(Array)
             body = array_body.compact
@@ -178,14 +178,15 @@ module Puma
             body = res_body
           end
         elsif !res_body.is_a?(::File) && res_body.respond_to?(:to_path) &&
-            (fn = res_body.to_path) && File.readable?(fn = res_body.to_path)
+            (fn = res_body.to_path) && File.readable?(fn)
+#            (fn = res_body.to_path) && File.readable?(fn = res_body.to_path)
           body = File.open fn, 'rb'
-          content_length = body.size
+          content_length ||= body.size
           close_body = true
         elsif !res_body.is_a?(::File) && res_body.respond_to?(:filename) &&
             res_body.respond_to?(:bytesize) && File.readable?(fn = res_body.filename)
           # Sprockets::Asset
-          content_length = res_body.bytesize unless content_length
+          content_length ||= res_body.bytesize
           if (body_str = res_body.to_hash[:source])
             body = [body_str]
           else                           # avoid each and use a File object
@@ -281,7 +282,7 @@ module Puma
     # @param body [Enumerable, File] the body object
     # @param io_buffer [Puma::IOBuffer] contains headers
     # @param chunked [Boolean]
-    # @paramn content_length [Integer
+    # @paramn content_length [Integer]
     # @raise [ConnectionError]
     #
     def fast_write_response(socket, body, io_buffer, chunked, content_length)
