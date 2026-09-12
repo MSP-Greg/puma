@@ -37,7 +37,7 @@ class TestIntegrationPumactl < TestIntegration
     skip_unless :unix
     stderr = Tempfile.new(%w(stderr .log))
 
-    cli_server "-q test/rackup/sleep.ru #{set_pumactl_args unix: true} -S #{@state_path}",
+    cli_server "-q #{set_pumactl_args unix: true} -S #{@state_path} test/rackup/hello.ru",
       config: "stdout_redirect nil, '#{stderr.path}'",
       unix: true
 
